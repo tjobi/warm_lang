@@ -4,7 +4,7 @@ using WarmLangLexerParser;
 Console.WriteLine("Something something compiler: ");
 
 var lexer = new Lexer();
-var tokens = lexer.ParseTextFile("test.test");
+var tokens = lexer.Lex("test.test");
 
 foreach(var token in tokens)
 {

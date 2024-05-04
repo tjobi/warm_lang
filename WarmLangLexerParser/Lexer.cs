@@ -5,7 +5,7 @@ public class Lexer
 {
     public Lexer() { }
 
-    public IList<SyntaxToken> ParseTextFile(string filePath)
+    public IList<SyntaxToken> Lex(string filePath)
     {
         StreamReader sr = new(filePath);
         IList<SyntaxToken> tokens = new List<SyntaxToken>();
