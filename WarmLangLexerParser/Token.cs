@@ -1,5 +1,5 @@
 namespace WarmLangLexerParser;
-
+//tokens haha
 public enum Token
 {
     TInt, TVariableName, TConst, TEqual, TSemiColon, TPlus, TNumber, TEOF, TNewLine,
