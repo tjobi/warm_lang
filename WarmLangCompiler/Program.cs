@@ -3,7 +3,7 @@ using WarmLangLexerParser.AST;
 
 //Console.WriteLine("Something something compiler: ");
 
-var program = "test1.test";
+var program = "test.test";
 var lexer = new Lexer();
 var tokens = lexer.Lex(program);
 
