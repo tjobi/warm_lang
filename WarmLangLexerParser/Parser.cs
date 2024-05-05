@@ -34,10 +34,31 @@ public class Parser
         {
             return NextToken();
         }
-        throw new Exception("What happens here?");
+        return tokens[tokens.Count-1];
     }
 
-    public ExpressionNode Parse()
+    public ASTNode Parse()
+    {
+        var children = new List<ASTNode>();
+        ASTNode left = new BlockStatement(children);
+        while(Current.Kind != TEOF)
+        {
+            switch(Current.Kind)
+            {
+                case TSemiColon: {
+                    NextToken();
+                } break;
+                default: {
+                    children.Add(ParseExpression());
+                } break;
+            }
+        }
+        //Our language should finish parsing with an End Of File, no?
+        var _ = MatchKind(TEOF);
+        return left;
+    }
+
+    private ExpressionNode ParseExpression()
     {
         ExpressionNode left = ParsePrimaryExpression();
         while(Current.Kind != TEOF)
@@ -56,15 +77,15 @@ public class Parser
                     };
                     left = new BinaryExpressionNode(left, binOp, right);
                 } break;
-                
+                case TSemiColon: { // Verryyyy hacky... ;(
+                    return left;
+                }
                 default: {
                     throw new NotImplementedException($"not yet implemented {Current.Kind}");
                 }
             }
             
         }
-        //Our language should finish parsing with an End Of File, no?
-        var _ = MatchKind(TEOF);
         return left;
     }
 
@@ -75,10 +96,26 @@ public class Parser
             case TConst: {
                 return ParseConstExpression();
             }
+            case TInt: { //Variable binding : int x = 2;
+                return ParseVariableBindingExpression();
+            }
+            case TIdentifier: { //About to use a variable : x + 4
+                var identToken = NextToken();
+                return new VarExpression(identToken.Name!);
+            }
             default: {
                 return null!;
             }
         }
+    }
+
+    private ExpressionNode ParseVariableBindingExpression()
+    {
+        var type = MatchKind(TInt);
+        var name = MatchKind(TIdentifier);
+        var _ = NextToken(); // throw away the '='
+        var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
+        return new VarBindingExpression(type.Kind, name.Name!, rhs);
     }
 
     private ExpressionNode ParseConstExpression()

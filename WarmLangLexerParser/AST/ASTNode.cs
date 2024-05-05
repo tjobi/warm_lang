@@ -7,3 +7,5 @@ public abstract class ASTNode
 }
 
 public abstract class ExpressionNode : ASTNode { }
+
+public abstract class StatementNode : ASTNode { }

@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using static WarmLangLexerParser.TokenKind;
+﻿using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
 public class Lexer
@@ -25,7 +24,7 @@ public class Lexer
                     "*" => new SyntaxToken(TStar),
                     "int" => new SyntaxToken(TInt),
                     _ when int.TryParse(token, out var number) => new SyntaxToken(TConst, null, number),
-                    _ => new SyntaxToken(TVariableName, token, 0) 
+                    _ => new SyntaxToken(TIdentifier, token, 0) 
                 };
                 tokens.Add(syntaxToken);
             }

@@ -3,9 +3,10 @@ namespace WarmLangLexerParser;
 public enum TokenKind
 {
     TInt, TConst,
-    TVariableName, 
-    TSemiColon, TNewLine, TEOF, 
-    TEqual, TPlus, TStar
+    TIdentifier, //Variable names, function names...
+    TSemiColon, TNewLine, TEOF,
+    TEqual, TPlus, TStar, 
+    TBlock,
 }
 
 public record SyntaxToken 
