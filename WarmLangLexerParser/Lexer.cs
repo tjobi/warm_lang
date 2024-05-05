@@ -1,4 +1,4 @@
-﻿using static WarmLangLexerParser.Token;
+﻿using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
 public class Lexer
@@ -42,6 +42,7 @@ public class Lexer
                 }
             }
         }
+        tokens.Add(new SyntaxToken(){Kind = TEOF});
         return tokens;
     }
 }
