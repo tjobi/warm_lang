@@ -1,5 +1,4 @@
-﻿using static WarmLangLexerParser.TokenKind;
-using WarmLangLexerParser;
+﻿using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 
 //Console.WriteLine("Something something compiler: ");
@@ -15,22 +14,26 @@ var tokens = lexer.Lex(program);
 
 var parser = new Parser(tokens);
 ExpressionNode root = parser.Parse();
+Console.WriteLine($"Parsed:\n\t{root}");
 Console.WriteLine($"Evaluating {program} -> {Evaluate(root)}");
 
-static int Evaluate(ExpressionNode root)
+static int Evaluate(ExpressionNode node)
 {
-    switch(root)
+    switch(node)
     {
         case ConstExpression c: {
             return c.Value;
         }
         case BinaryExpressionNode cur: {
-            var left = Evaluate(cur.Right);
+            var left = Evaluate(cur.Left);
             var right = Evaluate(cur.Right);
             switch(cur.Operation)
             {
                 case "+": {
                     return left + right;
+                }
+                case "*": {
+                    return left * right;
                 }
                 default: {
                     throw new NotImplementedException($"Operation {cur.Operation} is not yet defined");
@@ -38,7 +41,7 @@ static int Evaluate(ExpressionNode root)
             }
         }
         default: {
-            throw new NotImplementedException($"Unsupported Expression: {root.GetType()}");
+            throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");
         }
     }
 }

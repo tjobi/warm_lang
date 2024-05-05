@@ -10,4 +10,7 @@ public sealed class ConstExpression : ExpressionNode
     {
         Value = value;
     }
+
+    public override string ToString() => $"CstI {Value}";
+    
 }

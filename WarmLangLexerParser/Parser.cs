@@ -8,16 +8,19 @@ public class Parser
     private readonly IList<SyntaxToken> tokens;
     private int currentToken;
     
-    private SyntaxToken Current => Peek();
     public Parser(IList<SyntaxToken> tokens)
     {
         this.tokens = tokens;
         currentToken = 0;
     }
 
-    private SyntaxToken Peek()
+    private SyntaxToken Current => Peek(0);
+    private SyntaxToken Peek(int offset)
     {
-        return tokens[currentToken];
+        var index = currentToken + offset;
+        if(index >= tokens.Count)
+            return tokens[index];
+        return tokens[index];
     }
 
     private SyntaxToken NextToken()
@@ -39,17 +42,23 @@ public class Parser
         ExpressionNode left = ParsePrimaryExpression();
         while(Current.Kind != TEOF)
         {
-            var next = NextToken();
-            switch(next.Kind)
+            switch(Current.Kind)
             {
-                case TPlus: {
-                    //Meaning next is a TPlus -> "+"
-                    var right = ParseConstExpression();
-
-                    left = new BinaryExpressionNode(left, "+", right);
+                case TStar:     //Meaning next token is a "*"
+                case TPlus: {   //Meaning next token is a "+" 
+                    var operatorToken = NextToken();
+                    var precedence = operatorToken.Kind.GetBinaryPrecedence();
+                    var right = ParseBinaryExpression(precedence);
+                    var binOp = operatorToken.Kind switch {
+                        TPlus => "+",
+                        TStar => "*",
+                        _ => throw new NotImplementedException($"{Current.Kind} is not yet supported!")
+                    };
+                    left = new BinaryExpressionNode(left, binOp, right);
                 } break;
+                
                 default: {
-                    throw new NotImplementedException($"not yet implemented {next}");
+                    throw new NotImplementedException($"not yet implemented {Current.Kind}");
                 }
             }
             
@@ -76,5 +85,27 @@ public class Parser
     {
         var token = NextToken();
         return new ConstExpression(token.IntValue!.Value);
+    }
+
+    private ExpressionNode ParseBinaryExpression(int parentPrecedence = 0)
+    {
+        ExpressionNode left = ParsePrimaryExpression();
+        while(true)
+        {
+            var precedence = Current.Kind.GetBinaryPrecedence();
+            if(precedence == -1 || precedence <= parentPrecedence) 
+            {
+                break;
+            }
+            var operatorToken = NextToken();
+            var binOp = operatorToken.Kind switch {
+                TPlus => "+",
+                TStar => "*",
+                _ => throw new NotImplementedException($"{Current.Kind} is not yet supported!")
+            };
+            var right = ParseBinaryExpression(precedence);
+            left = new BinaryExpressionNode(left, binOp, right);
+        }
+        return left;
     }
 }

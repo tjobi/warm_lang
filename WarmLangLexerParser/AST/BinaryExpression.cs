@@ -17,4 +17,11 @@ public class BinaryExpressionNode : ExpressionNode
         //TODO:
         _kind = TokenKind.TPlus;
     }
+
+    public override string ToString()
+    {
+        var leftStr = Left.ToString();
+        var rightStr = Right.ToString();
+        return $"({leftStr} {Operation} {rightStr})";
+    }
 }

@@ -1,4 +1,5 @@
-﻿using static WarmLangLexerParser.TokenKind;
+﻿using System.Diagnostics.CodeAnalysis;
+using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
 public class Lexer
@@ -14,35 +15,22 @@ public class Lexer
         {
             string[] toTokenize = line.Split(" ");
 
-            foreach(var elm in toTokenize)
+            foreach(var token in toTokenize)
             {
-                switch(elm) 
+                var syntaxToken = token switch
                 {
-                    case ";": {
-                        tokens.Add(new SyntaxToken(){Kind=TSemiColon});
-                    } break;
-                    case "=": {
-                        tokens.Add(new SyntaxToken(){Kind=TEqual});
-                    } break;
-                    case "int": {
-                        tokens.Add(new SyntaxToken(){Kind=TInt});
-                    } break;
-                    case "+": {
-                        tokens.Add(new SyntaxToken(){Kind=TPlus});
-                    } break;
-                    default: {
-                        if(int.TryParse(elm, out var number))
-                        {
-                            tokens.Add(new SyntaxToken(){Kind=TConst, IntValue = number});
-                        } else
-                        {
-                            tokens.Add(new SyntaxToken(){Kind=TVariableName, Name = elm});
-                        }
-                    } break;
-                }
+                    ";" => new SyntaxToken(TSemiColon),
+                    "=" => new SyntaxToken(TEqual),
+                    "+" => new SyntaxToken(TPlus),
+                    "*" => new SyntaxToken(TStar),
+                    "int" => new SyntaxToken(TInt),
+                    _ when int.TryParse(token, out var number) => new SyntaxToken(TConst, null, number),
+                    _ => new SyntaxToken(TVariableName, token, 0) 
+                };
+                tokens.Add(syntaxToken);
             }
         }
-        tokens.Add(new SyntaxToken(){Kind = TEOF});
+        tokens.Add(new(TEOF));
         return tokens;
     }
 }
