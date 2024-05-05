@@ -1,19 +1,18 @@
 ﻿using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 
-//Console.WriteLine("Something something compiler: ");
-
 var program = "test.test";
+if (args.Length > 0)
+{
+    program = args[0];
+}
+
 var lexer = new Lexer();
 var tokens = lexer.Lex(program);
 
-// foreach(var token in tokens)
-// {
-//     Console.WriteLine(token);
-// }
-
 var parser = new Parser(tokens);
 ASTNode root = parser.Parse();
+
 Console.WriteLine($"Parsed:\n\t{root}");
 
 var env = new Dictionary<string,int>();
@@ -52,6 +51,9 @@ static int Evaluate(ASTNode node, Dictionary<string,int> env)
         }
         case VarExpression var: {
             return env[var.Name];
+        }
+        case ExprStatement expr: {
+            return Evaluate(expr.Expression, env);
         }
         case BlockStatement block: {
             var expressions = block.Children;

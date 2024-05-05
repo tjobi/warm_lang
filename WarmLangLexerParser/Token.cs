@@ -6,7 +6,7 @@ public enum TokenKind
     TIdentifier, //Variable names, function names...
     TSemiColon, TNewLine, TEOF,
     TEqual, TPlus, TStar, 
-    TBlock,
+    TBlock, TCurLeft, TCurRight
 }
 
 public record SyntaxToken 

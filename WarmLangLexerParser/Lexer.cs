@@ -23,6 +23,8 @@ public class Lexer
                     "+" => new SyntaxToken(TPlus),
                     "*" => new SyntaxToken(TStar),
                     "int" => new SyntaxToken(TInt),
+                    "{" => new SyntaxToken(TCurLeft),
+                    "}" => new SyntaxToken(TCurRight),
                     _ when int.TryParse(token, out var number) => new SyntaxToken(TConst, null, number),
                     _ => new SyntaxToken(TIdentifier, token, 0) 
                 };

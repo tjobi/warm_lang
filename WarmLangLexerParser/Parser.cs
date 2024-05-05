@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Text.RegularExpressions;
 using WarmLangLexerParser.AST;
 using static WarmLangLexerParser.TokenKind;
 
@@ -15,6 +17,7 @@ public class Parser
     }
 
     private SyntaxToken Current => Peek(0);
+    private bool NotEndOfFile => Current.Kind != TEOF;
     private SyntaxToken Peek(int offset)
     {
         var index = currentToken + offset;
@@ -39,29 +42,50 @@ public class Parser
 
     public ASTNode Parse()
     {
-        var children = new List<ASTNode>();
-        ASTNode left = new BlockStatement(children);
-        while(Current.Kind != TEOF)
-        {
-            switch(Current.Kind)
-            {
-                case TSemiColon: {
-                    NextToken();
-                } break;
-                default: {
-                    children.Add(ParseExpression());
-                } break;
-            }
-        }
+        ASTNode left = ParseStatement();
         //Our language should finish parsing with an End Of File, no?
         var _ = MatchKind(TEOF);
         return left;
     }
 
+    private StatementNode ParseStatement()
+    {
+        return ParseBlockStatement();
+        //TODO: The code below only becomes relevant when we have an entry point!! 
+        // return Current.Kind switch 
+        // {
+        //     TCurLeft => ParseBlockStatement(),
+        //     _ => ParseExpressionStatement()
+        // };
+    }
+
+    private StatementNode ParseBlockStatement()
+    {
+        var statements = new List<StatementNode>();
+        //TODO: The commented code becomes relevant when we have an entry point!!
+        //var curLeftToken = MatchKind(TCurLeft);
+        while( NotEndOfFile && Current.Kind != TCurRight)
+        {
+            //var statement = ParseStatement(); 
+            var statement = ParseExpressionStatement();
+            statements.Add(statement);
+        }
+        //var curRightToken = MatchKind(TCurRight);
+        return new BlockStatement(statements);
+    }
+    private StatementNode ParseExpressionStatement()
+    {
+        //Lifts an expression to a statement, x + 5;
+        // the semicolon makes it a statement.
+        var expr = ParseExpression();
+        var semiColonToken = MatchKind(TSemiColon);
+        return new ExprStatement(expr);
+    }
+
     private ExpressionNode ParseExpression()
     {
         ExpressionNode left = ParsePrimaryExpression();
-        while(Current.Kind != TEOF)
+        while(NotEndOfFile)
         {
             switch(Current.Kind)
             {

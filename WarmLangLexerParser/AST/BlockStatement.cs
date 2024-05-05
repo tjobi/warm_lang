@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 
 namespace WarmLangLexerParser.AST;
@@ -6,11 +7,11 @@ public sealed class BlockStatement : StatementNode
 {
     public override TokenKind Kind => TokenKind.TBlock;
 
-    public IList<ASTNode> Children { get; }
+    public ImmutableList<StatementNode> Children { get; }
 
-    public BlockStatement(IList<ASTNode> children)
+    public BlockStatement(IList<StatementNode> children)
     {
-        Children = children;
+        Children = children.ToImmutableList();
     }
 
     public override string ToString()
