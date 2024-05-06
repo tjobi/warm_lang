@@ -43,7 +43,7 @@ static int Evaluate(ASTNode node, Dictionary<string,int> env)
             }
         
         }
-        case VarBindingExpression binding: {
+        case VarDeclarationExpression binding: {
             var name = binding.Name;
             var value = Evaluate(binding.RightHandSide, env);
             env[name] = value;

@@ -1,6 +1,6 @@
 namespace WarmLangLexerParser.AST;
 
-public sealed class VarBindingExpression : ExpressionNode
+public sealed class VarDeclarationExpression : ExpressionNode
 {
     private readonly TokenKind _kind;
     public override TokenKind Kind => _kind;
@@ -8,7 +8,7 @@ public sealed class VarBindingExpression : ExpressionNode
     public string Name { get; }
     public ExpressionNode RightHandSide { get; }
 
-    public VarBindingExpression(TokenKind type, string name, ExpressionNode rightHandSide)
+    public VarDeclarationExpression(TokenKind type, string name, ExpressionNode rightHandSide)
     {
         _kind = type;
         Name = name;

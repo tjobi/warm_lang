@@ -137,7 +137,7 @@ public class Parser
         var name = MatchKind(TIdentifier);
         var _ = NextToken(); // throw away the '='
         var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
-        return new VarBindingExpression(type.Kind, name.Name!, rhs);
+        return new VarDeclarationExpression(type.Kind, name.Name!, rhs);
     }
 
     private ExpressionNode ParseConstExpression()
