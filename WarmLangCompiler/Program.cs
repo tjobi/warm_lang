@@ -6,6 +6,11 @@ var program = "test.test";
 if (args.Length > 0)
 {
     program = args[0];
+    if (!File.Exists(program))
+    {
+        Console.WriteLine("Failed: Given an non-existing filepath");
+        return 2;
+    }
 }
 
 var lexer = new Lexer();
@@ -17,8 +22,14 @@ ASTNode root = parser.Parse();
 Console.WriteLine($"Parsed:\n\t{root}");
 
 var env = ImmutableDictionary.Create<string,int>();
-var (returned, _) = Evaluate(root, env);
-Console.WriteLine($"Evaluating {program} -> {returned}");
+try {
+    var (returned, _) = Evaluate(root, env);
+    Console.WriteLine($"Evaluating {program} -> {returned}");
+} catch (Exception e)
+{
+    Console.WriteLine(e.Message);
+    return 1;
+}
 
 
 static (int, ImmutableDictionary<string,int>) Evaluate(ASTNode node, ImmutableDictionary<string,int> env)
@@ -59,17 +70,21 @@ static (int, ImmutableDictionary<string,int>) Evaluate(ASTNode node, ImmutableDi
         }
         case BlockStatement block: {
             var expressions = block.Children;
+            var nenv = env;
             for (int i = 0; i < expressions.Count-1; i++)
             {
                 var expr = expressions[i];
-                var (val, nenv) = Evaluate(expr, env);
-                env = nenv;
+                var (_, nenv2) = Evaluate(expr, nenv);
+                nenv = nenv2;
             }
             var last = expressions[^1];
-            return Evaluate(last, env);
+            var (lastValue, _) = Evaluate(last, nenv);
+            return (lastValue, env); //Return an unaltered environment.
         }
         default: {
             throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");
         }
     }
 }
+
+return 0;
