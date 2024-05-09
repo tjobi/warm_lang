@@ -40,35 +40,42 @@ public class Parser
 
     public ASTNode Parse()
     {
-        ASTNode left = ParseStatement();
+        ASTNode left = ParseEntry();
         //Our language should finish parsing with an End Of File, no?
         var _ = MatchKind(TEOF);
         return left;
     }
 
+    public StatementNode ParseEntry()
+    {
+        var statements = new List<StatementNode>();
+        while( NotEndOfFile && Current.Kind != TCurRight)
+        {
+            var statement = ParseStatement(); 
+            statements.Add(statement);
+        }
+        return new BlockStatement(statements);
+    }
+
     private StatementNode ParseStatement()
     {
-        return ParseBlockStatement();
-        //TODO: The code below only becomes relevant when we have an entry point!! 
-        // return Current.Kind switch 
-        // {
-        //     TCurLeft => ParseBlockStatement(),
-        //     _ => ParseExpressionStatement()
-        // };
+        return Current.Kind switch 
+        {
+            TCurLeft => ParseBlockStatement(),
+            _ => ParseExpressionStatement()
+        };
     }
 
     private StatementNode ParseBlockStatement()
     {
         var statements = new List<StatementNode>();
-        //TODO: The commented code becomes relevant when we have an entry point!!
-        //var curLeftToken = MatchKind(TCurLeft);
+        var curLeftToken = MatchKind(TCurLeft);
         while( NotEndOfFile && Current.Kind != TCurRight)
         {
-            //var statement = ParseStatement(); 
-            var statement = ParseExpressionStatement();
+            var statement = ParseStatement();
             statements.Add(statement);
         }
-        //var curRightToken = MatchKind(TCurRight);
+        var curRightToken = MatchKind(TCurRight);
         return new BlockStatement(statements);
     }
     private StatementNode ParseExpressionStatement()

@@ -12,7 +12,7 @@ public class Lexer
         
         for(var line = sr.ReadLine(); line != null; line = sr.ReadLine())
         {
-            string[] toTokenize = line.Split(" ");
+            string[] toTokenize = line.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             foreach(var token in toTokenize)
             {
