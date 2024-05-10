@@ -8,6 +8,7 @@ public enum TokenKind
     TSemiColon, TNewLine, TEOF,
     TEqual, TPlus, TStar, 
     TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
+    TAssign, //Assignment x = 10;
 }
 
 public record SyntaxToken 

@@ -51,7 +51,6 @@ static (int, ImmutableDictionary<string,int>) Evaluate(ASTNode node, ImmutableDi
             }
             return (value, env);
         }
-
         case BinaryExpressionNode cur: {
             var (left, leftEnv) = Evaluate(cur.Left, env);
             var (right, resEnv) = Evaluate(cur.Right, leftEnv);
@@ -69,6 +68,14 @@ static (int, ImmutableDictionary<string,int>) Evaluate(ASTNode node, ImmutableDi
             var (value, eEnv) = Evaluate(binding.RightHandSide, env);
             var nextEnv = eEnv.Add(name, value);
             return (value, nextEnv);
+        }
+        case VarAssignmentExpression assignment: {
+            var name = assignment.Name;
+            var (value, eEnv) = Evaluate(assignment.RightHandSide, env);
+            return (value, eEnv.SetItem(name, value)); 
+            //Use eEnv because in the future we may want to allow something like
+            // var x = 10; var y = 5; x = y++;
+            // which would update both x and y.
         }
         case ExprStatement expr: {
             return Evaluate(expr.Expression, env);

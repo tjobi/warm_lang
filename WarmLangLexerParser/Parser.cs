@@ -87,7 +87,25 @@ public class Parser
         return new ExprStatement(expr);
     }
 
-    private ExpressionNode ParseExpression() => ParseBinaryExpression();
+    private ExpressionNode ParseExpression() => ParseVariableAssignmentExpression();
+
+    private ExpressionNode ParseVariableAssignmentExpression()
+    {
+        if(Current.Kind == TIdentifier)
+        {
+            switch(Peek(1).Kind) //Look ahead to next token, x = (<--) 5, look for a '=' 
+            {
+                case TEqual: {
+                    var nameToken = NextToken();
+                    var equalToken = NextToken();
+                    var rightHandSide = ParseBinaryExpression();
+                    return new VarAssignmentExpression(nameToken, rightHandSide);
+                }
+            }
+        }
+
+        return ParseBinaryExpression();
+    }
 
     private ExpressionNode ParseBinaryExpression(int parentPrecedence = 0)
     {
