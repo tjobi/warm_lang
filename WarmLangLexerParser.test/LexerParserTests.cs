@@ -164,7 +164,7 @@ public class LexerParserTests
     }
 
     [Fact]
-    public void TestLexerIfStatement()
+    public void TestLexerIfThenElseStatement()
     {
         string input = "if 0 then 2; else 5;";
         var expected = new List<SyntaxToken>()
@@ -187,7 +187,7 @@ public class LexerParserTests
     }
 
     [Fact]
-    public void TestLexerParserIfStatement()
+    public void TestLexerParserIfThenElseStatement()
     {
         string input = "if 0 then 2; else 5;";
         var expected = new BlockStatement(new List<StatementNode>()
@@ -196,6 +196,26 @@ public class LexerParserTests
                 new ConstExpression(0),
                 new ExprStatement(new ConstExpression(2)),
                 new ExprStatement(new ConstExpression(5))
+            )
+        });
+
+        var lexer = GetLexer(input);
+        var tokens = lexer.Lex();
+        var res = new Parser(tokens).Parse();
+
+        res.Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public void TestLexerParserIfThenStatement()
+    {
+        string input = "if 0 then 2;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new IfStatement(
+                new ConstExpression(0),
+                new ExprStatement(new ConstExpression(2)),
+                null
             )
         });
 

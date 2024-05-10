@@ -77,10 +77,13 @@ public static class WarmLangInterpreter
             }
             case IfStatement ifstmnt: {
                 var (condValue, cEnv) = Evaluate(ifstmnt.Condition, env);
-                var (value, nEnv) = Evaluate(
-                    condValue != 0 ? ifstmnt.Then : ifstmnt.Else,
-                    cEnv 
-                );
+                var doThenBranch = condValue != 0;
+                if(!doThenBranch && ifstmnt.Else is null)
+                {
+                    //What to return in this case?
+                    return (0, cEnv);
+                }
+                var (value, nEnv) = Evaluate(doThenBranch ? ifstmnt.Then : ifstmnt.Else!, cEnv);
                 return (value, nEnv);
             }
             default: {

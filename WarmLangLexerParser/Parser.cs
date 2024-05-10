@@ -74,6 +74,10 @@ public class Parser
         var thenToken = MatchKind(TThen);
         var thenStmnt = ParseStatement();
         var elseToken = MatchKind(TElse);
+        if (elseToken.Kind != TElse) //Could be an EOF if the statement looks like "if <cond> then <stmnt>"
+        {
+            return new IfStatement(condition, thenStmnt, null);
+        }
         var elseStmnt = ParseStatement();
         return new IfStatement(condition, thenStmnt, elseStmnt);
     }

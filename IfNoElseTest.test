@@ -1,0 +1,3 @@
+var x = 10;
+if 1 then x = x + 20;
+x;
