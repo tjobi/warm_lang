@@ -1,0 +1,13 @@
+var x = 5;
+var z = 1;
+if z then {
+    var g  = 10;
+    if 0 + g then
+        x = x + 25;
+    else
+        z = x + 5; 
+}
+else 
+    x = 25;
+if z then x + g;
+else x;

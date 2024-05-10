@@ -28,7 +28,7 @@ public static class WarmLangInterpreter
                 var hasFailed = !env.TryGetValue(var.Name, out var value);
                 if(hasFailed)
                 {
-                    throw new Exception($"Failed: Variable {var.Name} is out of scope.");
+                    throw new Exception($"Failed: Variable {var.Name} has not been declared.");
                 }
                 return (value, env);
             }
@@ -71,8 +71,17 @@ public static class WarmLangInterpreter
                     nenv = nenv2;
                 }
                 var last = expressions[^1];
-                var (lastValue, _) = Evaluate(last, nenv);
-                return (lastValue, env); //Return an unaltered environment - to throw away any variables declared in block.
+                
+                var (lastValue, fEnv) = Evaluate(last, nenv);
+                return (lastValue, fEnv); //Return an unaltered environment - to throw away any variables declared in block.
+            }
+            case IfStatement ifstmnt: {
+                var (condValue, cEnv) = Evaluate(ifstmnt.Condition, env);
+                var (value, nEnv) = Evaluate(
+                    condValue != 0 ? ifstmnt.Then : ifstmnt.Else,
+                    cEnv 
+                );
+                return (value, nEnv);
             }
             default: {
                 throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");

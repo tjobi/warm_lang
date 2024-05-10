@@ -145,6 +145,9 @@ public class Lexer
         var name = sb.ToString();
         return name switch 
         {
+            "if" => SyntaxToken.MakeToken(TIf, row, col),
+            "then" => SyntaxToken.MakeToken(TThen, row, col),
+            "else" => SyntaxToken.MakeToken(TElse, row, col),
             "var" => SyntaxToken.MakeToken(TVar, row, col),
             _ => SyntaxToken.MakeToken(TIdentifier, row, col, name: name)
         };

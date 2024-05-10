@@ -62,8 +62,20 @@ public class Parser
         return Current.Kind switch 
         {
             TCurLeft => ParseBlockStatement(),
+            TIf => ParseIfStatement(),
             _ => ParseExpressionStatement()
         };
+    }
+
+    private StatementNode ParseIfStatement()
+    {
+        var ifToken   = MatchKind(TIf);
+        var condition = ParseExpression();
+        var thenToken = MatchKind(TThen);
+        var thenStmnt = ParseStatement();
+        var elseToken = MatchKind(TElse);
+        var elseStmnt = ParseStatement();
+        return new IfStatement(condition, thenStmnt, elseStmnt);
     }
 
     private StatementNode ParseBlockStatement()

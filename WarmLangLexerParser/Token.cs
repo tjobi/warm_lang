@@ -9,6 +9,7 @@ public enum TokenKind
     TEqual, TPlus, TStar, 
     TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
     TAssign, //Assignment x = 10;
+    TIfStmnt, TIf, TThen, TElse //To allow if <cond> then <statement> else <statement>
 }
 
 public record SyntaxToken 

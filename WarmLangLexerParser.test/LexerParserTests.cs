@@ -162,4 +162,47 @@ public class LexerParserTests
 
         res.Should().BeEquivalentTo(expected);
     }
+
+    [Fact]
+    public void TestLexerIfStatement()
+    {
+        string input = "if 0 then 2; else 5;";
+        var expected = new List<SyntaxToken>()
+        {
+            MakeToken(TIf,0,2),
+            MakeToken(TConst,0,4, intValue:0),
+            MakeToken(TThen,0,9),
+            MakeToken(TConst,0,11,intValue:2),
+            MakeToken(TSemiColon,0,11),
+            MakeToken(TElse,0,17),
+            MakeToken(TConst,0,19,intValue:5),
+            MakeToken(TSemiColon,0,19),
+            MakeToken(TEOF, 1,0)
+        };
+
+        var lexer = GetLexer(input);
+        var tokens = lexer.Lex();
+
+        tokens.Should().ContainInOrder(expected);
+    }
+
+    [Fact]
+    public void TestLexerParserIfStatement()
+    {
+        string input = "if 0 then 2; else 5;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new IfStatement(
+                new ConstExpression(0),
+                new ExprStatement(new ConstExpression(2)),
+                new ExprStatement(new ConstExpression(5))
+            )
+        });
+
+        var lexer = GetLexer(input);
+        var tokens = lexer.Lex();
+        var res = new Parser(tokens).Parse();
+
+        res.Should().BeEquivalentTo(expected);
+    }
 }
