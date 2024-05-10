@@ -4,11 +4,11 @@ using static SyntaxToken;
 using static TokenKind;
 
 
-public class LexerTests
+public class LexerParserTests
 { 
     private readonly IFileReader _reader;
 
-    public LexerTests()
+    public LexerParserTests()
     {
         _reader = Substitute.For<IFileReader>();
     }
