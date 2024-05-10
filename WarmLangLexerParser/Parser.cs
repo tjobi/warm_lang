@@ -20,7 +20,7 @@ public class Parser
     {
         var index = currentToken + offset;
         if(index >= tokens.Count)
-            return tokens[index];
+            return tokens[^1];
         return tokens[index];
     }
 
@@ -69,13 +69,13 @@ public class Parser
     private StatementNode ParseBlockStatement()
     {
         var statements = new List<StatementNode>();
-        var curLeftToken = MatchKind(TCurLeft);
+        var _ = MatchKind(TCurLeft);
         while( NotEndOfFile && Current.Kind != TCurRight)
         {
             var statement = ParseStatement();
             statements.Add(statement);
         }
-        var curRightToken = MatchKind(TCurRight);
+        var __ = MatchKind(TCurRight);
         return new BlockStatement(statements);
     }
     private StatementNode ParseExpressionStatement()
@@ -87,71 +87,7 @@ public class Parser
         return new ExprStatement(expr);
     }
 
-    private ExpressionNode ParseExpression()
-    {
-        ExpressionNode left = ParsePrimaryExpression();
-        while(NotEndOfFile)
-        {
-            switch(Current.Kind)
-            {
-                case TStar:     //Meaning next token is a "*"
-                case TPlus: {   //Meaning next token is a "+" 
-                    var operatorToken = NextToken();
-                    var precedence = operatorToken.Kind.GetBinaryPrecedence();
-                    var right = ParseBinaryExpression(precedence);
-                    var binOp = operatorToken.Kind switch {
-                        TPlus => "+",
-                        TStar => "*",
-                        _ => throw new NotImplementedException($"{Current.Kind} is not yet supported!")
-                    };
-                    left = new BinaryExpressionNode(left, binOp, right);
-                } break;
-                case TSemiColon: { // Verryyyy hacky... ;(
-                    return left;
-                }
-                default: {
-                    throw new NotImplementedException($"not yet implemented {Current.Kind}");
-                }
-            }
-            
-        }
-        return left;
-    }
-
-    private ExpressionNode ParsePrimaryExpression()
-    {
-        switch(Current.Kind)
-        {
-            case TConst: {
-                return ParseConstExpression();
-            }
-            case TVar: { //Variable binding : var x = 2;
-                return ParseVariableBindingExpression();
-            }
-            case TIdentifier: { //About to use a variable : x + 4
-                var identToken = NextToken();
-                return new VarExpression(identToken.Name!);
-            }
-            default: {
-                return null!;
-            }
-        }
-    }
-
-    private ExpressionNode ParseVariableBindingExpression()
-    {
-        var type = MatchKind(TVar);
-        var name = MatchKind(TIdentifier);
-        var _ = NextToken(); // throw away the '='
-        var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
-        return new VarDeclarationExpression(type.Kind, name.Name!, rhs);
-    }
-
-    private ExpressionNode ParseConstExpression()
-    {
-        var token = NextToken();
-        return new ConstExpression(token.IntValue!.Value);
-    }
+    private ExpressionNode ParseExpression() => ParseBinaryExpression();
 
     private ExpressionNode ParseBinaryExpression(int parentPrecedence = 0)
     {
@@ -164,14 +100,55 @@ public class Parser
                 break;
             }
             var operatorToken = NextToken();
-            var binOp = operatorToken.Kind switch {
-                TPlus => "+",
-                TStar => "*",
-                _ => throw new NotImplementedException($"{Current.Kind} is not yet supported!")
-            };
             var right = ParseBinaryExpression(precedence);
-            left = new BinaryExpressionNode(left, binOp, right);
+            left = new BinaryExpressionNode(left, operatorToken, right);
         }
         return left;
+    }
+
+    private ExpressionNode ParsePrimaryExpression()
+    {
+        switch(Current.Kind)
+        {
+            case TConst: {
+                return ParseConstExpression();
+            }
+            case TVar: { //Variable binding : var x = 2;
+                return ParseVariableDeclarationExpression();
+            }
+            case TIdentifier: { //About to use a variable : x + 4
+                var identToken = NextToken();
+                return new VarExpression(identToken.Name!);
+            }
+            case TParLeft: {
+                return ParseParenthesesExpression();
+            }
+            default: {
+                return null!;
+            }
+        }
+    }
+
+    private ExpressionNode ParseParenthesesExpression()
+    {
+        var openPar = MatchKind(TParLeft);
+        var expr = ParseBinaryExpression();
+        var closePar = MatchKind(TParRight);
+        return expr;
+    }
+
+    private ExpressionNode ParseVariableDeclarationExpression()
+    {
+        var type = MatchKind(TVar);
+        var name = MatchKind(TIdentifier);
+        var _ = NextToken(); // throw away the '='
+        var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
+        return new VarDeclarationExpression(type.Kind, name.Name!, rhs);
+    }
+
+    private ExpressionNode ParseConstExpression()
+    {
+        var token = NextToken();
+        return new ConstExpression(token.IntValue!.Value);
     }
 }

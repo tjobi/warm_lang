@@ -2,7 +2,7 @@
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 
-var program = "test.test";
+var program = "test1.test";
 if (args.Length > 0)
 {
     program = args[0];
@@ -15,10 +15,10 @@ if (args.Length > 0)
 
 var lexer = new Lexer(program);
 var tokens = lexer.Lex();
-// foreach(var token in tokens)
-// {
-//     Console.WriteLine(token);
-// }
+foreach(var token in tokens)
+{
+    Console.WriteLine(token);
+}
 
 var parser = new Parser(tokens);
 ASTNode root = parser.Parse();
@@ -51,6 +51,7 @@ static (int, ImmutableDictionary<string,int>) Evaluate(ASTNode node, ImmutableDi
             }
             return (value, env);
         }
+        
         case BinaryExpressionNode cur: {
             var (left, leftEnv) = Evaluate(cur.Left, env);
             var (right, resEnv) = Evaluate(cur.Right, leftEnv);

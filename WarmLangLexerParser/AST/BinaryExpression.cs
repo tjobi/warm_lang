@@ -9,13 +9,16 @@ public class BinaryExpressionNode : ExpressionNode
 
     public override TokenKind Kind => _kind; 
 
-    public BinaryExpressionNode(ExpressionNode left, string op, ExpressionNode right)
+    public BinaryExpressionNode(ExpressionNode left, SyntaxToken op, ExpressionNode right)
     {
         Left = left;
         Right = right;
-        Operation = op;
-        //TODO:
-        _kind = TokenKind.TPlus;
+        Operation = op.Kind switch {
+            TokenKind.TPlus => "+",
+            TokenKind.TStar => "*",
+            _ => throw new NotImplementedException($"{op.Kind} is not yet supported!")
+        };
+        _kind = op.Kind;
     }
 
     public override string ToString()

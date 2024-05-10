@@ -79,6 +79,14 @@ public class Lexer
                     token = SyntaxToken.MakeToken(TCurRight, row, col);
                     AdvanceText();
                 } break;
+                case '(': {
+                    token = SyntaxToken.MakeToken(TParLeft, row, col);
+                    AdvanceText();
+                } break;
+                case ')': {
+                    token = SyntaxToken.MakeToken(TParRight, row, col);
+                    AdvanceText();
+                } break;
                 default: {
                     if(char.IsDigit(Current))
                     {
@@ -123,7 +131,7 @@ public class Lexer
                     AdvanceText();
                 } break;
                 case ' ': case '\n': case ';': case '=': case '+': case '*':
-                case '{': case '}': // We know none of these are valid identifiers.
+                case '{': case '}': case '(': case ')': // We know none of these are valid identifiers.
                 default: //What to do in the default case, are we lexing invalid stuff?
                     readingKeywordOrIdentifier = false;
                     break;

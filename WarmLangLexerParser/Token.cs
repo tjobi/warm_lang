@@ -7,7 +7,7 @@ public enum TokenKind
     TVar, //var x = 5, the keyword 'var'
     TSemiColon, TNewLine, TEOF,
     TEqual, TPlus, TStar, 
-    TBlock, TCurLeft, TCurRight
+    TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
 }
 
 public record SyntaxToken 
