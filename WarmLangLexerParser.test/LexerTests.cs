@@ -56,6 +56,7 @@ public class LexerTests
     [Theory]
     [InlineData("5*(4+4);", "{(CstI 5 * (CstI 4 + CstI 4));}")]
     [InlineData("5*4+4;", "{((CstI 5 * CstI 4) + CstI 4);}")]
+    [InlineData("(5*(4+4))*5;", "{((CstI 5 * (CstI 4 + CstI 4)) * CstI 5);}")]
     public void TestLexerParserPrecedenceShouldSucceed(string input, string expected)
     {
         //AAA
