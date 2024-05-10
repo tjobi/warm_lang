@@ -13,8 +13,12 @@ if (args.Length > 0)
     }
 }
 
-var lexer = new Lexer();
-var tokens = lexer.Lex(program);
+var lexer = new Lexer(program);
+var tokens = lexer.Lex();
+// foreach(var token in tokens)
+// {
+//     Console.WriteLine(token);
+// }
 
 var parser = new Parser(tokens);
 ASTNode root = parser.Parse();
@@ -79,7 +83,7 @@ static (int, ImmutableDictionary<string,int>) Evaluate(ASTNode node, ImmutableDi
             }
             var last = expressions[^1];
             var (lastValue, _) = Evaluate(last, nenv);
-            return (lastValue, env); //Return an unaltered environment.
+            return (lastValue, env); //Return an unaltered environment - to throw away any variables declared in block.
         }
         default: {
             throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");

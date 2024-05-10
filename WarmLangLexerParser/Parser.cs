@@ -125,7 +125,7 @@ public class Parser
             case TConst: {
                 return ParseConstExpression();
             }
-            case TInt: { //Variable binding : int x = 2;
+            case TVar: { //Variable binding : var x = 2;
                 return ParseVariableBindingExpression();
             }
             case TIdentifier: { //About to use a variable : x + 4
@@ -140,7 +140,7 @@ public class Parser
 
     private ExpressionNode ParseVariableBindingExpression()
     {
-        var type = MatchKind(TInt);
+        var type = MatchKind(TVar);
         var name = MatchKind(TIdentifier);
         var _ = NextToken(); // throw away the '='
         var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"

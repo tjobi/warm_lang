@@ -1,37 +1,139 @@
-﻿using static WarmLangLexerParser.TokenKind;
+﻿using System.Text;
+using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
 public class Lexer
 {
-    public Lexer() { }
+    private int col, row;
+    private readonly string filePath;
+    private readonly StreamReader reader;
+    private string curLine;
+    public Lexer(string filePath)
+    { 
+        this.filePath = filePath;
+        col = row = 0;
+        reader = new StreamReader(filePath);
+        curLine = reader.ReadLine() ?? "";
+    }
 
-    public IList<SyntaxToken> Lex(string filePath)
+    private char Current => Peek();
+    private bool IsEndOfFile => curLine == "";
+
+    private char Peek()
     {
-        StreamReader sr = new(filePath);
-        IList<SyntaxToken> tokens = new List<SyntaxToken>();
-        
-        for(var line = sr.ReadLine(); line != null; line = sr.ReadLine())
+        try 
         {
-            string[] toTokenize = line.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return curLine[col];
+        } catch (Exception)
+        {
+            Console.WriteLine($"LEXER Failed: in file {filePath}, line: {row+1}, column: {col}");
+            throw;
+        }
+    }
 
-            foreach(var token in toTokenize)
+    private void AdvanceText()
+    {
+        col++;
+        if(col >= curLine.Length)
+        {
+            curLine = reader.ReadLine() ?? "";
+            col = 0;
+            row++;
+        }
+    }
+
+    public IList<SyntaxToken> Lex()
+    {
+        IList<SyntaxToken> tokens = new List<SyntaxToken>();
+        while(!IsEndOfFile)
+        {
+            SyntaxToken token;
+            if(char.IsWhiteSpace(Current)) 
             {
-                var syntaxToken = token switch
-                {
-                    ";" => new SyntaxToken(TSemiColon),
-                    "=" => new SyntaxToken(TEqual),
-                    "+" => new SyntaxToken(TPlus),
-                    "*" => new SyntaxToken(TStar),
-                    "int" => new SyntaxToken(TInt),
-                    "{" => new SyntaxToken(TCurLeft),
-                    "}" => new SyntaxToken(TCurRight),
-                    _ when int.TryParse(token, out var number) => new SyntaxToken(TConst, null, number),
-                    _ => new SyntaxToken(TIdentifier, token, 0) 
-                };
-                tokens.Add(syntaxToken);
+                AdvanceText();
+                continue;
+            }
+            switch(Current)
+            {
+                case ';': {
+                    token = SyntaxToken.MakeToken(TSemiColon, row, col);
+                    AdvanceText();
+                } break;
+                case '=': {
+                    token = SyntaxToken.MakeToken(TEqual, row, col);
+                    AdvanceText();
+                } break;
+                case '+': {
+                    token = SyntaxToken.MakeToken(TPlus, row, col);
+                    AdvanceText();
+                } break;
+                case '*': {
+                    token = SyntaxToken.MakeToken(TStar, row, col);
+                    AdvanceText();
+                } break;
+                case '{': {
+                    token = SyntaxToken.MakeToken(TCurLeft, row, col);
+                    AdvanceText();
+                } break;
+                case '}': {
+                    token = SyntaxToken.MakeToken(TCurRight, row, col);
+                    AdvanceText();
+                } break;
+                default: {
+                    if(char.IsDigit(Current))
+                    {
+                        token = LexNumericLiteral();
+                    } else
+                    {
+                        token = LexKeywordOrIdentifier();
+                    }
+                } break;
+            }
+            tokens.Add(token);
+        }
+        //End token stream with an EndOfFile
+        tokens.Add(SyntaxToken.MakeToken(TEOF, row, col));
+        return tokens;
+    }
+
+    private SyntaxToken LexNumericLiteral()
+    {
+        //TODO: Maybe just work on straight up numbers?
+        //collect the full number as a string
+        var sb = new StringBuilder();
+        for(; char.IsDigit(Current); AdvanceText())
+        {
+            sb.Append(Current);
+        }
+        var number = int.Parse(sb.ToString());
+        return SyntaxToken.MakeToken(TConst, row, col, intValue: number);
+    }
+
+    private SyntaxToken LexKeywordOrIdentifier()
+    {
+        var sb = new StringBuilder();
+        var readingKeywordOrIdentifier = true;
+        while(readingKeywordOrIdentifier)
+        {
+            switch(Current) 
+            {
+                case '_': //allow variables with names that include _ (underscore)
+                case (>= 'a' and <= 'z') or (>= 'A' and <= 'Z'): { //TODO: How do we handle unicode æøå? D:
+                    sb.Append(Current);
+                    AdvanceText();
+                } break;
+                case ' ': case '\n': case ';': case '=': case '+': case '*':
+                case '{': case '}': // We know none of these are valid identifiers.
+                default: //What to do in the default case, are we lexing invalid stuff?
+                    readingKeywordOrIdentifier = false;
+                    break;
             }
         }
-        tokens.Add(new(TEOF));
-        return tokens;
+        var name = sb.ToString();
+        return name switch 
+        {
+            "var" => SyntaxToken.MakeToken(TVar, row, col),
+            _ => SyntaxToken.MakeToken(TIdentifier, row, col, name: name)
+        };
     }
 }
