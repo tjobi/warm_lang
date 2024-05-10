@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarmLangCompiler", "WarmLan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarmLangLexerParser", "WarmLangLexerParser\WarmLangLexerParser.csproj", "{6C19A9B7-F151-4D41-923F-8EA1EEFD8F28}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarmLangLexerParser.test", "WarmLangLexerParser.test\WarmLangLexerParser.test.csproj", "{839F2123-F43A-43CE-B544-2F2D5D07FEC2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{6C19A9B7-F151-4D41-923F-8EA1EEFD8F28}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C19A9B7-F151-4D41-923F-8EA1EEFD8F28}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6C19A9B7-F151-4D41-923F-8EA1EEFD8F28}.Release|Any CPU.Build.0 = Release|Any CPU
+		{839F2123-F43A-43CE-B544-2F2D5D07FEC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{839F2123-F43A-43CE-B544-2F2D5D07FEC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{839F2123-F43A-43CE-B544-2F2D5D07FEC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{839F2123-F43A-43CE-B544-2F2D5D07FEC2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

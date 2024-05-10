@@ -51,7 +51,7 @@ static (int, ImmutableDictionary<string,int>) Evaluate(ASTNode node, ImmutableDi
             }
             return (value, env);
         }
-        
+
         case BinaryExpressionNode cur: {
             var (left, leftEnv) = Evaluate(cur.Left, env);
             var (right, resEnv) = Evaluate(cur.Right, leftEnv);

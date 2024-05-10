@@ -5,12 +5,17 @@ namespace WarmLangLexerParser;
 public class Lexer
 {
     private int col, row;
-    private readonly string filePath;
     private readonly StreamReader reader;
     private string curLine;
-    public Lexer(string filePath)
+    public Lexer(IFileReader fileReader)
     { 
-        this.filePath = filePath;
+        col = row = 0;
+        reader = fileReader.GetStreamReader();
+        curLine = reader.ReadLine() ?? "";
+    }
+    
+    public Lexer(string filePath)
+    {
         col = row = 0;
         reader = new StreamReader(filePath);
         curLine = reader.ReadLine() ?? "";
@@ -26,7 +31,7 @@ public class Lexer
             return curLine[col];
         } catch (Exception)
         {
-            Console.WriteLine($"LEXER Failed: in file {filePath}, line: {row+1}, column: {col}");
+            Console.WriteLine($"LEXER Failed: on line: {row+1}, column: {col}");
             throw;
         }
     }
