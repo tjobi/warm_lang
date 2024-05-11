@@ -1,7 +1,6 @@
 namespace WarmLangLexerParser.test;
 
 using System.Text;
-using System.Text.RegularExpressions;
 using static SyntaxToken;
 using static TokenKind;
 
@@ -152,7 +151,7 @@ x;
         var tokens = lexer.Lex();
         var res = new Parser(tokens).Parse();
 
-        res.Should().BeEquivalentTo(expected);
+        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
 
     [Fact]
@@ -161,13 +160,6 @@ x;
         string input = "var x = 25; x = (var y = 3) + 4;x + y;";
         var expectedNameToken = MakeToken(TIdentifier,0,1, "x");
         var plusToken = MakeToken(TPlus, 0,0);
-        ExpressionNode innerExpr = new VarAssignmentExpression(
-            expectedNameToken, new BinaryExpressionNode(
-                new VarDeclarationExpression(TVar, "x", new ConstExpression(3)),
-                plusToken,
-                new ConstExpression(4)
-            )
-        );
         var expected = new BlockStatement(
             new List<StatementNode>()
             {
@@ -175,7 +167,15 @@ x;
                     new VarDeclarationExpression(TVar, "x", new ConstExpression(25))
                 ),
                 new ExprStatement(
-                    new VarAssignmentExpression(expectedNameToken, innerExpr)
+                    new VarAssignmentExpression(
+                        MakeToken(TIdentifier, 0,0, "x"), 
+                        new BinaryExpressionNode
+                        (
+                            new VarDeclarationExpression(TVar, "y", new ConstExpression(3)),
+                            MakeToken(TPlus, 0,0),
+                            new ConstExpression(4)
+                        )
+                    )
                 ),
                 new ExprStatement( new BinaryExpressionNode(
                     new VarExpression("x"),
@@ -189,7 +189,7 @@ x;
         var tokens = lexer.Lex();
         var res = new Parser(tokens).Parse();
 
-        res.Should().BeEquivalentTo(expected);
+        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
 
     [Fact]
@@ -232,7 +232,7 @@ x;
         var tokens = lexer.Lex();
         var res = new Parser(tokens).Parse();
 
-        res.Should().BeEquivalentTo(expected);
+        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
 
     [Fact]
@@ -290,7 +290,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(new FuncDeclaration(
-                MakeToken(TFunc,0,0,"f"),
+                MakeToken(TIdentifier,0,0,"f"),
                 new List<string>(),
                 new BlockStatement(new List<StatementNode>()
                 {
@@ -307,7 +307,7 @@ x;
         var lexer = GetLexer(input);
         var res = new Parser(lexer.Lex()).Parse();
 
-        res.Should().BeEquivalentTo(expected);
+        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
 
       [Fact]
@@ -317,7 +317,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(new FuncDeclaration(
-                MakeToken(TFunc,0,0,"f"),
+                MakeToken(TIdentifier,0,0,"f"),
                 new List<string>(){"y", "z", "l"},
                 new BlockStatement(new List<StatementNode>()
                 {
@@ -338,6 +338,50 @@ x;
         var lexer = GetLexer(input);
         var res = new Parser(lexer.Lex()).Parse();
 
-        res.Should().BeEquivalentTo(expected);
+        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
+    }
+
+    [Fact]
+    public void TextLexerParserFunctionCall()
+    {
+        var input = "f();";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new CallExpression(MakeToken(TIdentifier, 0,0, "f"), new List<ExpressionNode>())
+            )
+        });
+
+        var lexer = GetLexer(input);
+        var res = new Parser(lexer.Lex()).Parse();
+
+        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
+    }
+
+    [Fact]
+    public void TextLexerParserFunctionCallWithParams()
+    {
+        var input = "f(2+5,10);";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new CallExpression(MakeToken(TIdentifier, 0,0, "f"), new List<ExpressionNode>()
+                {
+                    new BinaryExpressionNode(
+                        new ConstExpression(2),
+                        MakeToken(TPlus, 0,0),
+                        new ConstExpression(5)
+                    ),
+                    new ConstExpression(10)
+                })
+            )
+        });
+
+        var lexer = GetLexer(input);
+        var res = new Parser(lexer.Lex()).Parse();
+
+        res.Should().BeEquivalentTo(expected, options => 
+            options.RespectingRuntimeTypes()
+        );
     }
 }

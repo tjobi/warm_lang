@@ -151,6 +151,10 @@ public class Parser
                 return ParseVariableDeclarationExpression();
             }
             case TIdentifier: { //About to use a variable : x + 4
+                if(Peek(1).Kind == TParLeft)
+                {
+                    return ParseCallExpression();
+                }
                 var identToken = NextToken();
                 return new VarExpression(identToken.Name!);
             }
@@ -220,5 +224,20 @@ public class Parser
         }
         var body = ParseBlockStatement();
         return new FuncDeclaration(name, paramNames, body);
+    }
+
+    private ExpressionNode ParseCallExpression()
+    {
+        var nameToken = NextToken();
+        var openPar = MatchKind(TParLeft);
+        var args = new List<ExpressionNode>();
+        while(NotEndOfFile && Current.Kind != TParRight)
+        {
+            var arg = ParseExpression();
+            var comma = MatchKind(TComma);
+            args.Add(arg);
+        }
+        var closePar = MatchKind(TParRight);
+        return new CallExpression(nameToken, args);
     }
 }

@@ -10,7 +10,7 @@ public enum TokenKind
     TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
     TAssign, //Assignment x = 10;
     TIfStmnt, TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
-    TFunc, //function
+    TFunc, TCall //function & function calls
 }
 
 public record SyntaxToken 

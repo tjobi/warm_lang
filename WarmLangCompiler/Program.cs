@@ -2,7 +2,7 @@
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 
-var program = "test.test";
+var program = "SyntaxTest/Function.test";
 if (args.Length > 0)
 {
     program = args[0];
