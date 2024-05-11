@@ -5,11 +5,12 @@ public enum TokenKind
     TConst,
     TIdentifier, //Variable names, function names...
     TVar, //var x = 5, the keyword 'var'
-    TSemiColon, TNewLine, TEOF,
+    TSemiColon, TComma, TDot, TEOF,
     TEqual, TPlus, TStar, 
     TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
     TAssign, //Assignment x = 10;
-    TIfStmnt, TIf, TThen, TElse //To allow if <cond> then <statement> else <statement>
+    TIfStmnt, TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
+    TFunc, //function
 }
 
 public record SyntaxToken 

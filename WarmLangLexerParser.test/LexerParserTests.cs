@@ -1,6 +1,7 @@
 namespace WarmLangLexerParser.test;
 
 using System.Text;
+using System.Text.RegularExpressions;
 using static SyntaxToken;
 using static TokenKind;
 
@@ -250,6 +251,92 @@ x;
         var lexer = GetLexer(input);
         var tokens = lexer.Lex();
         var res = new Parser(tokens).Parse();
+
+        res.Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public void TestLexerFunctionDeclarationKeyword()
+    {
+        var input = "function f(){ var x = 10; x; }";
+        var expectedTokens = new List<SyntaxToken>()
+        {
+            MakeToken(TFunc, 0,8),
+            MakeToken(TIdentifier, 0, 10, "f"),
+            MakeToken(TParLeft, 0,10),
+            MakeToken(TParRight, 0,11),
+            MakeToken(TCurLeft,0,12),
+            MakeToken(TVar,0,17),
+            MakeToken(TIdentifier,0,19, "x"),
+            MakeToken(TEqual,0,20),
+            MakeToken(TConst, 0,24,intValue:10),
+            MakeToken(TSemiColon,0,24),
+            MakeToken(TIdentifier,0,27,"x"),
+            MakeToken(TSemiColon,0,27),
+            MakeToken(TCurRight,0,29),
+            MakeToken(TEOF,1,0),
+        };
+
+        var lexer = GetLexer(input);
+        var res = lexer.Lex();
+
+        res.Should().ContainInOrder(expectedTokens);
+    }
+
+    [Fact]
+    public void TestLexerParserFunctionDeclarationKeywordNoParams()
+    {
+        var input = "function f(){ var x = 10; x; }";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(new FuncDeclaration(
+                MakeToken(TFunc,0,0,"f"),
+                new List<string>(),
+                new BlockStatement(new List<StatementNode>()
+                {
+                    new ExprStatement(new VarDeclarationExpression(
+                        TVar,
+                        "x",
+                        new ConstExpression(10)
+                    )),
+                    new ExprStatement(new VarExpression("x"))
+                })
+            ))
+        });
+
+        var lexer = GetLexer(input);
+        var res = new Parser(lexer.Lex()).Parse();
+
+        res.Should().BeEquivalentTo(expected);
+    }
+
+      [Fact]
+    public void TestLexerParserFunctionDeclarationKeyword()
+    {
+        var input = "function f(y, z, l){ var x = 10; x + y; }";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(new FuncDeclaration(
+                MakeToken(TFunc,0,0,"f"),
+                new List<string>(){"y", "z", "l"},
+                new BlockStatement(new List<StatementNode>()
+                {
+                    new ExprStatement(new VarDeclarationExpression(
+                        TVar,
+                        "x",
+                        new ConstExpression(10)
+                    )),
+                    new ExprStatement(new BinaryExpressionNode(
+                        new VarExpression("x"),
+                        MakeToken(TPlus, 0,0),
+                        new VarExpression("y")
+                    ))
+                })
+            ))
+        });
+
+        var lexer = GetLexer(input);
+        var res = new Parser(lexer.Lex()).Parse();
 
         res.Should().BeEquivalentTo(expected);
     }

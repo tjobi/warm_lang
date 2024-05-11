@@ -157,6 +157,9 @@ public class Parser
             case TParLeft: {
                 return ParseParenthesesExpression();
             }
+            case TFunc: {
+                return ParseFuncionDeclarationExpression();
+            }
             default: {
                 return null!;
             }
@@ -184,5 +187,38 @@ public class Parser
     {
         var token = NextToken();
         return new ConstExpression(token.IntValue!.Value);
+    }
+
+    private ExpressionNode ParseFuncionDeclarationExpression()
+    {
+        var funcKeyword = MatchKind(TFunc);
+        var name = MatchKind(TIdentifier);
+        var _ = MatchKind(TParLeft);
+        var paramNames = new List<string>();
+        if(Current.Kind == TParRight)
+        {
+            var paramClose = NextToken();
+        } else 
+        {
+            while(Current.Kind != TParRight)
+            {
+                var next = NextToken();
+                if(next.Kind == TIdentifier && next.Name is not null)
+                {
+                    paramNames.Add(next.Name);
+                    if(Current.Kind == TComma && Peek(1).Kind != TParRight)
+                    {   //We want to remove commas that separate function params
+                        var comma = NextToken();
+                    }
+                }
+                else 
+                {
+                    throw new Exception($"Invalid Expression in param declaration, line: {next.Line}, column: {next.Column}");
+                }
+            }
+            var paramClose = NextToken();
+        }
+        var body = ParseBlockStatement();
+        return new FuncDeclaration(name, paramNames, body);
     }
 }

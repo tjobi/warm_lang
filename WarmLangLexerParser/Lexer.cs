@@ -69,6 +69,10 @@ public class Lexer
                     token = SyntaxToken.MakeToken(TSemiColon, row, col);
                     AdvanceText();
                 } break;
+                case ',': {
+                    token = SyntaxToken.MakeToken(TComma, row, col);
+                    AdvanceText();
+                } break;
                 case '=': {
                     token = SyntaxToken.MakeToken(TEqual, row, col);
                     AdvanceText();
@@ -150,6 +154,7 @@ public class Lexer
         var name = sb.ToString();
         return name switch 
         {
+            "function" => SyntaxToken.MakeToken(TFunc, row, col),
             "if" => SyntaxToken.MakeToken(TIf, row, col),
             "then" => SyntaxToken.MakeToken(TThen, row, col),
             "else" => SyntaxToken.MakeToken(TElse, row, col),
