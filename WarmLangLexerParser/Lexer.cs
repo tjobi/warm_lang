@@ -41,7 +41,12 @@ public class Lexer
         col++;
         if(col >= curLine.Length)
         {
-            curLine = reader.ReadLine() ?? "";
+            string? line = "";
+            while(!reader.EndOfStream && ((line = reader.ReadLine()) == null || string.IsNullOrWhiteSpace(line))) 
+            {
+                row++;
+            }
+            curLine = line ?? "";
             col = 0;
             row++;
         }

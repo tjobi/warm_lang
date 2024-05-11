@@ -23,6 +23,34 @@ public class LexerParserTests
     }
 
     [Fact]
+    public void TestLexerEmptyLineShouldSucceed()
+    {
+        string input = //keep the string as is, or screws with the line numbers you'd expect, hehe :)
+@"var x = 25;
+
+x;
+
+"; 
+                       
+        var expectedRes = new List<SyntaxToken>()
+        {
+            MakeToken(TVar,0,3),
+            MakeToken(TIdentifier,0, 5, "x"),
+            MakeToken(TEqual,0,6),
+            MakeToken(TConst,0,10, intValue:25),
+            MakeToken(TSemiColon,0,10),
+            MakeToken(TIdentifier,2,1, "x"),
+            MakeToken(TEOF, 4, 0)
+        };
+
+
+        var lexer = GetLexer(input);
+        var res = lexer.Lex();
+
+        res.Should().ContainInOrder(expectedRes);
+    }
+
+    [Fact]
     public void TestVarDeclarationShouldSucceed()
     {
         //AAA
