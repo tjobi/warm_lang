@@ -9,5 +9,5 @@ if z then {
 }
 else 
     x = 25;
-if z then x + g;
+if z then x + z;
 else x;
