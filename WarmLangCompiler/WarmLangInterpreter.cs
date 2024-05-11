@@ -1,26 +1,15 @@
 namespace WarmLangCompiler;
-using System.Collections.Immutable;
+
+using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser.AST;
-
-
-using VarEnv = List<System.Collections.Immutable.ImmutableDictionary<string,int>>;
-using Funct = Tuple<System.Collections.Immutable.ImmutableList<string>, WarmLangLexerParser.AST.StatementNode>;
-using FuncEnv = List<System.Collections.Immutable.ImmutableDictionary<string, Tuple<System.Collections.Immutable.ImmutableList<string>, WarmLangLexerParser.AST.StatementNode>>>;
-
 public static class WarmLangInterpreter
 {
     public static int Run(ASTNode root)
     {
-        var env = new VarEnv()
-        {
-            ImmutableDictionary.Create<string,int>()
-        };
-        var fenv = new FuncEnv()
-        {
-            ImmutableDictionary<string, Funct>.Empty
-        };
+        var venv = new VarEnv();
+        var fenv = new FuncEnv();
         try {
-            var (returned, _,_) = Evaluate(root, env, fenv);
+            var (returned, _,_) = Evaluate(root, venv, fenv);
             return returned;
         } catch (Exception e)
         {
@@ -29,102 +18,7 @@ public static class WarmLangInterpreter
         }
     }
 
-    private static FuncEnv PushFuncScope(FuncEnv env)
-    {
-        env.Add(ImmutableDictionary<string, Funct>.Empty);
-        return env;
-    }
-
-    private static FuncEnv PopFuncScope(FuncEnv env)
-    {
-        env.RemoveAt(env.Count - 1);
-        return env;
-    }
-
-    private static Funct LookupFunc(FuncEnv env, string funcName)
-    {
-        for (int i = env.Count - 1; i >= 0 ; i--)
-        {
-            var scope = env[i];
-            if(scope.TryGetValue(funcName, out var res))
-            {
-                return res;
-            }
-        }
-        throw new Exception($"Failed: Variable {funcName} has not been declared.");
-    }
-
-    private static (Funct, FuncEnv) DeclareFunc(FuncEnv env, string funcName, IList<string> paramNames, StatementNode body)
-    {
-        var latestFuncScope = env[^1];
-        try
-        {
-            var funcTuple = (paramNames.ToImmutableList(), body).ToTuple();
-            var newEnv = latestFuncScope.Add(funcName, funcTuple);
-            env[^1] = newEnv;
-            return (funcTuple, env);
-        } catch
-        {
-            throw new Exception("Failed: Function is already defined");
-        }
-
-    }
-
-    private static VarEnv PushScope(VarEnv env)
-    {
-        env.Add(ImmutableDictionary<string, int>.Empty);
-        return env;
-    }
-
-    private static VarEnv PopScope(VarEnv env )
-    {
-        env.RemoveAt(env.Count-1);
-        return env;
-    } 
-
-    private static int Lookup(VarEnv env, string name)
-    {
-        for (int i = env.Count - 1; i >= 0 ; i--)
-        {
-            var scope = env[i];
-            if(scope.TryGetValue(name, out var res))
-            {
-                return res;
-            }
-        }
-        throw new Exception($"Failed: Variable {name} has not been declared.");
-    }
-
-    private static (int, VarEnv) AssignVar(VarEnv env, string name, int value)
-    {
-        for (int i = env.Count - 1; i >= 0 ; i--)
-        {
-            var scope = env[i];
-            if(scope.ContainsKey(name))
-            {
-                env[i] = scope.SetItem(name, value);
-                return (value, env);
-            }
-        }
-        throw new Exception($"Failed: {name} does not exist");
-    }
-
-    private static (int, VarEnv) DeclareVar(VarEnv env, string name, int value)
-    {
-
-        var mostRecentScope = env.Last();
-        try
-        {
-            var newEnv = mostRecentScope.Add(name, value);
-            env[^1] = newEnv;
-            return (value, env);
-        } catch
-        {
-            throw new Exception("Failed: Variable is already defined");
-        }
-    }
-
-    public static (int, VarEnv, FuncEnv) Evaluate(ASTNode node, VarEnv env, FuncEnv fenv)
+    public static (int, IAssignableEnv<int>, IEnv<Funct>) Evaluate(ASTNode node, IAssignableEnv<int> env, IEnv<Funct> fenv)
     {
         switch(node)
         {
@@ -132,7 +26,7 @@ public static class WarmLangInterpreter
                 return (c.Value, env, fenv);
             }
             case VarExpression var: {
-                var value = Lookup(env, var.Name);
+                var value = env.Lookup(var.Name);
                 return (value, env, fenv);
             }
             case BinaryExpressionNode cur: {
@@ -150,14 +44,14 @@ public static class WarmLangInterpreter
             case VarDeclarationExpression decl: {
                 var name = decl.Name;
                 var (value, eEnv,_) = Evaluate(decl.RightHandSide, env, fenv);
-                var (_, nextEnv) = DeclareVar(eEnv, name, value);
-                return (value, nextEnv, fenv);
+                var (_, nextEnv) = eEnv.Declare( name, value);
+                return (value, (VarEnv)nextEnv, fenv);
             }
             case VarAssignmentExpression assignment: {
                 var name = assignment.Name;
                 var (value, eEnv,_) = Evaluate(assignment.RightHandSide, env, fenv);
-                var (res, nEnv) = AssignVar(eEnv, name, value);
-                return (res, nEnv, fenv);
+                var (res, nEnv) = eEnv.Assign(name, value);
+                return (res, (VarEnv)nEnv, fenv);
                 //Use eEnv because in the future we may want to allow something like
                 // var x = 10; var y = 5; x = y++;
                 // which would update both x and y.
@@ -165,24 +59,24 @@ public static class WarmLangInterpreter
             case CallExpression call: {
                 var name = call.Name;
                 var callArgs = call.Arguments;
-                var (paramNames, funcBody) = LookupFunc(fenv, name);
-                var callVarScope = PushScope(env); 
-                var callFunScope = PushFuncScope(fenv);
+                var (paramNames, funcBody) = fenv.Lookup(name);
+                var callVarScope = env.Push();
+                var callFunScope = fenv.Push();
                 foreach(var (paramName, expr) in paramNames.Zip(callArgs))
                 {
-                    var (value, nEnv, nFEnv) = Evaluate(expr, callVarScope, callFunScope);
-                    var (_, nVarEnv) = DeclareVar(nEnv, paramName, value);
+                    var (value, nEnv, nFEnv) = Evaluate(expr, (VarEnv)callVarScope, callFunScope);
+                    var (_, nVarEnv) = nEnv.Declare(paramName, value);
                     callVarScope = nVarEnv;
                     callFunScope = nFEnv; //not too sure about this one :)
                 }
-                var (returnedValue, retVarEnv, retFuncEnv) = Evaluate(funcBody,callVarScope, callFunScope);
-                return (returnedValue, PopScope(retVarEnv), PopFuncScope(retFuncEnv));
+                var (returnedValue, retVarEnv, retFuncEnv) = Evaluate(funcBody,(VarEnv)callVarScope, callFunScope);
+                return (returnedValue, (VarEnv)retVarEnv.Pop(), retFuncEnv.Pop());
             }
             case FuncDeclaration funDecl: {
                 var funcName = funDecl.Name;
                 var paramNames = funDecl.Params;
                 var body = funDecl.Body;
-                var (fun, newFEnv) = DeclareFunc(fenv, funcName, paramNames, body);
+                var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
                 return (0, env, newFEnv);
             }
             case ExprStatement expr: {
@@ -190,32 +84,32 @@ public static class WarmLangInterpreter
             }
             case BlockStatement block: {
                 var expressions = block.Children;
-                var nenv = PushScope(env);
-                var nFuncEnv = PushFuncScope(fenv);
+                var nenv = env.Push();
+                var nFuncEnv = fenv.Push();
                 for (int i = 0; i < expressions.Count-1; i++)
                 {
                     var expr = expressions[i];
-                    var (_, nenv2, fenv2) = Evaluate(expr, nenv, fenv);
+                    var (_, nenv2, fenv2) = Evaluate(expr, (VarEnv)nenv, fenv);
                     nenv = nenv2;
                     nFuncEnv = fenv2;
                 }
                 var last = expressions[^1];
                 
-                var (lastValue, lastEnv, lastFuncEnv) = Evaluate(last, nenv, nFuncEnv);
-                return (lastValue, PopScope(lastEnv), PopFuncScope(lastFuncEnv)); //Return an unaltered environment - to throw away any variables declared in block.
+                var (lastValue, lastEnv, lastFuncEnv) = Evaluate(last, (VarEnv)nenv, nFuncEnv);
+                return (lastValue, (VarEnv)lastEnv.Pop(), lastFuncEnv.Pop()); //Return an unaltered environment - to throw away any variables declared in block.
             }
             case IfStatement ifstmnt: {
-                var ifScope = PushScope(env);
-                var ifFuncScope = PushFuncScope(fenv);
-                var (condValue, cEnv, cFuncEnv) = Evaluate(ifstmnt.Condition, ifScope, ifFuncScope);
+                var ifScope = env.Push();
+                var ifFuncScope = fenv.Push();
+                var (condValue, cEnv, cFuncEnv) = Evaluate(ifstmnt.Condition, (VarEnv) ifScope, ifFuncScope);
                 var doThenBranch = condValue != 0;
                 if(!doThenBranch && ifstmnt.Else is null)
                 {
                     //What to return in this case?
-                    return (0, PopScope(cEnv), PopFuncScope(cFuncEnv));
+                    return (0, (VarEnv)cEnv.Pop(), cFuncEnv.Pop());
                 }
                 var (value, nEnv, nFuncEnv) = Evaluate(doThenBranch ? ifstmnt.Then : ifstmnt.Else!, cEnv, fenv);
-                return (value, PopScope(nEnv), PopFuncScope(nFuncEnv));
+                return (value, (VarEnv)nEnv.Pop(), nFuncEnv.Pop());
             }
             default: {
                 throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");
