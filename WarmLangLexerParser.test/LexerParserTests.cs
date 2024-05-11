@@ -41,7 +41,7 @@ public class LexerParserTests
         var lexer = GetLexer(input);
         var res = lexer.Lex();
 
-        res.Should().ContainInOrder(expected);
+        res.Should().BeEquivalentTo(expected);
     }
 
     [Fact]
@@ -62,6 +62,7 @@ x;
             MakeToken(TConst,0,10, intValue:25),
             MakeToken(TSemiColon,0,10),
             MakeToken(TIdentifier,2,1, "x"),
+            MakeToken(TSemiColon,2,1),
             MakeToken(TEOF, 4, 0)
         };
 
@@ -69,7 +70,7 @@ x;
         var lexer = GetLexer(input);
         var res = lexer.Lex();
 
-        res.Should().ContainInOrder(expectedRes);
+        res.Should().BeEquivalentTo(expectedRes);
     }
 
     [Fact]
@@ -83,12 +84,14 @@ x;
             MakeToken(TIdentifier,0, 5, "x"),
             MakeToken(TEqual,0,6),
             MakeToken(TConst,0,10, intValue:25),
+            MakeToken(TSemiColon,0,10),
+            MakeToken(TEOF,1,0),
         };
 
         var lexer = GetLexer(input);
         var res = lexer.Lex();
 
-        res.Should().ContainInOrder(expectedRes);
+        res.Should().BeEquivalentTo(expectedRes);
     }
 
     [Fact]
@@ -133,12 +136,13 @@ x;
             MakeToken(TEqual,0,13),
             MakeToken(TConst,0,17, intValue: 10),
             MakeToken(TSemiColon,0,17), //Little weird it doesn't advance for ";" \o/
+            MakeToken(TEOF,1,0)
         };
 
         var lexer = GetLexer(input);
         var res = lexer.Lex();
 
-        res.Should().ContainInOrder(expected);
+        res.Should().BeEquivalentTo(expected);
     }
 
     [Fact]
