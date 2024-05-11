@@ -1,5 +1,4 @@
 namespace WarmLangLexerParser.test;
-
 using System.Text;
 using static SyntaxToken;
 using static TokenKind;
@@ -20,6 +19,29 @@ public class LexerParserTests
         MemoryStream memoryStream = new(memory);
         _reader.GetStreamReader().Returns(new StreamReader(memoryStream));
         return new Lexer(_reader);
+    }
+
+    [Fact]
+    public void TestLexerCommentShouldSucceed()
+    {
+        string input = 
+@"//This here is my comment 1
+2 + 2;
+//comment two
+";
+        var expected = new List<SyntaxToken>()
+        {
+            MakeToken(TConst,1,1, intValue: 2),
+            MakeToken(TPlus,1,2),
+            MakeToken(TConst,1,5, intValue: 2),
+            MakeToken(TSemiColon,1,5),
+            MakeToken(TEOF, 3,0)
+        };
+
+        var lexer = GetLexer(input);
+        var res = lexer.Lex();
+
+        res.Should().ContainInOrder(expected);
     }
 
     [Fact]

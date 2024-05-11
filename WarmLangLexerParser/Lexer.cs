@@ -31,7 +31,7 @@ public class Lexer
             return curLine[col];
         } catch (Exception)
         {
-            Console.WriteLine($"LEXER Failed: on line: {row+1}, column: {col}");
+            Console.WriteLine($"LEXER Failed: on line: {row+1}, column: {col+1}");
             throw;
         }
     }
@@ -52,6 +52,18 @@ public class Lexer
         }
     }
 
+    private void AdvanceLine()
+    {
+        string? line = null;
+        while(!reader.EndOfStream && string.IsNullOrWhiteSpace(line = reader.ReadLine())) 
+        {
+            row++;
+        }
+        curLine = line ?? "";
+        col = 0;
+        row++;
+    }
+
     public IList<SyntaxToken> Lex()
     {
         IList<SyntaxToken> tokens = new List<SyntaxToken>();
@@ -68,6 +80,15 @@ public class Lexer
                 case ';': {
                     token = SyntaxToken.MakeToken(TSemiColon, row, col);
                     AdvanceText();
+                } break;
+                case '/': {
+                    token = SyntaxToken.MakeToken(TSlash, row, col);
+                    AdvanceText();
+                    if(Current == '/'){
+                        //We've reached a comment
+                        AdvanceLine();
+                        continue;
+                    }
                 } break;
                 case ',': {
                     token = SyntaxToken.MakeToken(TComma, row, col);

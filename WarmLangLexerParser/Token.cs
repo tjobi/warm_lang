@@ -6,7 +6,7 @@ public enum TokenKind
     TIdentifier, //Variable names, function names...
     TVar, //var x = 5, the keyword 'var'
     TSemiColon, TComma, TDot, TEOF,
-    TEqual, TPlus, TStar, 
+    TEqual, TPlus, TStar, TSlash,
     TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
     TAssign, //Assignment x = 10;
     TIfStmnt, TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
