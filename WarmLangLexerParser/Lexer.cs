@@ -22,7 +22,7 @@ public class Lexer
     }
 
     private char Current => Peek();
-    private bool IsEndOfFile => curLine == "";
+    private bool IsEndOfFile => reader.EndOfStream && curLine == "" ;
 
     private char Peek()
     {
