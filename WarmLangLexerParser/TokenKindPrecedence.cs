@@ -10,8 +10,9 @@ public static class TokenKindPrecedence
             TokenKind.TStar => 1000,
             // + 
             TokenKind.TPlus => 100,
+            TokenKind.TMinus => 100,
             //The rest shouldn't have any precedence - I think
-            _ => -1,
+            _ => -1
         };
     }
 }

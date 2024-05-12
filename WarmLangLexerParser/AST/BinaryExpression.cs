@@ -16,6 +16,7 @@ public class BinaryExpressionNode : ExpressionNode
         Operation = op.Kind switch {
             TokenKind.TPlus => "+",
             TokenKind.TStar => "*",
+            TokenKind.TMinus => "-",
             _ => throw new NotImplementedException($"{op.Kind} is not yet supported!")
         };
         _kind = op.Kind;

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "WarmLangCompiler": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\Users\\chris\\source\\repos\\warm_lang"
+    }
+  }
+}
