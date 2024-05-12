@@ -3,21 +3,34 @@ using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 
 var program = "SyntaxTest/Minus.test";
-if (args.Length > 0)
+var lexerDebug = true;
+foreach (var arg in args)
 {
-    program = args[0];
-    if (!File.Exists(program))
+    switch(arg)
     {
-        Console.WriteLine("Failed: Given an non-existing filepath");
-        return 2;
+        case "--lex-mute":
+        {
+            lexerDebug = false;
+        } break;
+        default: {
+            if(!File.Exists(arg))
+            {
+                Console.WriteLine("Failed: Given an non-existing filepath");
+                return 2;
+            }
+            program = arg;
+        }break;
     }
 }
 
 var lexer = new Lexer(program);
 var tokens = lexer.Lex();
-foreach(var token in tokens)
+if(lexerDebug)
 {
-    Console.WriteLine(token);
+    foreach(var token in tokens)
+    {
+        Console.WriteLine(token);
+    }
 }
 
 var parser = new Parser(tokens);
