@@ -102,6 +102,10 @@ public class Lexer
                     token = SyntaxToken.MakeToken(TPlus, row, col);
                     AdvanceText();
                 } break;
+                case '-':{
+                    token = SyntaxToken.MakeToken(TMinus, row, col);
+                    AdvanceText();
+                } break;
                 case '*': {
                     token = SyntaxToken.MakeToken(TStar, row, col);
                     AdvanceText();

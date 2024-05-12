@@ -36,6 +36,7 @@ public static class WarmLangInterpreter
                 var res = cur.Operation switch {
                     "+" => left + right,
                     "*" => left * right,
+                    "-" => left - right,
                     _ => throw new NotImplementedException($"Failed: Operation {cur.Operation} is not yet defined")
                 };
 
