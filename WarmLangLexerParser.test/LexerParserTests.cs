@@ -195,7 +195,7 @@ x;
                 new ExprStatement(
                     new VarAssignmentExpression(
                         MakeToken(TIdentifier, 0,0, "x"), 
-                        new BinaryExpressionNode
+                        new BinaryExpression
                         (
                             new VarDeclarationExpression(TVar, "y", new ConstExpression(3)),
                             MakeToken(TPlus, 0,0),
@@ -203,7 +203,7 @@ x;
                         )
                     )
                 ),
-                new ExprStatement( new BinaryExpressionNode(
+                new ExprStatement( new BinaryExpression(
                     new VarExpression("x"),
                     plusToken,
                     new VarExpression("y")
@@ -352,7 +352,7 @@ x;
                         "x",
                         new ConstExpression(10)
                     )),
-                    new ExprStatement(new BinaryExpressionNode(
+                    new ExprStatement(new BinaryExpression(
                         new VarExpression("x"),
                         MakeToken(TPlus, 0,0),
                         new VarExpression("y")
@@ -393,7 +393,7 @@ x;
             new ExprStatement(
                 new CallExpression(MakeToken(TIdentifier, 0,0, "f"), new List<ExpressionNode>()
                 {
-                    new BinaryExpressionNode(
+                    new BinaryExpression(
                         new ConstExpression(2),
                         MakeToken(TPlus, 0,0),
                         new ConstExpression(5)
@@ -409,5 +409,69 @@ x;
         res.Should().BeEquivalentTo(expected, options => 
             options.RespectingRuntimeTypes()
         );
+    }
+
+    [Fact]
+    public void TestLexerParserUnaryMinus()
+    {
+        var input = "var x = -1;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new VarDeclarationExpression(TVar, "x",
+                    new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
+                )
+            ),
+        });
+
+        var lexer = GetLexer(input);
+        var parser = new Parser(lexer.Lex());
+        var res = parser.Parse();
+
+        res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+    }
+
+    [Fact]
+    public void TestLexerParserDoubleUnaryMinus()
+    {
+        var input = "var x = - -1;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new VarDeclarationExpression(TVar, "x",
+                    new UnaryExpression(MakeToken(TMinus,0,0), 
+                        new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
+                    )
+                )
+            ),
+        });
+
+        var lexer = GetLexer(input);
+        var parser = new Parser(lexer.Lex());
+        var res = parser.Parse();
+
+        res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+    }
+    
+    [Fact]
+    public void TestLexerParserDoubleUnaryPlus()
+    {
+        var input = "var x = + + 1;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new VarDeclarationExpression(TVar, "x",
+                    new UnaryExpression(MakeToken(TPlus,0,0), 
+                        new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
+                    )
+                )
+            ),
+        });
+
+        var lexer = GetLexer(input);
+        var parser = new Parser(lexer.Lex());
+        var res = parser.Parse();
+
+        res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
     }
 }

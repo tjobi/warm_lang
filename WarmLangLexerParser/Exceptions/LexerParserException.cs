@@ -6,10 +6,10 @@ public class LexerException : Exception
     public int Column { get; }
     private readonly string message;
     public override string Message => message;
-    public LexerException(string file, string msg, int line, int col) : base()
+    public LexerException(string msg, int line, int col) : base()
     {
         Line = line;
         Column = col;
-        message = $"In file: {file}, line: {line}, column: {col} -> {msg}";
+        message = $"On line: {line}, column: {col} -> {msg}";
     }
 }

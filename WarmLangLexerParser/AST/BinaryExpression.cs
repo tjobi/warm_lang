@@ -1,6 +1,6 @@
 namespace WarmLangLexerParser.AST;
 
-public class BinaryExpressionNode : ExpressionNode
+public class BinaryExpression : ExpressionNode
 {
     public ExpressionNode Left { get; }
     public ExpressionNode Right { get; }
@@ -9,7 +9,7 @@ public class BinaryExpressionNode : ExpressionNode
 
     public override TokenKind Kind => _kind; 
 
-    public BinaryExpressionNode(ExpressionNode left, SyntaxToken op, ExpressionNode right)
+    public BinaryExpression(ExpressionNode left, SyntaxToken op, ExpressionNode right)
     {
         Left = left;
         Right = right;

@@ -15,4 +15,14 @@ public static class TokenKindPrecedence
             _ => -1
         };
     }
+
+    public static int GetUnaryPrecedence(this TokenKind kind)
+    {
+        return kind switch
+        {
+            TokenKind.TMinus 
+            or TokenKind.TPlus => 10_000,
+            _ => -1
+        };
+    }
 }

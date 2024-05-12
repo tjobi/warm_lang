@@ -29,11 +29,12 @@ public static class WarmLangInterpreter
                 var value = env.Lookup(var.Name);
                 return (value, env, fenv);
             }
-            case BinaryExpressionNode cur: {
+            case BinaryExpression cur: {
                 var (left, leftEnv, _) = Evaluate(cur.Left, env, fenv);
                 var (right, resEnv, _) = Evaluate(cur.Right, leftEnv, fenv);
 
-                var res = cur.Operation switch {
+                var res = cur.Operation switch 
+                {
                     "+" => left + right,
                     "*" => left * right,
                     "-" => left - right,
@@ -41,6 +42,16 @@ public static class WarmLangInterpreter
                 };
 
                 return (res, resEnv, fenv);
+            }
+            case UnaryExpression unary: {
+                var (exprValue, newVarEnv, newFuncEnv) = Evaluate(unary.Expression, env, fenv);
+                var value = unary.Operation switch 
+                {
+                    "+" => exprValue,  //do nothing for the (+1) cases
+                    "-" => -exprValue, //flip it for the (-1) cases
+                    _ => throw new NotImplementedException($"Failed: Unary {unary.Operation} is not defined")
+                };
+                return (value, newVarEnv, newFuncEnv);
             }
             case VarDeclarationExpression decl: {
                 var name = decl.Name;

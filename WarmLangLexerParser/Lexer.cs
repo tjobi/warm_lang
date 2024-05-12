@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using WarmLangLexerParser.Exceptions;
 using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
@@ -130,9 +131,13 @@ public class Lexer
                     if(char.IsDigit(Current))
                     {
                         token = LexNumericLiteral();
-                    } else
+                    } else if(char.IsLetter(Current))
                     {
                         token = LexKeywordOrIdentifier();
+                    }
+                    else 
+                    {
+                        throw new LexerException($"Invalid character '{Current}'", row, col);
                     }
                 } break;
             }

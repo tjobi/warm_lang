@@ -1,1 +1,3 @@
 var number = 10 - 2;
+
+var x = -(-number); //should result in x=8

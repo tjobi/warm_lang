@@ -125,17 +125,30 @@ public class Parser
 
     private ExpressionNode ParseBinaryExpression(int parentPrecedence = 0)
     {
-        ExpressionNode left = ParsePrimaryExpression();
+        ExpressionNode left;
+        var precedence = Current.Kind.GetUnaryPrecedence(); 
+        //If it returns -1, it is certainly not a Unary operator, so go to else-branch and parse a normal BinaryExpression
+        if(precedence != -1 && precedence >= parentPrecedence)
+        {
+            var op = NextToken();
+            var expr = ParseBinaryExpression(precedence);
+            left = new UnaryExpression(op, expr);
+        }
+        else 
+        {
+            left = ParsePrimaryExpression();
+        }
+
         while(true)
         {
-            var precedence = Current.Kind.GetBinaryPrecedence();
+            precedence = Current.Kind.GetBinaryPrecedence();
             if(precedence == -1 || precedence <= parentPrecedence) 
             {
                 break;
             }
             var operatorToken = NextToken();
             var right = ParseBinaryExpression(precedence);
-            left = new BinaryExpressionNode(left, operatorToken, right);
+            left = new BinaryExpression(left, operatorToken, right);
         }
         return left;
     }
