@@ -153,7 +153,7 @@ public class Lexer
         //TODO: Maybe just work on straight up numbers?
         //collect the full number as a string
         var sb = new StringBuilder();
-        for(; char.IsDigit(Current); AdvanceText())
+        for(; !IsEndOfFile && char.IsDigit(Current); AdvanceText())
         {
             sb.Append(Current);
         }
@@ -165,7 +165,7 @@ public class Lexer
     {
         var sb = new StringBuilder();
         var readingKeywordOrIdentifier = true;
-        while(readingKeywordOrIdentifier)
+        while(readingKeywordOrIdentifier && !IsEndOfFile)
         {
             switch(Current) 
             {
