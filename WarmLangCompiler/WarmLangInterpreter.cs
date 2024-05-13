@@ -4,7 +4,7 @@ using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser.AST;
 public static class WarmLangInterpreter
 {
-    public static int Run(ASTNode root)
+    public static Value Run(ASTNode root)
     {
         var venv = new VarEnv();
         var fenv = new FuncEnv();
@@ -13,17 +13,21 @@ public static class WarmLangInterpreter
             return returned;
         } catch (Exception e)
         {
-            Console.WriteLine(e.Message);
-            return -1;
+            return new StrValue(e.Message);
         }
     }
 
-    public static (int, IAssignableEnv<int>, IEnv<Funct>) Evaluate(ASTNode node, IAssignableEnv<int> env, IEnv<Funct> fenv)
+    private static string BinaryExpresssionErorrMsg(string op, Value v1, Value v2)
+    {
+        return $"Failed: Operator:{op} on {v1.GetType()} and {v2.GetType()} is not defined";
+    }
+
+    public static (Value, IAssignableEnv<Value>, IEnv<Funct>) Evaluate(ASTNode node, IAssignableEnv<Value> env, IEnv<Funct> fenv)
     {
         switch(node)
         {
             case ConstExpression c: {
-                return (c.Value, env, fenv);
+                return (new IntValue(c.Value), env, fenv);
             }
             case VarExpression var: {
                 var value = env.Lookup(var.Name);
@@ -33,23 +37,24 @@ public static class WarmLangInterpreter
                 var (left, leftEnv, _) = Evaluate(cur.Left, env, fenv);
                 var (right, resEnv, _) = Evaluate(cur.Right, leftEnv, fenv);
 
-                var res = cur.Operation switch 
+                var op = cur.Operation;
+                var res = (op,left,right) switch 
                 {
-                    "+" => left + right,
-                    "*" => left * right,
-                    "-" => left - right,
-                    _ => throw new NotImplementedException($"Failed: Operation {cur.Operation} is not yet defined")
+                    ("+", IntValue i1, IntValue i2) => new IntValue(i1.Value + i2.Value),
+                    ("*", IntValue i1, IntValue i2) => new IntValue(i1.Value * i2.Value),
+                    ("-", IntValue i1, IntValue i2) => new IntValue(i1.Value - i2.Value),
+                    _ => throw new NotImplementedException($"Failed: Operator:{op} on {left.GetType()} and {right.GetType()} is not defined")
                 };
 
                 return (res, resEnv, fenv);
             }
             case UnaryExpression unary: {
                 var (exprValue, newVarEnv, newFuncEnv) = Evaluate(unary.Expression, env, fenv);
-                var value = unary.Operation switch 
+                var value = (unary.Operation, exprValue) switch 
                 {
-                    "+" => exprValue,  //do nothing for the (+1) cases
-                    "-" => -exprValue, //flip it for the (-1) cases
-                    _ => throw new NotImplementedException($"Failed: Unary {unary.Operation} is not defined")
+                    ("+", IntValue i) => i,  //do nothing for the (+1) cases
+                    ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
+                    _ => throw new NotImplementedException($"Failed: Unary {unary.Operation} is not defined on {exprValue.GetType()}")
                 };
                 return (value, newVarEnv, newFuncEnv);
             }
@@ -89,7 +94,7 @@ public static class WarmLangInterpreter
                 var paramNames = funDecl.Params;
                 var body = funDecl.Body;
                 var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
-                return (0, env, newFEnv);
+                return (new IntValue(0), env, newFEnv);
             }
             case ExprStatement expr: {
                 return Evaluate(expr.Expression, env, fenv);
@@ -114,11 +119,17 @@ public static class WarmLangInterpreter
                 var ifScope = env.Push();
                 var ifFuncScope = fenv.Push();
                 var (condValue, cEnv, cFuncEnv) = Evaluate(ifstmnt.Condition, (VarEnv) ifScope, ifFuncScope);
-                var doThenBranch = condValue != 0;
+                
+                bool doThenBranch = condValue switch //TODO: When we introduce booleans, look at this again :)
+                {
+                    IntValue i => i.Value != 0,
+                    _ => throw new NotImplementedException($"Failed: value of {condValue.GetType()} cannot be used as boolean")
+                };
+
                 if(!doThenBranch && ifstmnt.Else is null)
                 {
                     //What to return in this case?
-                    return (0, (VarEnv)cEnv.Pop(), cFuncEnv.Pop());
+                    return (new IntValue(0), (VarEnv)cEnv.Pop(), cFuncEnv.Pop());
                 }
                 var (value, nEnv, nFuncEnv) = Evaluate(doThenBranch ? ifstmnt.Then : ifstmnt.Else!, cEnv, fenv);
                 return (value, (VarEnv)nEnv.Pop(), nFuncEnv.Pop());

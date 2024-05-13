@@ -1,16 +1,16 @@
 namespace WarmLangCompiler.Interpreter;
 using System.Collections.Immutable;
-public sealed class VarEnv : IAssignableEnv<int>
+public sealed class VarEnv : IAssignableEnv<Value>
 {
-    private readonly List<ImmutableDictionary<string,int>> env;
+    private readonly List<ImmutableDictionary<string,Value>> env;
     public VarEnv()
     {
-        env = new List<ImmutableDictionary<string, int>>()
+        env = new List<ImmutableDictionary<string, Value>>()
         {
-            ImmutableDictionary<string, int>.Empty
+            ImmutableDictionary<string, Value>.Empty
         };
     }
-    public (int, IEnv<int>) Declare(string name, int value)
+    public (Value, IEnv<Value>) Declare(string name, Value value)
     {
         var mostRecentScope = env.Last();
         try
@@ -24,7 +24,7 @@ public sealed class VarEnv : IAssignableEnv<int>
         }
     }
 
-    public (int, IAssignableEnv<int>) Assign(string name, int value)
+    public (Value, IAssignableEnv<Value>) Assign(string name, Value value)
     {
         for (int i = env.Count - 1; i >= 0 ; i--)
         {
@@ -38,7 +38,7 @@ public sealed class VarEnv : IAssignableEnv<int>
         throw new Exception($"Failed: {name} does not exist");
     }
 
-    public int Lookup(string name)
+    public Value Lookup(string name)
     {
         for (int i = env.Count - 1; i >= 0 ; i--)
         {
@@ -51,15 +51,15 @@ public sealed class VarEnv : IAssignableEnv<int>
         throw new Exception($"Failed: Variable {name} has not been declared.");
     }
 
-    public IEnv<int> Pop()
+    public IEnv<Value> Pop()
     {
         env.RemoveAt(env.Count-1);
         return this;
     }
 
-    public IEnv<int> Push()
+    public IEnv<Value> Push()
     {
-        env.Add(ImmutableDictionary<string, int>.Empty);
+        env.Add(ImmutableDictionary<string, Value>.Empty);
         return this;
     }
 }
