@@ -1,6 +1,7 @@
 ﻿using WarmLangCompiler;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
+using WarmLangLexerParser.Exceptions;
 
 var program = "SyntaxTest/Minus.test";
 var lexerDebug = true;
@@ -33,13 +34,20 @@ if(lexerDebug)
     }
 }
 
-var parser = new Parser(tokens);
-ASTNode root = parser.Parse();
+try 
+{
+    var parser = new Parser(tokens);
+    ASTNode root = parser.Parse();
+    Console.WriteLine($"Parsed:\n\t{root}");
 
-Console.WriteLine($"Parsed:\n\t{root}");
+    var res = WarmLangInterpreter.Run(root);
+    Console.WriteLine($"Evaluated '{program}' -> {res}");
+} catch(ParserException e)
+{
+    Console.WriteLine(e.Message);
+    return -1;
+}
 
-var res = WarmLangInterpreter.Run(root);
-Console.WriteLine($"Evaluated '{program}' -> {res}");
 
 
 return 0;

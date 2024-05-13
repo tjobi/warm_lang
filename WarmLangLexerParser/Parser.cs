@@ -1,4 +1,5 @@
 using WarmLangLexerParser.AST;
+using WarmLangLexerParser.Exceptions;
 using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
@@ -163,22 +164,24 @@ public class Parser
             case TVar: { //Variable binding : var x = 2;
                 return ParseVariableDeclarationExpression();
             }
-            case TIdentifier: { //About to use a variable : x + 4
-                if(Peek(1).Kind == TParLeft)
-                {
-                    return ParseCallExpression();
-                }
-                var identToken = NextToken();
-                return new VarExpression(identToken.Name!);
-            }
             case TParLeft: {
                 return ParseParenthesesExpression();
             }
             case TFunc: {
                 return ParseFuncionDeclarationExpression();
             }
+            case TIdentifier: //About to use a variable : x + 4
             default: {
-                return null!;
+                if(Peek(1).Kind == TParLeft)
+                {
+                    return ParseCallExpression();
+                }
+                var identToken = NextToken();
+                if(identToken.Kind != TIdentifier)
+                {
+                    throw new ParserException($"Expected expression but got {identToken.Kind}", identToken.Line, identToken.Column);
+                }
+                return new VarExpression(identToken.Name!);
             }
         }
     }
@@ -230,7 +233,7 @@ public class Parser
                 }
                 else 
                 {
-                    throw new Exception($"Invalid Expression in param declaration, line: {next.Line}, column: {next.Column}");
+                    throw new ParserException($"Invalid expression in parameter declaration starting with {next.Kind}", next);
                 }
             }
             var paramClose = NextToken();
