@@ -5,6 +5,7 @@ using WarmLangLexerParser.Exceptions;
 
 var program = "SyntaxTest/Minus.test";
 var lexerDebug = true;
+var longExceptions = false;
 foreach (var arg in args)
 {
     switch(arg)
@@ -12,6 +13,10 @@ foreach (var arg in args)
         case "--lex-mute":
         {
             lexerDebug = false;
+        } break;
+        case "--trace":
+        {
+            longExceptions = true;
         } break;
         default: {
             if(!File.Exists(arg))
@@ -44,8 +49,13 @@ try
     Console.WriteLine($"Evaluated '{program}' -> {res}");
 } catch(ParserException e)
 {
-    Console.WriteLine(e.Message);
+    Console.WriteLine(longExceptions ? e : e.Message);
     return -1;
+}
+catch (NotImplementedException e )
+{
+    Console.WriteLine(longExceptions ? e : e.Message);
+    return 2;
 }
 
 

@@ -1,4 +1,5 @@
 namespace WarmLangLexerParser.AST;
+using static TokenKind;
 
 public class BinaryExpression : ExpressionNode
 {
@@ -14,10 +15,13 @@ public class BinaryExpression : ExpressionNode
         Left = left;
         Right = right;
         Operation = op.Kind switch {
-            TokenKind.TPlus => "+",
-            TokenKind.TStar => "*",
-            TokenKind.TMinus => "-",
-            _ => throw new NotImplementedException($"{op.Kind} is not yet supported!")
+            TPlus           => "+",
+            TStar           => "*",
+            TMinus          => "-",
+            TEqualEqual     => "==",
+            TLessThan       => "<",
+            TLessThanEqual  => "<=",
+            _ => throw new NotImplementedException($"BinaryExpression: {op.Kind} is not yet supported!")
         };
         _kind = op.Kind;
     }

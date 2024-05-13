@@ -85,7 +85,8 @@ public class Lexer
                 case '/': {
                     token = SyntaxToken.MakeToken(TSlash, row, col);
                     AdvanceText();
-                    if(Current == '/'){
+                    if(Current == '/')
+                    {
                         //We've reached a comment
                         AdvanceLine();
                         continue;
@@ -98,6 +99,24 @@ public class Lexer
                 case '=': {
                     token = SyntaxToken.MakeToken(TEqual, row, col);
                     AdvanceText();
+                    switch(Current)
+                    {
+                        case '=': { //we've hit a ==
+                            token = SyntaxToken.MakeToken(TEqualEqual, row, col);
+                            AdvanceText();
+                        } break;
+                    }
+                } break;
+                case '<': {
+                    token = SyntaxToken.MakeToken(TLessThan, row, col);
+                    AdvanceText();
+                    switch(Current)
+                    {
+                        case '=': {
+                            token = SyntaxToken.MakeToken(TLessThanEqual, row, col);
+                            AdvanceText();
+                        } break;
+                    }
                 } break;
                 case '+': {
                     token = SyntaxToken.MakeToken(TPlus, row, col);

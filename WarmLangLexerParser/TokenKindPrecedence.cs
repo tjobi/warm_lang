@@ -11,6 +11,9 @@ public static class TokenKindPrecedence
             // + 
             TokenKind.TPlus => 100,
             TokenKind.TMinus => 100,
+            TokenKind.TLessThan or 
+                TokenKind.TLessThanEqual => 75,
+            TokenKind.TEqualEqual => 50,
             //The rest shouldn't have any precedence - I think
             _ => -1
         };

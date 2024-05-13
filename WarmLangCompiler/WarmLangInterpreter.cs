@@ -38,7 +38,11 @@ public static class WarmLangInterpreter
                     ("+", IntValue i1, IntValue i2) => new IntValue(i1.Value + i2.Value),
                     ("*", IntValue i1, IntValue i2) => new IntValue(i1.Value * i2.Value),
                     ("-", IntValue i1, IntValue i2) => new IntValue(i1.Value - i2.Value),
-                    _ => throw new NotImplementedException($"Failed: Operator:{op} on {left.GetType()} and {right.GetType()} is not defined")
+                    //TODO: When we introduce booleans, change ones below
+                    ("==", IntValue i1, IntValue i2) => new IntValue(i1.Value == i2.Value ? 1 : 0), 
+                    ("<", IntValue i1, IntValue i2) => new IntValue(i1.Value < i2.Value ? 1 : 0), 
+                    ("<=", IntValue i1, IntValue i2) =>  new IntValue(i1.Value <= i2.Value ? 1 : 0),
+                    _ => throw new NotImplementedException($"Failed: Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
                 };
 
                 return (res, resEnv, fenv);
