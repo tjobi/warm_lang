@@ -131,7 +131,7 @@ public class Lexer
                     if(char.IsDigit(Current))
                     {
                         token = LexNumericLiteral();
-                    } else if(char.IsLetter(Current))
+                    } else if(char.IsLetter(Current) || Current == '_')
                     {
                         token = LexKeywordOrIdentifier();
                     }
