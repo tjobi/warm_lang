@@ -17,11 +17,6 @@ public static class WarmLangInterpreter
         }
     }
 
-    private static string BinaryExpresssionErorrMsg(string op, Value v1, Value v2)
-    {
-        return $"Failed: Operator:{op} on {v1.GetType()} and {v2.GetType()} is not defined";
-    }
-
     public static (Value, IAssignableEnv<Value>, IEnv<Funct>) Evaluate(ASTNode node, IAssignableEnv<Value> env, IEnv<Funct> fenv)
     {
         switch(node)
