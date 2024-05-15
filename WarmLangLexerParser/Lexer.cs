@@ -11,6 +11,8 @@ public class Lexer
     { 
         _window = window;
     }
+
+    public static Lexer FromFile(string path) => new Lexer(new FileWindow(path));
     
     private char Current => _window.Peek();
     private bool IsEndOfFile => _window.IsEndOfFile;

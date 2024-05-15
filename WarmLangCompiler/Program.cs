@@ -15,7 +15,7 @@ var (program, parserDebug, lexerDebug, longExceptions) = (ParsedArgs) parsedArgs
 
 try 
 {
-    var lexer = new Lexer(new FileWindow(program));
+    var lexer = Lexer.FromFile(program);
     var tokens = lexer.Lex();
     if(lexerDebug)
     {
