@@ -1,6 +1,6 @@
 function incrementBySteps(start, incrementAmount, amountOfTimes)
 {
-    var result = start;
+    int result = start;
     
     //function delcared inside of the other function, we use it to loop (amountOfTimes) :D
     function loop(cnt)
@@ -16,5 +16,5 @@ function incrementBySteps(start, incrementAmount, amountOfTimes)
 }
 
 //Starting at 0 increment by 5, and do it 10 times
-var res = incrementBySteps(0, 5, 10);
+int res = incrementBySteps(0, 5, 10);
 res;

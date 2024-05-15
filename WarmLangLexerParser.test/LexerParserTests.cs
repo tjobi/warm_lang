@@ -50,7 +50,7 @@ public class LexerParserTests
     public void TestLexerEmptyLineShouldSucceed()
     {
         string input = //keep the string as is, or screws with the line numbers you'd expect, hehe :)
-@"var x = 25;
+@"int x = 25;
 
 x;
 
@@ -58,7 +58,7 @@ x;
                        
         var expectedRes = new List<SyntaxToken>()
         {
-            MakeToken(TVar,1,1),
+            MakeToken(TInt,1,1),
             MakeToken(TIdentifier,1, 5, "x"),
             MakeToken(TEqual,1,7),
             MakeToken(TConst,1,9, intValue:25),
@@ -79,10 +79,10 @@ x;
     public void TestVarDeclarationShouldSucceed()
     {
         //AAA
-        string input = "var x = 25;";
+        string input = "int x = 25;";
         var expectedRes = new List<SyntaxToken>()
         {
-            MakeToken(TVar,1,1),
+            MakeToken(TInt,1,1),
             MakeToken(TIdentifier,1,5, "x"),
             MakeToken(TEqual,1,7),
             MakeToken(TConst,1,9, intValue:25),
@@ -101,7 +101,7 @@ x;
     {
         //TODO: Does it need to tho? Should we really crash when there is no semi colon? :D
         //AAA
-        string input = "var x = 25";
+        string input = "int x = 25";
 
         var lexer = GetLexer(input);
         var action = lexer.Lex;
@@ -126,10 +126,10 @@ x;
     [Fact]
     public void TestLexerVariableAssignment()
     {
-        string input = "var x = 5; x = 10;";
+        string input = "int x = 5; x = 10;";
         var expected = new List<SyntaxToken>()
         {
-            MakeToken(TVar,1,1),
+            MakeToken(TInt,1,1),
             MakeToken(TIdentifier,1,5,"x"),
             MakeToken(TEqual,1,7),
             MakeToken(TConst,1,9, intValue:5),
@@ -150,8 +150,8 @@ x;
     [Fact]
     public void TestLexerParserVariableAssignment()
     {
-        string input = "var x = 5; x = 10;";
-        var expected = "{(x:TVar = CstI 5);, (Assign x = CstI 10);}";
+        string input = "int x = 5; x = 10;";
+        var expected = "{(x:TInt = CstI 5);, (Assign x = CstI 10);}";
 
         var lexer = GetLexer(input);
         var tokens = lexer.Lex();
@@ -185,21 +185,21 @@ x;
     [Fact]
     public void TestLexerParserVariableAssignmentCursedState()
     {
-        string input = "var x = 25; x = (var y = 3) + 4;x + y;";
+        string input = "int x = 25; x = (int y = 3) + 4;x + y;";
         var expectedNameToken = MakeToken(TIdentifier,0,1, "x");
         var plusToken = MakeToken(TPlus, 0,0);
         var expected = new BlockStatement(
             new List<StatementNode>()
             {
                 new ExprStatement(
-                    new VarDeclarationExpression(TVar, "x", new ConstExpression(25))
+                    new VarDeclarationExpression(TInt, "x", new ConstExpression(25))
                 ),
                 new ExprStatement(
                     new VarAssignmentExpression(
                         MakeToken(TIdentifier, 0,0, "x"), 
                         new BinaryExpression
                         (
-                            new VarDeclarationExpression(TVar, "y", new ConstExpression(3)),
+                            new VarDeclarationExpression(TInt, "y", new ConstExpression(3)),
                             MakeToken(TPlus, 0,0),
                             new ConstExpression(4)
                         )
@@ -286,7 +286,7 @@ x;
     [Fact]
     public void TestLexerFunctionDeclarationKeyword()
     {
-        var input = "function f(){ var x = 10; x; }";
+        var input = "function f(){ int x = 10; x; }";
         var expectedTokens = new List<SyntaxToken>()
         {
             MakeToken(TFunc, 1,1),
@@ -294,7 +294,7 @@ x;
             MakeToken(TParLeft,1,11),
             MakeToken(TParRight,1,12),
             MakeToken(TCurLeft,1,13),
-            MakeToken(TVar,1,15),
+            MakeToken(TInt,1,15),
             MakeToken(TIdentifier,1,19, "x"),
             MakeToken(TEqual,1,21),
             MakeToken(TConst,1,23,intValue:10),
@@ -314,7 +314,7 @@ x;
     [Fact]
     public void TestLexerParserFunctionDeclarationKeywordNoParams()
     {
-        var input = "function f(){ var x = 10; x; }";
+        var input = "function f(){ int x = 10; x; }";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(new FuncDeclaration(
@@ -323,7 +323,7 @@ x;
                 new BlockStatement(new List<StatementNode>()
                 {
                     new ExprStatement(new VarDeclarationExpression(
-                        TVar,
+                        TInt,
                         "x",
                         new ConstExpression(10)
                     )),
@@ -341,7 +341,7 @@ x;
       [Fact]
     public void TestLexerParserFunctionDeclarationKeyword()
     {
-        var input = "function f(y, z, l){ var x = 10; x + y; }";
+        var input = "function f(y, z, l){ int x = 10; x + y; }";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(new FuncDeclaration(
@@ -350,7 +350,7 @@ x;
                 new BlockStatement(new List<StatementNode>()
                 {
                     new ExprStatement(new VarDeclarationExpression(
-                        TVar,
+                        TInt,
                         "x",
                         new ConstExpression(10)
                     )),
@@ -416,11 +416,11 @@ x;
     [Fact]
     public void TestLexerParserUnaryMinus()
     {
-        var input = "var x = -1;";
+        var input = "int x = -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new VarDeclarationExpression(TVar, "x",
+                new VarDeclarationExpression(TInt, "x",
                     new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
                 )
             ),
@@ -436,11 +436,11 @@ x;
     [Fact]
     public void TestLexerParserDoubleUnaryMinus()
     {
-        var input = "var x = - -1;";
+        var input = "int x = - -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new VarDeclarationExpression(TVar, "x",
+                new VarDeclarationExpression(TInt, "x",
                     new UnaryExpression(MakeToken(TMinus,0,0), 
                         new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
                     )
@@ -458,11 +458,11 @@ x;
     [Fact]
     public void TestLexerParserDoubleUnaryPlus()
     {
-        var input = "var x = + + 1;";
+        var input = "int x = + + 1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new VarDeclarationExpression(TVar, "x",
+                new VarDeclarationExpression(TInt, "x",
                     new UnaryExpression(MakeToken(TPlus,0,0), 
                         new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
                     )

@@ -166,7 +166,8 @@ public class Lexer
             "if" => SyntaxToken.MakeToken(TIf, Line, startColumn),
             "then" => SyntaxToken.MakeToken(TThen, Line, startColumn),
             "else" => SyntaxToken.MakeToken(TElse, Line, startColumn),
-            "var" => SyntaxToken.MakeToken(TVar, Line, startColumn),
+            "int" => SyntaxToken.MakeToken(TInt, Line, startColumn),
+            //"var" => SyntaxToken.MakeToken(TVar, Line, startColumn),
             _ => SyntaxToken.MakeToken(TIdentifier, Line, startColumn, name: name)
         };
     }

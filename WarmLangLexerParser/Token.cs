@@ -4,7 +4,7 @@ public enum TokenKind
 {
     TConst,
     TIdentifier, //Variable names, function names...
-    TVar, //var x = 5, the keyword 'var'
+    TVar, TInt, //var x = 5, the keyword 'var'
     TSemiColon, TComma, TDot, TEOF,
     TEqual, 
     TEqualEqual, TLessThan, TLessThanEqual, TPlus, TStar, TSlash, TMinus,

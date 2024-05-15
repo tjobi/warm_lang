@@ -39,6 +39,15 @@ public class Parser
         return tokens[tokens.Count-1];
     }
 
+    private SyntaxToken MatchKinds(params TokenKind[] kinds)
+    {
+        if(kinds.Contains(Current.Kind))
+        {
+            return NextToken();
+        }
+        return tokens[^1];
+    }
+
     public ASTNode Parse()
     {
         ASTNode left = ParseEntry();
@@ -161,7 +170,7 @@ public class Parser
             case TConst: {
                 return ParseConstExpression();
             }
-            case TVar: { //Variable binding : var x = 2;
+            case TInt: { //Variable binding : var x = 2;
                 return ParseVariableDeclarationExpression();
             }
             case TParLeft: {
@@ -196,7 +205,7 @@ public class Parser
 
     private ExpressionNode ParseVariableDeclarationExpression()
     {
-        var type = MatchKind(TVar);
+        var type = MatchKinds(TInt);
         var name = MatchKind(TIdentifier);
         var _ = NextToken(); // throw away the '='
         var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
