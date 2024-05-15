@@ -319,7 +319,7 @@ x;
         {
             new ExprStatement(new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<string>(),
+                new List<(TokenKind, string)>(),
                 new BlockStatement(new List<StatementNode>()
                 {
                     new ExprStatement(new VarDeclarationExpression(
@@ -341,12 +341,12 @@ x;
       [Fact]
     public void TestLexerParserFunctionDeclarationKeyword()
     {
-        var input = "function f(y, z, l){ int x = 10; x + y; }";
+        var input = "function f(int y, int z, int l){ int x = 10; x + y; }";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<string>(){"y", "z", "l"},
+                new List<(TokenKind, string)>() {(TInt, "y"), (TInt, "z"), (TInt, "l")},
                 new BlockStatement(new List<StatementNode>()
                 {
                     new ExprStatement(new VarDeclarationExpression(

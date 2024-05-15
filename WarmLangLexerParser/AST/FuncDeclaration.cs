@@ -7,11 +7,11 @@ public sealed class FuncDeclaration : ExpressionNode //should it be a different 
     public override TokenKind Kind => TokenKind.TFunc;
 
     public string Name { get; }
-    public IList<string> Params { get; set; }
+    public IList<(TokenKind, string)> Params { get; set; }
     public StatementNode Body { get; set; }
 
     //TODO: Remember to fix <parameters> when we add typing?
-    public FuncDeclaration(SyntaxToken nameToken, IList<string> parameters, StatementNode body)
+    public FuncDeclaration(SyntaxToken nameToken, IList<(TokenKind, string)> parameters, StatementNode body)
     {
         Name = nameToken.Name!;
         Params = parameters;

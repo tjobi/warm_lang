@@ -78,7 +78,7 @@ public static class WarmLangInterpreter
                 var (paramNames, funcBody) = fenv.Lookup(name);
                 var callVarScope = env.Push();
                 var callFunScope = fenv.Push();
-                foreach(var (paramName, expr) in paramNames.Zip(callArgs))
+                foreach(var ((paramType, paramName), expr) in paramNames.Zip(callArgs))
                 {
                     var (value, nEnv, nFEnv) = Evaluate(expr, (VarEnv)callVarScope, callFunScope);
                     var (_, nVarEnv) = nEnv.Declare(paramName, value);

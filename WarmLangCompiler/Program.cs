@@ -10,6 +10,7 @@ if(parsedArgs is null)
 {
     return -1;
 }
+// To change the "default" value of the values below goto ArgsParser.ParseArgs :)
 var (program, parserDebug, lexerDebug, longExceptions) = (ParsedArgs) parsedArgs; //cast is okay-ish, we just did a null check
 
 try 

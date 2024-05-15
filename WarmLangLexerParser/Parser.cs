@@ -223,18 +223,20 @@ public class Parser
         var funcKeyword = MatchKind(TFunc);
         var name = MatchKind(TIdentifier);
         var _ = MatchKind(TParLeft);
-        var paramNames = new List<string>();
+        //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
+        var paramNames = new List<(TokenKind, string)>(); 
         if(Current.Kind == TParRight)
         {
-            var paramClose = NextToken();
+            var parClose = NextToken();
         } else 
         {
             while(Current.Kind != TParRight)
             {
-                var next = NextToken();
-                if(next.Kind == TIdentifier && next.Name is not null)
+                var paramType = MatchKinds(TInt); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
+                var nextParam = NextToken();
+                if(nextParam.Kind == TIdentifier && nextParam.Name is not null)
                 {
-                    paramNames.Add(next.Name);
+                    paramNames.Add((paramType.Kind, nextParam.Name)); //TODO: User-defined types, what to do?
                     if(Current.Kind == TComma && Peek(1).Kind != TParRight)
                     {   //We want to remove commas that separate function params
                         var comma = NextToken();
@@ -242,7 +244,7 @@ public class Parser
                 }
                 else 
                 {
-                    throw new ParserException($"Invalid expression in parameter declaration starting with {next.Kind}", next);
+                    throw new ParserException($"Invalid expression in parameter declaration starting with {nextParam.Kind}", nextParam);
                 }
             }
             var paramClose = NextToken();

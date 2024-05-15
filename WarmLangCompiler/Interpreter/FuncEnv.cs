@@ -1,12 +1,6 @@
 namespace WarmLangCompiler.Interpreter;
 
 using System.Collections.Immutable;
-using WarmLangLexerParser.AST;
-
-public sealed record Funct(ImmutableList<string> ParamNames, StatementNode Body)
-{
-    public Funct(IList<string> paramss, StatementNode body) : this(paramss.ToImmutableList(), body) { }
-};
 
 public sealed class FuncEnv : IEnv<Funct>
 {

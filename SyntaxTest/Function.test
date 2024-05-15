@@ -1,4 +1,4 @@
-function f(y,z) 
+function f(int y, int z) 
 { 
     y + z;
 }
