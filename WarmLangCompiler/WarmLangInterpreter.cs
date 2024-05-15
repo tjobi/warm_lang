@@ -1,6 +1,7 @@
 namespace WarmLangCompiler;
 
 using WarmLangCompiler.Interpreter;
+using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 public static class WarmLangInterpreter
 {
@@ -75,13 +76,24 @@ public static class WarmLangInterpreter
             case CallExpression call: {
                 var name = call.Name;
                 var callArgs = call.Arguments;
-                var (paramNames, funcBody) = fenv.Lookup(name);
+                var (functionParameters, funcBody) = fenv.Lookup(name);
+                
                 var callVarScope = env.Push();
                 var callFunScope = fenv.Push();
-                foreach(var ((paramType, paramName), expr) in paramNames.Zip(callArgs))
+
+                foreach(var ((paramType, paramName), expr) in functionParameters.Zip(callArgs)) 
                 {
                     var (value, nEnv, nFEnv) = Evaluate(expr, (VarEnv)callVarScope, callFunScope);
-                    var (_, nVarEnv) = nEnv.Declare(paramName, value);
+
+                    //This is an attempt at prevention a function being called with arguments of wrong types.
+                    //something like : "function func(int x) { x + 2; } 
+                    //                  func(true)"  <-- true is not an int?!?!
+                    var (_, nVarEnv) = (value, paramType) switch 
+                    {
+                        (IntValue _, TokenKind.TInt) => nEnv.Declare(paramName, value),
+                        _ => throw new Exception($"Value of {value.GetType().Name} does not match function paramter type {paramType}")
+                    };
+                    
                     callVarScope = nVarEnv;
                     callFunScope = nFEnv; //not too sure about this one :)
                 }
