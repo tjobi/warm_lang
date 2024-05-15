@@ -2,9 +2,8 @@
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.Exceptions;
-using WarmLangLexerParser.Read;
 
-var DEFAULT_PROGRAM = "SyntaxTest/Minus.test";
+var DEFAULT_PROGRAM = "SyntaxTest/test.test";
 
 var parsedArgs = ArgsParser.ParseArgs(args, DEFAULT_PROGRAM);
 if(parsedArgs is null)

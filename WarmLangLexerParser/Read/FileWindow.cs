@@ -1,17 +1,16 @@
 namespace WarmLangLexerParser.Read;
 
-/*
-    FileWindow gives us a "window" into some file, that is we can see parts of the file at a time :)
-*/
+/// <summary>
+/// FileWindow gives us a "window" into some file, that is we can see parts of the file at a time :)
+/// </summary>
 public sealed class FileWindow : TextWindow
 {
     private readonly StreamReader _reader;
     private string _curLine;
 
-    private FileWindow(StreamReader reader)
+    private FileWindow(StreamReader reader) : base()
     {
         _reader = reader;
-        Column = Line = 0;
         _curLine = _reader.ReadLine() ?? "";
     }
 
@@ -29,13 +28,12 @@ public sealed class FileWindow : TextWindow
             Line++;
         }
         _curLine = line ?? "";
-        Column = 0;
-        Line++;
+        UpdateLineCounter();
     }
 
     public override void AdvanceText()
     {
-        Column++;
+        UpdateColumnCounter();
         if(Column >= _curLine.Length)
         {
             string? line = "";
@@ -44,8 +42,7 @@ public sealed class FileWindow : TextWindow
                 Line++;
             }
             _curLine = line ?? "";
-            Column = 0;
-            Line++;
+            UpdateLineCounter();
         }
     }
 
