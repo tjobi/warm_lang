@@ -1,4 +1,4 @@
-namespace WarmLangLexerParser;
+namespace WarmLangLexerParser.Read;
 
 public interface IFileReader
 {

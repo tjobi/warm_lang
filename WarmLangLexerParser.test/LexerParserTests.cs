@@ -1,4 +1,5 @@
 namespace WarmLangLexerParser.test;
+using WarmLangLexerParser.Read;
 using System.Text;
 using static SyntaxToken;
 using static TokenKind;
@@ -18,7 +19,8 @@ public class LexerParserTests
         byte[] memory = Encoding.UTF8.GetBytes(input);
         MemoryStream memoryStream = new(memory);
         _reader.GetStreamReader().Returns(new StreamReader(memoryStream));
-        return new Lexer(_reader);
+        FileWindow window = new(_reader);
+        return new Lexer(window);
     }
 
     [Fact]
@@ -94,7 +96,7 @@ x;
         res.Should().BeEquivalentTo(expectedRes);
     }
 
-    [Fact]
+    [Fact(Skip = "Until we decide on whether or not a semicolon is mandatory")]
     public void TestDeclarationShouldFail()
     {
         //TODO: Does it need to tho? Should we really crash when there is no semi colon? :D

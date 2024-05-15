@@ -1,69 +1,26 @@
 ﻿using System.Text;
 using WarmLangLexerParser.Exceptions;
+using WarmLangLexerParser.Read;
 using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
 public class Lexer
 {
-    private int col, row;
-    private readonly StreamReader reader;
-    private string curLine;
-    public Lexer(IFileReader fileReader)
+    private readonly TextWindow _window;
+    public Lexer(TextWindow window)
     { 
-        col = row = 0;
-        reader = fileReader.GetStreamReader();
-        curLine = reader.ReadLine() ?? "";
+        _window = window;
     }
     
-    public Lexer(string filePath)
-    {
-        col = row = 0;
-        reader = new StreamReader(filePath);
-        curLine = reader.ReadLine() ?? "";
-    }
+    private char Current => _window.Peek();
+    private bool IsEndOfFile => _window.IsEndOfFile;
+    
+    private int Column => _window.Column;
+    private int Line => _window.Line; 
 
-    private char Current => Peek();
-    private bool IsEndOfFile => reader.EndOfStream && curLine == "" ;
+    private void AdvanceText() => _window.AdvanceText();
 
-    private char Peek()
-    {
-        try 
-        {
-            return curLine[col];
-        } catch (Exception)
-        {
-            Console.WriteLine($"LEXER Failed: on line: {row+1}, column: {col+1}");
-            throw;
-        }
-    }
-
-    private void AdvanceText()
-    {
-        col++;
-        if(col >= curLine.Length)
-        {
-            string? line = "";
-            while(!reader.EndOfStream && string.IsNullOrWhiteSpace(line = reader.ReadLine())) 
-            {
-                row++;
-            }
-            curLine = line ?? "";
-            col = 0;
-            row++;
-        }
-    }
-
-    private void AdvanceLine()
-    {
-        string? line = null;
-        while(!reader.EndOfStream && string.IsNullOrWhiteSpace(line = reader.ReadLine())) 
-        {
-            row++;
-        }
-        curLine = line ?? "";
-        col = 0;
-        row++;
-    }
+    private void AdvanceLine() => _window.AdvanceLine(); 
 
     public IList<SyntaxToken> Lex()
     {
@@ -79,11 +36,11 @@ public class Lexer
             switch(Current)
             {
                 case ';': {
-                    token = SyntaxToken.MakeToken(TSemiColon, row, col);
+                    token = SyntaxToken.MakeToken(TSemiColon, Line, Column);
                     AdvanceText();
                 } break;
                 case '/': {
-                    token = SyntaxToken.MakeToken(TSlash, row, col);
+                    token = SyntaxToken.MakeToken(TSlash, Line, Column);
                     AdvanceText();
                     if(Current == '/')
                     {
@@ -93,57 +50,57 @@ public class Lexer
                     }
                 } break;
                 case ',': {
-                    token = SyntaxToken.MakeToken(TComma, row, col);
+                    token = SyntaxToken.MakeToken(TComma, Line, Column);
                     AdvanceText();
                 } break;
                 case '=': {
-                    token = SyntaxToken.MakeToken(TEqual, row, col);
+                    token = SyntaxToken.MakeToken(TEqual, Line, Column);
                     AdvanceText();
                     switch(Current)
                     {
                         case '=': { //we've hit a ==
-                            token = SyntaxToken.MakeToken(TEqualEqual, row, col);
+                            token = SyntaxToken.MakeToken(TEqualEqual, Line, Column);
                             AdvanceText();
                         } break;
                     }
                 } break;
                 case '<': {
-                    token = SyntaxToken.MakeToken(TLessThan, row, col);
+                    token = SyntaxToken.MakeToken(TLessThan, Line, Column);
                     AdvanceText();
                     switch(Current)
                     {
                         case '=': {
-                            token = SyntaxToken.MakeToken(TLessThanEqual, row, col);
+                            token = SyntaxToken.MakeToken(TLessThanEqual, Line, Column);
                             AdvanceText();
                         } break;
                     }
                 } break;
                 case '+': {
-                    token = SyntaxToken.MakeToken(TPlus, row, col);
+                    token = SyntaxToken.MakeToken(TPlus, Line, Column);
                     AdvanceText();
                 } break;
                 case '-':{
-                    token = SyntaxToken.MakeToken(TMinus, row, col);
+                    token = SyntaxToken.MakeToken(TMinus, Line, Column);
                     AdvanceText();
                 } break;
                 case '*': {
-                    token = SyntaxToken.MakeToken(TStar, row, col);
+                    token = SyntaxToken.MakeToken(TStar, Line, Column);
                     AdvanceText();
                 } break;
                 case '{': {
-                    token = SyntaxToken.MakeToken(TCurLeft, row, col);
+                    token = SyntaxToken.MakeToken(TCurLeft, Line, Column);
                     AdvanceText();
                 } break;
                 case '}': {
-                    token = SyntaxToken.MakeToken(TCurRight, row, col);
+                    token = SyntaxToken.MakeToken(TCurRight, Line, Column);
                     AdvanceText();
                 } break;
                 case '(': {
-                    token = SyntaxToken.MakeToken(TParLeft, row, col);
+                    token = SyntaxToken.MakeToken(TParLeft, Line, Column);
                     AdvanceText();
                 } break;
                 case ')': {
-                    token = SyntaxToken.MakeToken(TParRight, row, col);
+                    token = SyntaxToken.MakeToken(TParRight, Line, Column);
                     AdvanceText();
                 } break;
                 default: {
@@ -156,14 +113,14 @@ public class Lexer
                     }
                     else 
                     {
-                        throw new LexerException($"Invalid character '{Current}'", row, col);
+                        throw new LexerException($"Invalid character '{Current}'", Line, Column);
                     }
                 } break;
             }
             tokens.Add(token);
         }
         //End token stream with an EndOfFile
-        tokens.Add(SyntaxToken.MakeToken(TEOF, row, col));
+        tokens.Add(SyntaxToken.MakeToken(TEOF, Line, Column));
         return tokens;
     }
 
@@ -177,7 +134,7 @@ public class Lexer
             sb.Append(Current);
         }
         var number = int.Parse(sb.ToString());
-        return SyntaxToken.MakeToken(TConst, row, col, intValue: number);
+        return SyntaxToken.MakeToken(TConst, Line, Column, intValue: number);
     }
 
     private SyntaxToken LexKeywordOrIdentifier()
@@ -203,12 +160,12 @@ public class Lexer
         var name = sb.ToString();
         return name switch 
         {
-            "function" => SyntaxToken.MakeToken(TFunc, row, col),
-            "if" => SyntaxToken.MakeToken(TIf, row, col),
-            "then" => SyntaxToken.MakeToken(TThen, row, col),
-            "else" => SyntaxToken.MakeToken(TElse, row, col),
-            "var" => SyntaxToken.MakeToken(TVar, row, col),
-            _ => SyntaxToken.MakeToken(TIdentifier, row, col, name: name)
+            "function" => SyntaxToken.MakeToken(TFunc, Line, Column),
+            "if" => SyntaxToken.MakeToken(TIf, Line, Column),
+            "then" => SyntaxToken.MakeToken(TThen, Line, Column),
+            "else" => SyntaxToken.MakeToken(TElse, Line, Column),
+            "var" => SyntaxToken.MakeToken(TVar, Line, Column),
+            _ => SyntaxToken.MakeToken(TIdentifier, Line, Column, name: name)
         };
     }
 }

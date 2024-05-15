@@ -2,6 +2,7 @@
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.Exceptions;
+using WarmLangLexerParser.Read;
 
 var program = "SyntaxTest/Minus.test";
 var lexerDebug = true;
@@ -29,7 +30,7 @@ foreach (var arg in args)
     }
 }
 
-var lexer = new Lexer(program);
+var lexer = new Lexer(new FileWindow(program));
 var tokens = lexer.Lex();
 if(lexerDebug)
 {
