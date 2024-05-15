@@ -33,11 +33,11 @@ public class LexerParserTests
 ";
         var expected = new List<SyntaxToken>()
         {
-            MakeToken(TConst,1,1, intValue: 2),
-            MakeToken(TPlus,1,2),
-            MakeToken(TConst,1,5, intValue: 2),
-            MakeToken(TSemiColon,1,5),
-            MakeToken(TEOF, 3,0)
+            MakeToken(TConst,2,1, intValue: 2),
+            MakeToken(TPlus,2,3),
+            MakeToken(TConst,2,5, intValue: 2),
+            MakeToken(TSemiColon,2,6),
+            MakeToken(TEOF, 4,1)
         };
 
         var lexer = GetLexer(input);
@@ -58,14 +58,14 @@ x;
                        
         var expectedRes = new List<SyntaxToken>()
         {
-            MakeToken(TVar,0,3),
-            MakeToken(TIdentifier,0, 5, "x"),
-            MakeToken(TEqual,0,6),
-            MakeToken(TConst,0,10, intValue:25),
-            MakeToken(TSemiColon,0,10),
-            MakeToken(TIdentifier,2,1, "x"),
-            MakeToken(TSemiColon,2,1),
-            MakeToken(TEOF, 4, 0)
+            MakeToken(TVar,1,1),
+            MakeToken(TIdentifier,1, 5, "x"),
+            MakeToken(TEqual,1,7),
+            MakeToken(TConst,1,9, intValue:25),
+            MakeToken(TSemiColon,1,11),
+            MakeToken(TIdentifier,3,1, "x"),
+            MakeToken(TSemiColon,3,2),
+            MakeToken(TEOF, 5, 1)
         };
 
 
@@ -82,12 +82,12 @@ x;
         string input = "var x = 25;";
         var expectedRes = new List<SyntaxToken>()
         {
-            MakeToken(TVar,0,3),
-            MakeToken(TIdentifier,0, 5, "x"),
-            MakeToken(TEqual,0,6),
-            MakeToken(TConst,0,10, intValue:25),
-            MakeToken(TSemiColon,0,10),
-            MakeToken(TEOF,1,0),
+            MakeToken(TVar,1,1),
+            MakeToken(TIdentifier,1,5, "x"),
+            MakeToken(TEqual,1,7),
+            MakeToken(TConst,1,9, intValue:25),
+            MakeToken(TSemiColon,1,11),
+            MakeToken(TEOF,2,1),
         };
 
         var lexer = GetLexer(input);
@@ -129,16 +129,16 @@ x;
         string input = "var x = 5; x = 10;";
         var expected = new List<SyntaxToken>()
         {
-            MakeToken(TVar,0,3),
-            MakeToken(TIdentifier,0, 5, "x"),
-            MakeToken(TEqual,0,6),
-            MakeToken(TConst,0,9, intValue:5),
-            MakeToken(TSemiColon,0,9),
-            MakeToken(TIdentifier,0,12, "x"),
-            MakeToken(TEqual,0,13),
-            MakeToken(TConst,0,17, intValue: 10),
-            MakeToken(TSemiColon,0,17), //Little weird it doesn't advance for ";" \o/
-            MakeToken(TEOF,1,0)
+            MakeToken(TVar,1,1),
+            MakeToken(TIdentifier,1,5,"x"),
+            MakeToken(TEqual,1,7),
+            MakeToken(TConst,1,9, intValue:5),
+            MakeToken(TSemiColon,1,10),
+            MakeToken(TIdentifier,1,12, "x"),
+            MakeToken(TEqual,1,14),
+            MakeToken(TConst,1,16, intValue: 10),
+            MakeToken(TSemiColon,1,18),
+            MakeToken(TEOF,2,1)
         };
 
         var lexer = GetLexer(input);
@@ -226,15 +226,15 @@ x;
         string input = "if 0 then 2; else 5;";
         var expected = new List<SyntaxToken>()
         {
-            MakeToken(TIf,0,2),
-            MakeToken(TConst,0,4, intValue:0),
-            MakeToken(TThen,0,9),
-            MakeToken(TConst,0,11,intValue:2),
-            MakeToken(TSemiColon,0,11),
-            MakeToken(TElse,0,17),
-            MakeToken(TConst,0,19,intValue:5),
-            MakeToken(TSemiColon,0,19),
-            MakeToken(TEOF, 1,0)
+            MakeToken(TIf,1,1),
+            MakeToken(TConst,1,4, intValue:0),
+            MakeToken(TThen,1,6),
+            MakeToken(TConst,1,11,intValue:2),
+            MakeToken(TSemiColon,1,12),
+            MakeToken(TElse,1,14),
+            MakeToken(TConst,1,19,intValue:5),
+            MakeToken(TSemiColon,1,20),
+            MakeToken(TEOF, 2,1)
         };
 
         var lexer = GetLexer(input);
@@ -289,20 +289,20 @@ x;
         var input = "function f(){ var x = 10; x; }";
         var expectedTokens = new List<SyntaxToken>()
         {
-            MakeToken(TFunc, 0,8),
-            MakeToken(TIdentifier, 0, 10, "f"),
-            MakeToken(TParLeft, 0,10),
-            MakeToken(TParRight, 0,11),
-            MakeToken(TCurLeft,0,12),
-            MakeToken(TVar,0,17),
-            MakeToken(TIdentifier,0,19, "x"),
-            MakeToken(TEqual,0,20),
-            MakeToken(TConst, 0,24,intValue:10),
-            MakeToken(TSemiColon,0,24),
-            MakeToken(TIdentifier,0,27,"x"),
-            MakeToken(TSemiColon,0,27),
-            MakeToken(TCurRight,0,29),
-            MakeToken(TEOF,1,0),
+            MakeToken(TFunc, 1,1),
+            MakeToken(TIdentifier,1,10, "f"),
+            MakeToken(TParLeft,1,11),
+            MakeToken(TParRight,1,12),
+            MakeToken(TCurLeft,1,13),
+            MakeToken(TVar,1,15),
+            MakeToken(TIdentifier,1,19, "x"),
+            MakeToken(TEqual,1,21),
+            MakeToken(TConst,1,23,intValue:10),
+            MakeToken(TSemiColon,1,25),
+            MakeToken(TIdentifier,1,27,"x"),
+            MakeToken(TSemiColon,1,28),
+            MakeToken(TCurRight,1,30),
+            MakeToken(TEOF,2,1),
         };
 
         var lexer = GetLexer(input);

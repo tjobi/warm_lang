@@ -15,8 +15,8 @@ public class Lexer
     private char Current => _window.Peek();
     private bool IsEndOfFile => _window.IsEndOfFile;
     
-    private int Column => _window.Column;
-    private int Line => _window.Line; 
+    private int Column => _window.Column + 1;
+    private int Line => _window.Line + 1; 
 
     private void AdvanceText() => _window.AdvanceText();
 
@@ -129,18 +129,20 @@ public class Lexer
         //TODO: Maybe just work on straight up numbers?
         //collect the full number as a string
         var sb = new StringBuilder();
+        var startColumn = Column;
         for(; !IsEndOfFile && char.IsDigit(Current); AdvanceText())
         {
             sb.Append(Current);
         }
         var number = int.Parse(sb.ToString());
-        return SyntaxToken.MakeToken(TConst, Line, Column, intValue: number);
+        return SyntaxToken.MakeToken(TConst, Line, startColumn, intValue: number);
     }
 
     private SyntaxToken LexKeywordOrIdentifier()
     {
         var sb = new StringBuilder();
         var readingKeywordOrIdentifier = true;
+        var startColumn = Column;
         while(readingKeywordOrIdentifier && !IsEndOfFile)
         {
             switch(Current) 
@@ -160,12 +162,12 @@ public class Lexer
         var name = sb.ToString();
         return name switch 
         {
-            "function" => SyntaxToken.MakeToken(TFunc, Line, Column),
-            "if" => SyntaxToken.MakeToken(TIf, Line, Column),
-            "then" => SyntaxToken.MakeToken(TThen, Line, Column),
-            "else" => SyntaxToken.MakeToken(TElse, Line, Column),
-            "var" => SyntaxToken.MakeToken(TVar, Line, Column),
-            _ => SyntaxToken.MakeToken(TIdentifier, Line, Column, name: name)
+            "function" => SyntaxToken.MakeToken(TFunc, Line, startColumn),
+            "if" => SyntaxToken.MakeToken(TIf, Line, startColumn),
+            "then" => SyntaxToken.MakeToken(TThen, Line, startColumn),
+            "else" => SyntaxToken.MakeToken(TElse, Line, startColumn),
+            "var" => SyntaxToken.MakeToken(TVar, Line, startColumn),
+            _ => SyntaxToken.MakeToken(TIdentifier, Line, startColumn, name: name)
         };
     }
 }
