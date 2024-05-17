@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text;
 
 namespace WarmLangLexerParser.ErrorReporting;
 
@@ -42,9 +43,26 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         Report(message, true, token.Line, token.Column);
     }
 
-    public void ReportMatchKindNotMatching(TokenKind expected, TokenKind received, int line, int col)
+    public void ReportUnexpectedToken(TokenKind expected, TokenKind received, int line, int col)
     {
         var message = $"Invalid token expected: '{expected}' but got '{received}'";
+        Report(message, true, line, col);
+    }
+
+    public void ReportUnexpectedTokenFromMany(TokenKind[] kinds, TokenKind received, int line, int col)
+    {
+        var sb = new StringBuilder().Append('<');
+        for (int i = 0; i < kinds.Length; i++)
+        {
+            var kind = kinds[i];
+            sb.Append(kind);
+            if(i < kinds.Length-1)
+            {
+                sb.Append(", ");
+            }
+        }
+        sb.Append('>');
+        var message = $"Invalid token expected to be in: '{sb}' but got '{received}'";
         Report(message, true, line, col);
     }
 }
