@@ -1,5 +1,5 @@
 using WarmLangLexerParser.AST;
-using WarmLangLexerParser.Exceptions;
+using WarmLangLexerParser.ErrorReporting;
 using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
@@ -7,12 +7,14 @@ namespace WarmLangLexerParser;
 public class Parser
 {
     private readonly IList<SyntaxToken> tokens;
+    private readonly ErrorWarrningBag _diag;
     private int currentToken;
     
-    public Parser(IList<SyntaxToken> tokens)
+    public Parser(IList<SyntaxToken> tokens, ErrorWarrningBag diag)
     {
         this.tokens = tokens;
         currentToken = 0;
+        _diag = diag;
     }
 
     private SyntaxToken Current => Peek(0);
@@ -179,18 +181,19 @@ public class Parser
             case TFunc: {
                 return ParseFuncionDeclarationExpression();
             }
-            case TIdentifier: //About to use a variable : x + 4
-            default: {
+            case TIdentifier: {
+                //About to use a variable : x + 4 or call a function x()
                 if(Peek(1).Kind == TParLeft)
                 {
                     return ParseCallExpression();
                 }
-                var identToken = NextToken();
-                if(identToken.Kind != TIdentifier)
-                {
-                    throw new ParserException($"Expected expression but got {identToken.Kind}", identToken.Line, identToken.Column);
-                }
+                var identToken = MatchKind(TIdentifier);
                 return new VarExpression(identToken.Name!);
+            }
+            default: {
+                var nextToken = Current.Kind == TEOF ? Current : NextToken();
+                _diag.ReportInvalidExpression(nextToken);
+                return new ExpressionErrorNode(nextToken.Line, nextToken.Column);
             }
         }
     }
@@ -244,7 +247,8 @@ public class Parser
                 }
                 else 
                 {
-                    throw new ParserException($"Invalid expression in parameter declaration starting with {nextParam.Kind}", nextParam);
+                    _diag.ReportInvalidParameterParameterDeclartion(nextParam);
+                    return new ExpressionErrorNode(nextParam.Line, nextParam.Column);
                 }
             }
             var paramClose = NextToken();

@@ -1,6 +1,7 @@
 ﻿using WarmLangCompiler;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
+using WarmLangLexerParser.ErrorReporting;
 using WarmLangLexerParser.Exceptions;
 
 var DEFAULT_PROGRAM = "SyntaxTest/test.test";
@@ -15,7 +16,8 @@ var (program, parserDebug, lexerDebug, longExceptions) = (ParsedArgs) parsedArgs
 
 try 
 {
-    var lexer = Lexer.FromFile(program);
+    var diagnostics = new ErrorWarrningBag();
+    var lexer = Lexer.FromFile(program, diagnostics);
     var tokens = lexer.Lex();
     if(lexerDebug)
     {
@@ -24,12 +26,29 @@ try
             Console.WriteLine(token);
         }
     }
+    if(diagnostics.Any())
+    {
+        Console.WriteLine("--Lexer problems--");
+        foreach(var err in diagnostics)
+        {
+            Console.WriteLine(err);
+        }
+    }
 
-    var parser = new Parser(tokens);
+    diagnostics.Clear();
+    var parser = new Parser(tokens, diagnostics);
     ASTNode root = parser.Parse();
     if(parserDebug)
     {
         Console.WriteLine($"Parsed:\n\t{root}");
+    }
+    if(diagnostics.Any())
+    {
+        Console.WriteLine("--Parser problems --");
+        foreach(var err in diagnostics)
+        {
+            Console.WriteLine(err);
+        }
     }
 
     var res = WarmLangInterpreter.Run(root);
