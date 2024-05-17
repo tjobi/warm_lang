@@ -28,9 +28,9 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         Report(message, true, line, col);
     }
 
-    public void ReportInvalidParameterParameterDeclartion(SyntaxToken token)
+    public void ReportExpectedIdentifierInParamDeclaration(SyntaxToken token)
     {
-        var message = $"Unexpected expression in parameter declaration: '{token}'";
+        var message = $"Identifier expected, got: '{token.Kind}'";
         int line = token.Line;
         int col = token.Column;
         Report(message, true, line, col);
@@ -40,5 +40,11 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
     {
         var message = $"Invalid expression term '{token.Kind}'";
         Report(message, true, token.Line, token.Column);
+    }
+
+    public void ReportMatchKindNotMatching(TokenKind expected, TokenKind received, int line, int col)
+    {
+        var message = $"Invalid token expected: '{expected}' but got '{received}'";
+        Report(message, true, line, col);
     }
 }

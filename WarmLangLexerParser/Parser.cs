@@ -193,7 +193,7 @@ public class Parser
             default: {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
                 _diag.ReportInvalidExpression(nextToken);
-                return new ExpressionErrorNode(nextToken.Line, nextToken.Column);
+                return new ErrorExpressionNode(nextToken.Line, nextToken.Column);
             }
         }
     }
@@ -247,8 +247,8 @@ public class Parser
                 }
                 else 
                 {
-                    _diag.ReportInvalidParameterParameterDeclartion(nextParam);
-                    return new ExpressionErrorNode(nextParam.Line, nextParam.Column);
+                    _diag.ReportExpectedIdentifierInParamDeclaration(nextParam);
+                    return new ErrorExpressionNode(nextParam);
                 }
             }
             var paramClose = NextToken();
