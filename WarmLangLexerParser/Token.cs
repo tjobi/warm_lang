@@ -2,7 +2,8 @@ namespace WarmLangLexerParser;
 
 public enum TokenKind
 {
-    TConst,
+    TBadToken, 
+    TConst, 
     TIdentifier, //Variable names, function names...
     TVar, TInt, //var x = 5, the keyword 'var'
     TSemiColon, TComma, TDot, TEOF,
@@ -11,7 +12,7 @@ public enum TokenKind
     TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
     TAssign, //Assignment x = 10;
     TIfStmnt, TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
-    TFunc, TCall //function & function calls
+    TFunc, TCall, //function & function calls
 }
 
 public record SyntaxToken 

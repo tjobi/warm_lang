@@ -1,19 +1,22 @@
 ﻿using System.Text;
-using WarmLangLexerParser.Exceptions;
 using WarmLangLexerParser.Read;
+using WarmLangLexerParser.ErrorReporting;
 using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
 public class Lexer
 {
     private readonly TextWindow _window;
-    public Lexer(TextWindow window)
+    private readonly ErrorWarrningBag _diag;
+
+    public Lexer(TextWindow window, ErrorWarrningBag reporter)
     { 
         _window = window;
+        _diag = reporter;
     }
 
-    public static Lexer FromFile(string path) => new(new FileWindow(path));
-    public static Lexer FromString(string target) => new(new StringWindow(target));
+    public static Lexer FromFile(string path, ErrorWarrningBag bag) => new(new FileWindow(path), bag);
+    public static Lexer FromString(string target, ErrorWarrningBag bag) => new(new StringWindow(target), bag);
     
     private char Current => _window.Peek();
     private bool IsEndOfFile => _window.IsEndOfFile;
@@ -110,13 +113,17 @@ public class Lexer
                     if(char.IsDigit(Current))
                     {
                         token = LexNumericLiteral();
-                    } else if(char.IsLetter(Current) || Current == '_')
+                    } else if(Current is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') 
+                              || Current == '_')
                     {
                         token = LexKeywordOrIdentifier();
                     }
                     else 
                     {
-                        throw new LexerException($"Invalid character '{Current}'", Line, Column);
+                        //I imagine we just throw in BadToken instead of crashing in the lexer - we are free to crash outside the lexer
+                        token = SyntaxToken.MakeToken(TBadToken, Line, Column);
+                        _diag.ReportInvalidCharacter(Current, Line, Column);
+                        AdvanceText();
                     }
                 } break;
             }

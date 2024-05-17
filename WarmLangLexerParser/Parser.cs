@@ -1,5 +1,5 @@
 using WarmLangLexerParser.AST;
-using WarmLangLexerParser.Exceptions;
+using WarmLangLexerParser.ErrorReporting;
 using static WarmLangLexerParser.TokenKind;
 
 namespace WarmLangLexerParser;
@@ -7,12 +7,14 @@ namespace WarmLangLexerParser;
 public class Parser
 {
     private readonly IList<SyntaxToken> tokens;
+    private readonly ErrorWarrningBag _diag;
     private int currentToken;
     
-    public Parser(IList<SyntaxToken> tokens)
+    public Parser(IList<SyntaxToken> tokens, ErrorWarrningBag diag)
     {
         this.tokens = tokens;
         currentToken = 0;
+        _diag = diag;
     }
 
     private SyntaxToken Current => Peek(0);
@@ -36,7 +38,10 @@ public class Parser
         {
             return NextToken();
         }
-        return tokens[tokens.Count-1];
+        int line = Current.Line;
+        int col = Current.Column;
+        _diag.ReportUnexpectedToken(kind, Current.Kind, line, col);
+        return new SyntaxToken(TBadToken, line, col);
     }
 
     private SyntaxToken MatchKinds(params TokenKind[] kinds)
@@ -45,7 +50,10 @@ public class Parser
         {
             return NextToken();
         }
-        return tokens[^1];
+        int line = Current.Line;
+        int col = Current.Column;
+        _diag.ReportUnexpectedTokenFromMany(kinds, Current.Kind, line, col);
+        return new SyntaxToken(TBadToken, line, col);
     }
 
     public ASTNode Parse()
@@ -109,7 +117,11 @@ public class Parser
         //Lifts an expression to a statement, x + 5;
         // the semicolon makes it a statement.
         var expr = ParseExpression();
-        var semiColonToken = MatchKind(TSemiColon);
+        if(expr is not FuncDeclaration)
+        { 
+            //TODO: this is a bit of a hack lol, there's gotta be another way. Should functions be statements?
+            var semiColonToken = MatchKind(TSemiColon);
+        }
         return new ExprStatement(expr);
     }
 
@@ -179,18 +191,20 @@ public class Parser
             case TFunc: {
                 return ParseFuncionDeclarationExpression();
             }
-            case TIdentifier: //About to use a variable : x + 4
-            default: {
+            case TIdentifier: {
+                //About to use a variable : x + 4 or call a function x()
                 if(Peek(1).Kind == TParLeft)
                 {
                     return ParseCallExpression();
                 }
-                var identToken = NextToken();
-                if(identToken.Kind != TIdentifier)
-                {
-                    throw new ParserException($"Expected expression but got {identToken.Kind}", identToken.Line, identToken.Column);
-                }
+                var identToken = MatchKind(TIdentifier);
                 return new VarExpression(identToken.Name!);
+            }
+            default: {
+                //var nextToken = Current.Kind == TEOF ? Current : NextToken();
+                var nextToken = Current;
+                _diag.ReportInvalidExpression(nextToken);
+                return new ErrorExpressionNode(nextToken.Line, nextToken.Column);
             }
         }
     }
@@ -230,27 +244,31 @@ public class Parser
             var parClose = NextToken();
         } else 
         {
-            while(Current.Kind != TParRight)
+            var parseParameter = true;
+            while(parseParameter 
+                  //&& Current.Kind != TParRight
+                  && NotEndOfFile)
             {
-                var paramType = MatchKinds(TInt); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
-                var nextParam = NextToken();
-                if(nextParam.Kind == TIdentifier && nextParam.Name is not null)
+                var paramType = ParseType(); 
+                var paramName = MatchKind(TIdentifier);
+                paramNames.Add( (paramType.Kind, paramName.Name!) );
+                if(Current.Kind == TComma)
                 {
-                    paramNames.Add((paramType.Kind, nextParam.Name)); //TODO: User-defined types, what to do?
-                    if(Current.Kind == TComma && Peek(1).Kind != TParRight)
-                    {   //We want to remove commas that separate function params
-                        var comma = NextToken();
-                    }
-                }
-                else 
+                    var comma = MatchKind(TComma);
+                } else 
                 {
-                    throw new ParserException($"Invalid expression in parameter declaration starting with {nextParam.Kind}", nextParam);
+                    parseParameter = false;
                 }
             }
-            var paramClose = NextToken();
+            var paramClose = MatchKind(TParRight);
         }
         var body = ParseBlockStatement();
         return new FuncDeclaration(name, paramNames, body);
+    }
+
+    private SyntaxToken ParseType()
+    {
+        return MatchKinds(TInt); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
     }
 
     private ExpressionNode ParseCallExpression()
@@ -258,11 +276,21 @@ public class Parser
         var nameToken = NextToken();
         var openPar = MatchKind(TParLeft);
         var args = new List<ExpressionNode>();
-        while(NotEndOfFile && Current.Kind != TParRight)
+
+        var isReadingArgs = true;
+        while(isReadingArgs && NotEndOfFile) 
+            //&& Current.Kind != TParRight) //TODO: removed this, so we don't allow 
+                                            //stuff like myFunc(2,), those trailing commas D:
         {
             var arg = ParseExpression();
-            var comma = MatchKind(TComma);
             args.Add(arg);
+            if(Current.Kind == TComma)
+            {
+                var comma = MatchKind(TComma);
+            } else 
+            {
+                isReadingArgs = false;
+            }
         }
         var closePar = MatchKind(TParRight);
         return new CallExpression(nameToken, args);

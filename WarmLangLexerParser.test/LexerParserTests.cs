@@ -3,15 +3,17 @@ using WarmLangLexerParser.Read;
 using System.Text;
 using static SyntaxToken;
 using static TokenKind;
-
+using WarmLangLexerParser.ErrorReporting;
 
 public class LexerParserTests
 { 
     private readonly IFileReader _reader;
+    private readonly ErrorWarrningBag _diag;
 
     public LexerParserTests()
     {
         _reader = Substitute.For<IFileReader>();
+        _diag = new ErrorWarrningBag();
     }
 
     private Lexer GetLexer(string input)
@@ -20,8 +22,11 @@ public class LexerParserTests
         MemoryStream memoryStream = new(memory);
         _reader.GetStreamReader().Returns(new StreamReader(memoryStream));
         FileWindow window = new(_reader);
-        return new Lexer(window);
+        return new Lexer(window, _diag);
     }
+
+    private Parser GetParser(Lexer lexer) => new(lexer.Lex(), _diag);
+    private Parser GetParser(IList<SyntaxToken> tokens) => new(tokens, _diag);
 
     [Fact]
     public void TestLexerCommentShouldSucceed()
@@ -117,7 +122,7 @@ x;
     {
         //AAA
         var lexer = GetLexer(input);
-        var parser = new Parser(lexer.Lex());
+        var parser = GetParser(lexer);
         var res = parser.Parse();
 
         res.ToString().Should().Be(expected);
@@ -154,8 +159,7 @@ x;
         var expected = "{(x:TInt = CstI 5);, (Assign x = CstI 10);}";
 
         var lexer = GetLexer(input);
-        var tokens = lexer.Lex();
-        var res = new Parser(tokens).Parse();
+        var res = GetParser(lexer).Parse();
 
         res.ToString().Should().Be(expected);
     }
@@ -176,8 +180,7 @@ x;
         );
 
         var lexer = GetLexer(input);
-        var tokens = lexer.Lex();
-        var res = new Parser(tokens).Parse();
+        var res = GetParser(lexer).Parse();
 
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
@@ -215,7 +218,7 @@ x;
 
         var lexer = GetLexer(input);
         var tokens = lexer.Lex();
-        var res = new Parser(tokens).Parse();
+        var res = GetParser(tokens).Parse();
 
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
@@ -258,7 +261,7 @@ x;
 
         var lexer = GetLexer(input);
         var tokens = lexer.Lex();
-        var res = new Parser(tokens).Parse();
+        var res = GetParser(tokens).Parse();
 
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
@@ -278,7 +281,7 @@ x;
 
         var lexer = GetLexer(input);
         var tokens = lexer.Lex();
-        var res = new Parser(tokens).Parse();
+        var res = GetParser(tokens).Parse();
 
         res.Should().BeEquivalentTo(expected);
     }
@@ -333,7 +336,7 @@ x;
         });
 
         var lexer = GetLexer(input);
-        var res = new Parser(lexer.Lex()).Parse();
+        var res = GetParser(lexer.Lex()).Parse();
 
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
@@ -364,7 +367,7 @@ x;
         });
 
         var lexer = GetLexer(input);
-        var res = new Parser(lexer.Lex()).Parse();
+        var res = GetParser(lexer.Lex()).Parse();
 
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
@@ -381,7 +384,7 @@ x;
         });
 
         var lexer = GetLexer(input);
-        var res = new Parser(lexer.Lex()).Parse();
+        var res = GetParser(lexer).Parse();
 
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
@@ -406,7 +409,7 @@ x;
         });
 
         var lexer = GetLexer(input);
-        var res = new Parser(lexer.Lex()).Parse();
+        var res = GetParser(lexer).Parse();
 
         res.Should().BeEquivalentTo(expected, options => 
             options.RespectingRuntimeTypes()
@@ -427,7 +430,7 @@ x;
         });
 
         var lexer = GetLexer(input);
-        var parser = new Parser(lexer.Lex());
+        var parser = GetParser(lexer);
         var res = parser.Parse();
 
         res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
@@ -449,7 +452,7 @@ x;
         });
 
         var lexer = GetLexer(input);
-        var parser = new Parser(lexer.Lex());
+        var parser = GetParser(lexer);
         var res = parser.Parse();
 
         res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
@@ -471,7 +474,7 @@ x;
         });
 
         var lexer = GetLexer(input);
-        var parser = new Parser(lexer.Lex());
+        var parser = GetParser(lexer);
         var res = parser.Parse();
 
         res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
