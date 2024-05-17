@@ -276,22 +276,25 @@ public class Parser
         var nameToken = NextToken();
         var openPar = MatchKind(TParLeft);
         var args = new List<ExpressionNode>();
-
-        var isReadingArgs = true;
-        while(isReadingArgs && NotEndOfFile) 
-            //&& Current.Kind != TParRight) //TODO: removed this, so we don't allow 
-                                            //stuff like myFunc(2,), those trailing commas D:
+        if(Current.Kind != TParRight)
         {
-            var arg = ParseExpression();
-            args.Add(arg);
-            if(Current.Kind == TComma)
+            var isReadingArgs = true;
+            while(isReadingArgs && NotEndOfFile) 
+                //&& Current.Kind != TParRight) //TODO: removed this, so we don't allow 
+                                                //stuff like myFunc(2,), those trailing commas D:
             {
-                var comma = MatchKind(TComma);
-            } else 
-            {
-                isReadingArgs = false;
+                var arg = ParseExpression();
+                args.Add(arg);
+                if(Current.Kind == TComma)
+                {
+                    var comma = MatchKind(TComma);
+                } else 
+                {
+                    isReadingArgs = false;
+                }
             }
         }
+
         var closePar = MatchKind(TParRight);
         return new CallExpression(nameToken, args);
     }
