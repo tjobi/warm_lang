@@ -21,6 +21,7 @@ public static class ArgsParser
         var parserDebug = false;
 
         var isLookingForFile = true;
+        var argsContainedProgram = false;
         foreach (var arg in args)
         {
             switch(arg)
@@ -47,6 +48,7 @@ public static class ArgsParser
                     {
                         program = arg;
                         isLookingForFile = false;
+                        argsContainedProgram = true;
                     } else 
                     {
                         Console.WriteLine($"INFO ARGS: Invalid arg \"{arg}\"");
@@ -56,7 +58,7 @@ public static class ArgsParser
                 }break;
             }
         }
-        if(program == defaultProgram)
+        if(program == defaultProgram && !argsContainedProgram)
         {
             Console.WriteLine("INFO ARGS: No program provided, using default: \"" + defaultProgram + "\"");
         }
