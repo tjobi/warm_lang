@@ -202,8 +202,8 @@ public class Parser
                 return new VarExpression(identToken.Name!);
             }
             default: {
-                //var nextToken = Current.Kind == TEOF ? Current : NextToken();
-                var nextToken = Current;
+                var nextToken = Current.Kind == TEOF ? Current : NextToken();
+                //var nextToken = Current;
                 _diag.ReportInvalidExpression(nextToken);
                 return new ErrorExpressionNode(nextToken.Line, nextToken.Column);
             }
@@ -275,6 +275,12 @@ public class Parser
             TInt => new TypInt(),
             _ => new TypInvalid() //TODO: user-defined types
         };
+        if(Current.Kind == TBracketLeft)
+        {
+            var bracketOpen = NextToken();
+            var bracketClose = MatchKind(TBracketRight);
+            return new TypArray(typ);
+        }
         return typ;
     }
 

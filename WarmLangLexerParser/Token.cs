@@ -9,7 +9,7 @@ public enum TokenKind
     TSemiColon, TComma, TDot, TEOF,
     TEqual, 
     TEqualEqual, TLessThan, TLessThanEqual, TPlus, TStar, TSlash, TMinus,
-    TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight,
+    TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
     TAssign, //Assignment x = 10;
     TIfStmnt, TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
     TFunc, TCall, //function & function calls

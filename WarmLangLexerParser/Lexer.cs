@@ -109,6 +109,14 @@ public class Lexer
                     token = SyntaxToken.MakeToken(TParRight, Line, Column);
                     AdvanceText();
                 } break;
+                case '[': {
+                    token = SyntaxToken.MakeToken(TBracketLeft, Line, Column);
+                    AdvanceText();
+                } break;
+                case ']': {
+                    token = SyntaxToken.MakeToken(TBracketRight, Line, Column);
+                    AdvanceText();
+                } break;
                 default: {
                     if(char.IsDigit(Current))
                     {
