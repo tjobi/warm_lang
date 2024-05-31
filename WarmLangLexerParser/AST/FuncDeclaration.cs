@@ -1,17 +1,20 @@
 using System.Text;
+using WarmLangLexerParser.AST.Typs;
 
 namespace WarmLangLexerParser.AST;
+
+using ParameterList = IList<(Typ,string)> ;
 
 public sealed class FuncDeclaration : ExpressionNode //should it be a different thing entirely?
 {
     public override TokenKind Kind => TokenKind.TFunc;
 
     public string Name { get; }
-    public IList<(TokenKind, string)> Params { get; set; }
+    public ParameterList Params { get; set; }
     public StatementNode Body { get; set; }
 
     //TODO: Remember to fix <parameters> when we add typing?
-    public FuncDeclaration(SyntaxToken nameToken, IList<(TokenKind, string)> parameters, StatementNode body)
+    public FuncDeclaration(SyntaxToken nameToken, ParameterList parameters, StatementNode body)
     {
         Name = nameToken.Name!;
         Params = parameters;

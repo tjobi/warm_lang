@@ -3,6 +3,8 @@ namespace WarmLangCompiler;
 using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
+using WarmLangLexerParser.AST.Typs;
+
 public static class WarmLangInterpreter
 {
     public static Value Run(ASTNode root)
@@ -102,7 +104,9 @@ public static class WarmLangInterpreter
             }
             case FuncDeclaration funDecl: {
                 var funcName = funDecl.Name;
-                var paramNames = funDecl.Params;
+                var paramNames = funDecl.Params
+                                        .Select(p => (p.Item1.ToTokenKind(), p.Item2))
+                                        .ToList();
                 var body = funDecl.Body;
                 var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
                 return (new IntValue(0), env, newFEnv);

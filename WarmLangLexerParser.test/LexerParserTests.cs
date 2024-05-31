@@ -4,6 +4,7 @@ using System.Text;
 using static SyntaxToken;
 using static TokenKind;
 using WarmLangLexerParser.ErrorReporting;
+using WarmLangLexerParser.AST.Typs;
 
 public class LexerParserTests
 { 
@@ -156,12 +157,22 @@ x;
     public void TestLexerParserVariableAssignment()
     {
         string input = "int x = 5; x = 10;";
-        var expected = "{(x:TInt = CstI 5);, (Assign x = CstI 10);}";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new VarDeclarationExpression(new TypInt(), "x", new ConstExpression(5))
+            ),
+            new ExprStatement(
+                new VarAssignmentExpression(MakeToken(TIdentifier,0,0, "x"),
+                                            new ConstExpression(10)
+                                            )
+            )
+        });
 
         var lexer = GetLexer(input);
         var res = GetParser(lexer).Parse();
 
-        res.ToString().Should().Be(expected);
+        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
 
     [Fact]
@@ -195,14 +206,14 @@ x;
             new List<StatementNode>()
             {
                 new ExprStatement(
-                    new VarDeclarationExpression(TInt, "x", new ConstExpression(25))
+                    new VarDeclarationExpression(new TypInt(), "x", new ConstExpression(25))
                 ),
                 new ExprStatement(
                     new VarAssignmentExpression(
                         MakeToken(TIdentifier, 0,0, "x"), 
                         new BinaryExpression
                         (
-                            new VarDeclarationExpression(TInt, "y", new ConstExpression(3)),
+                            new VarDeclarationExpression(new TypInt(), "y", new ConstExpression(3)),
                             MakeToken(TPlus, 0,0),
                             new ConstExpression(4)
                         )
@@ -322,11 +333,11 @@ x;
         {
             new ExprStatement(new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<(TokenKind, string)>(),
+                new List<(Typ, string)>(),
                 new BlockStatement(new List<StatementNode>()
                 {
                     new ExprStatement(new VarDeclarationExpression(
-                        TInt,
+                        new TypInt(),
                         "x",
                         new ConstExpression(10)
                     )),
@@ -349,11 +360,16 @@ x;
         {
             new ExprStatement(new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<(TokenKind, string)>() {(TInt, "y"), (TInt, "z"), (TInt, "l")},
+                new List<(Typ, string)>() 
+                {
+                    (new TypInt(), "y"), 
+                    (new TypInt(), "z"), 
+                    (new TypInt(), "l")
+                },
                 new BlockStatement(new List<StatementNode>()
                 {
                     new ExprStatement(new VarDeclarationExpression(
-                        TInt,
+                        new TypInt(),
                         "x",
                         new ConstExpression(10)
                     )),
@@ -423,7 +439,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new VarDeclarationExpression(TInt, "x",
+                new VarDeclarationExpression(new TypInt(), "x",
                     new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
                 )
             ),
@@ -443,7 +459,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new VarDeclarationExpression(TInt, "x",
+                new VarDeclarationExpression(new TypInt(), "x",
                     new UnaryExpression(MakeToken(TMinus,0,0), 
                         new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
                     )
@@ -465,7 +481,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new VarDeclarationExpression(TInt, "x",
+                new VarDeclarationExpression(new TypInt(), "x",
                     new UnaryExpression(MakeToken(TPlus,0,0), 
                         new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
                     )

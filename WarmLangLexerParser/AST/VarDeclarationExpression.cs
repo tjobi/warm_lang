@@ -1,3 +1,5 @@
+using WarmLangLexerParser.AST.Typs;
+
 namespace WarmLangLexerParser.AST;
 
 public sealed class VarDeclarationExpression : ExpressionNode
@@ -6,19 +8,22 @@ public sealed class VarDeclarationExpression : ExpressionNode
     public override TokenKind Kind => _kind;
 
     public string Name { get; }
+
+    public Typ Type { get; set; }
     public ExpressionNode RightHandSide { get; }
 
-    public VarDeclarationExpression(TokenKind type, string name, ExpressionNode rightHandSide)
+    public VarDeclarationExpression(Typ type, string name, ExpressionNode rightHandSide)
     {
-        _kind = type;
+        _kind = type.ToTokenKind();
         Name = name;
         RightHandSide = rightHandSide;
+        Type = type;
     }
 
     public override string ToString()
     {
         var rhs = RightHandSide.ToString();
-        return $"({Name}:{_kind} = {rhs})";
+        return $"({Name}:{Type} = {rhs})";
     }
 
 }

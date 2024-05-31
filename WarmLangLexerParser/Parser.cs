@@ -1,4 +1,5 @@
 using WarmLangLexerParser.AST;
+using WarmLangLexerParser.AST.Typs;
 using WarmLangLexerParser.ErrorReporting;
 using static WarmLangLexerParser.TokenKind;
 
@@ -219,11 +220,11 @@ public class Parser
 
     private ExpressionNode ParseVariableDeclarationExpression()
     {
-        var type = MatchKinds(TInt);
+        var type = ParseType();
         var name = MatchKind(TIdentifier);
         var _ = NextToken(); // throw away the '='
         var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
-        return new VarDeclarationExpression(type.Kind, name.Name!, rhs);
+        return new VarDeclarationExpression(type, name.Name!, rhs);
     }
 
     private ExpressionNode ParseConstExpression()
@@ -238,7 +239,7 @@ public class Parser
         var name = MatchKind(TIdentifier);
         var _ = MatchKind(TParLeft);
         //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        var paramNames = new List<(TokenKind, string)>(); 
+        List<(Typ,string)> paramNames = new(); 
         if(Current.Kind == TParRight)
         {
             var parClose = NextToken();
@@ -251,7 +252,7 @@ public class Parser
             {
                 var paramType = ParseType(); 
                 var paramName = MatchKind(TIdentifier);
-                paramNames.Add( (paramType.Kind, paramName.Name!) );
+                paramNames.Add( (paramType, paramName.Name!) );
                 if(Current.Kind == TComma)
                 {
                     var comma = MatchKind(TComma);
@@ -266,9 +267,15 @@ public class Parser
         return new FuncDeclaration(name, paramNames, body);
     }
 
-    private SyntaxToken ParseType()
+    private Typ ParseType()
     {
-        return MatchKinds(TInt); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
+        var type = MatchKinds(TInt); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
+        Typ typ = type.Kind switch 
+        {
+            TInt => new TypInt(),
+            _ => new TypInvalid() //TODO: user-defined types
+        };
+        return typ;
     }
 
     private ExpressionNode ParseCallExpression()
