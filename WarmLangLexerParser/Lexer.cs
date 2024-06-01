@@ -148,12 +148,13 @@ public class Lexer
         //collect the full number as a string
         var sb = new StringBuilder();
         var startColumn = Column;
+        var startLine = Line;
         for(; !IsEndOfFile && char.IsDigit(Current); AdvanceText())
         {
             sb.Append(Current);
         }
         var number = int.Parse(sb.ToString());
-        return SyntaxToken.MakeToken(TConst, Line, startColumn, intValue: number);
+        return SyntaxToken.MakeToken(TConst, startLine, startColumn, intValue: number);
     }
 
     private SyntaxToken LexKeywordOrIdentifier()
@@ -161,12 +162,13 @@ public class Lexer
         var sb = new StringBuilder();
         var readingKeywordOrIdentifier = true;
         var startColumn = Column;
+        var startLine = Line;
         while(readingKeywordOrIdentifier && !IsEndOfFile)
         {
             switch(Current) 
             {
                 case '_': //allow variables with names that include _ (underscore)
-                case (>= 'a' and <= 'z') or (>= 'A' and <= 'Z'): { //TODO: How do we handle unicode æøå? D:
+                case (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'): { //TODO: How do we handle unicode æøå? D:
                     sb.Append(Current);
                     AdvanceText();
                 } break;
@@ -180,13 +182,13 @@ public class Lexer
         var name = sb.ToString();
         return name switch 
         {
-            "function" => SyntaxToken.MakeToken(TFunc, Line, startColumn),
-            "if" => SyntaxToken.MakeToken(TIf, Line, startColumn),
-            "then" => SyntaxToken.MakeToken(TThen, Line, startColumn),
-            "else" => SyntaxToken.MakeToken(TElse, Line, startColumn),
-            "int" => SyntaxToken.MakeToken(TInt, Line, startColumn),
-            //"var" => SyntaxToken.MakeToken(TVar, Line, startColumn),
-            _ => SyntaxToken.MakeToken(TIdentifier, Line, startColumn, name: name)
+            "function" => SyntaxToken.MakeToken(TFunc, startLine, startColumn),
+            "if" => SyntaxToken.MakeToken(TIf, startLine, startColumn),
+            "then" => SyntaxToken.MakeToken(TThen, startLine, startColumn),
+            "else" => SyntaxToken.MakeToken(TElse, startLine, startColumn),
+            "int" => SyntaxToken.MakeToken(TInt, startLine, startColumn),
+            //"var" => SyntaxToken.MakeToken(TVar, startLine, startColumn),
+            _ => SyntaxToken.MakeToken(TIdentifier, startLine, startColumn, name: name)
         };
     }
 }

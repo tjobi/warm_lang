@@ -102,17 +102,47 @@ x;
         res.Should().BeEquivalentTo(expectedRes);
     }
 
-    [Fact(Skip = "Until we decide on whether or not a semicolon is mandatory")]
-    public void TestDeclarationShouldFail()
+    [Fact]
+    public void TestLexerForNumericFollowedByEOF()
     {
         //TODO: Does it need to tho? Should we really crash when there is no semi colon? :D
         //AAA
         string input = "int x = 25";
+        var expectedTokens = new List<SyntaxToken>()
+        {
+            MakeToken(TInt,1,1),
+            MakeToken(TIdentifier,1,5, "x"),
+            MakeToken(TEqual,1,7),
+            MakeToken(TConst,1,9, intValue:25)
+        };
 
         var lexer = GetLexer(input);
-        var action = lexer.Lex;
+        var tokens = lexer.Lex();
 
-        action.Should().Throw<Exception>();
+        tokens.Should().ContainInConsecutiveOrder(expectedTokens);
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerForIdentifierFollowedByEOF()
+    {
+        //TODO: Does it need to tho? Should we really crash when there is no semi colon? :D
+        //AAA
+        string input = "int x = yyyyyy";
+        var expectedTokens = new List<SyntaxToken>()
+        {
+            MakeToken(TInt,1,1),
+            MakeToken(TIdentifier,1,5, "x"),
+            MakeToken(TEqual,1,7),
+            MakeToken(TIdentifier,1,9, "yyyyyy"),
+            MakeToken(TEOF, 2,1)
+        };
+
+        var lexer = GetLexer(input);
+        var tokens = lexer.Lex();
+
+        tokens.Should().ContainInConsecutiveOrder(expectedTokens);
+        _diag.Should().BeEmpty();
     }
 
     [Theory]
