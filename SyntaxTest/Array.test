@@ -1,0 +1,13 @@
+int xs = [1,2,3];
+int xsLength = 3;
+
+function safeIndex(int i)
+{
+    if xsLength < i
+    then
+        xsLength-1;
+    else
+        i;
+}
+
+xs[safeIndex(5000)];

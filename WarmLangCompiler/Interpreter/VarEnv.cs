@@ -1,5 +1,6 @@
 namespace WarmLangCompiler.Interpreter;
 using System.Collections.Immutable;
+using WarmLangCompiler.Interpreter.Values;
 public sealed class VarEnv : IAssignableEnv<Value>
 {
     private readonly List<ImmutableDictionary<string,Value>> env;
@@ -20,7 +21,7 @@ public sealed class VarEnv : IAssignableEnv<Value>
             return (value, this);
         } catch
         {
-            throw new Exception("Failed: Variable is already defined");
+            throw new Exception("Variable is already defined");
         }
     }
 
@@ -35,7 +36,7 @@ public sealed class VarEnv : IAssignableEnv<Value>
                 return (value, this);
             }
         }
-        throw new Exception($"Failed: {name} does not exist");
+        throw new Exception($"Name {name} does not exist");
     }
 
     public Value Lookup(string name)
@@ -48,7 +49,7 @@ public sealed class VarEnv : IAssignableEnv<Value>
                 return res;
             }
         }
-        throw new Exception($"Failed: Variable {name} has not been declared.");
+        throw new Exception($"Variable {name} has not been declared.");
     }
 
     public IEnv<Value> Pop()

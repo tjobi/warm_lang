@@ -2,7 +2,7 @@ using WarmLangLexerParser.AST.Typs;
 
 namespace WarmLangLexerParser.AST;
 
-public sealed class VarDeclarationExpression : ExpressionNode
+public sealed class VarDeclarationExpression : StatementNode
 {
     private readonly TokenKind _kind;
     public override TokenKind Kind => _kind;

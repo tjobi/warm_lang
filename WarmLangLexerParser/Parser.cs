@@ -82,6 +82,9 @@ public class Parser
         {
             TCurLeft => ParseBlockStatement(),
             TIf => ParseIfStatement(),
+            //TODO: May be a problem when we introduce more types? -- what to do?
+            TInt => ParseVariableDeclaration(), 
+            TFunc =>  ParseFunctionDeclaration(),
             _ => ParseExpressionStatement()
         };
     }
@@ -113,16 +116,58 @@ public class Parser
         var __ = MatchKind(TCurRight);
         return new BlockStatement(statements);
     }
+
+    private StatementNode ParseVariableDeclaration()
+    {
+        var type = ParseType();
+        var name = MatchKind(TIdentifier);
+        var _ = NextToken(); // throw away the '='
+        var rhs = ParseExpression(); //Parse the right hand side of a "int x = rhs"
+        var semicolon = MatchKind(TSemiColon);
+        return new VarDeclarationExpression(type, name.Name!, rhs);
+    }
+
+
+    private StatementNode ParseFunctionDeclaration()
+    {
+        var funcKeyword = MatchKind(TFunc);
+        var name = MatchKind(TIdentifier);
+        var _ = MatchKind(TParLeft);
+        //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
+        List<(Typ,string)> paramNames = new(); 
+        if(Current.Kind == TParRight)
+        {
+            var parClose = NextToken();
+        } else 
+        {
+            var parseParameter = true;
+            while(parseParameter 
+                  //&& Current.Kind != TParRight
+                  && NotEndOfFile)
+            {
+                var paramType = ParseType(); 
+                var paramName = MatchKind(TIdentifier);
+                paramNames.Add( (paramType, paramName.Name!) );
+                if(Current.Kind == TComma)
+                {
+                    var comma = MatchKind(TComma);
+                } else 
+                {
+                    parseParameter = false;
+                }
+            }
+            var paramClose = MatchKind(TParRight);
+        }
+        var body = ParseBlockStatement();
+        return new FuncDeclaration(name, paramNames, body);
+    }
+
     private StatementNode ParseExpressionStatement()
     {
         //Lifts an expression to a statement, x + 5;
         // the semicolon makes it a statement.
         var expr = ParseExpression();
-        if(expr is not FuncDeclaration)
-        { 
-            //TODO: this is a bit of a hack lol, there's gotta be another way. Should functions be statements?
-            var semiColonToken = MatchKind(TSemiColon);
-        }
+        var semicolon = MatchKind(TSemiColon);
         return new ExprStatement(expr);
     }
 
@@ -134,12 +179,23 @@ public class Parser
         {
             switch(Peek(1).Kind) //Look ahead to next token, x = (<--) 5, look for a '=' 
             {
-                case TEqual: {
-                    var nameToken = NextToken();
-                    var equalToken = NextToken();
+                case TEqual:
+                {
+                    var access = ParseNameAccess();
+                    var equalToken = MatchKind(TEqual);
                     var rightHandSide = ParseBinaryExpression();
-                    return new VarAssignmentExpression(nameToken, rightHandSide);
+                    return new AssignmentExpression(access, rightHandSide);
                 }
+                case TBracketLeft: //Parsing xs[2] = expression;
+                {
+                    if(TryParseSubscriptAccess(out var access))
+                    {
+                        var equalToken = MatchKind(TEqual);
+                        var rightHandSide = ParseBinaryExpression();
+                        return new AssignmentExpression(access, rightHandSide);
+                    }
+                } break;
+                
             }
         }
 
@@ -183,27 +239,48 @@ public class Parser
             case TConst: {
                 return ParseConstExpression();
             }
-            case TInt: { //Variable binding : var x = 2;
-                return ParseVariableDeclarationExpression();
-            }
             case TParLeft: {
                 return ParseParenthesesExpression();
             }
-            case TFunc: {
-                return ParseFuncionDeclarationExpression();
+            case TBracketLeft: {
+                //Allow list initialization like [] or [1,2,3,4]?
+                var bracketOpen = MatchKind(TBracketLeft);
+                var staticElements = new List<ExpressionNode>();
+                var isReading = true;
+                if(Current.Kind == TBracketRight) //empty array
+                {
+                    var _ = MatchKind(TBracketRight);
+                    return new ArrayInitExpression(staticElements);
+                }
+                while(isReading && NotEndOfFile)
+                {
+                    var next = ParseExpression();
+                    staticElements.Add(next);
+                    if(Current.Kind != TComma)
+                    {
+                        isReading = false;
+                    } else
+                    {
+                        var comma = NextToken();
+                    }
+                }
+                var bracketClose = MatchKind(TBracketRight);
+                return new ArrayInitExpression(staticElements);
             }
             case TIdentifier: {
                 //About to use a variable : x + 4 or call a function x()
-                if(Peek(1).Kind == TParLeft)
+                var peekKind = Peek(1).Kind;
+                if(peekKind == TParLeft)
                 {
                     return ParseCallExpression();
                 }
-                var identToken = MatchKind(TIdentifier);
-                return new VarExpression(identToken.Name!);
+                //var identToken = MatchKind(TIdentifier);
+                var access = ParseAccess();
+                return new AccessExpression(access);
             }
             default: {
-                //var nextToken = Current.Kind == TEOF ? Current : NextToken();
-                var nextToken = Current;
+                var nextToken = Current.Kind == TEOF ? Current : NextToken();
+                //var nextToken = Current;
                 _diag.ReportInvalidExpression(nextToken);
                 return new ErrorExpressionNode(nextToken.Line, nextToken.Column);
             }
@@ -218,53 +295,10 @@ public class Parser
         return expr;
     }
 
-    private ExpressionNode ParseVariableDeclarationExpression()
-    {
-        var type = ParseType();
-        var name = MatchKind(TIdentifier);
-        var _ = NextToken(); // throw away the '='
-        var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
-        return new VarDeclarationExpression(type, name.Name!, rhs);
-    }
-
     private ExpressionNode ParseConstExpression()
     {
         var token = NextToken();
         return new ConstExpression(token.IntValue!.Value);
-    }
-
-    private ExpressionNode ParseFuncionDeclarationExpression()
-    {
-        var funcKeyword = MatchKind(TFunc);
-        var name = MatchKind(TIdentifier);
-        var _ = MatchKind(TParLeft);
-        //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        List<(Typ,string)> paramNames = new(); 
-        if(Current.Kind == TParRight)
-        {
-            var parClose = NextToken();
-        } else 
-        {
-            var parseParameter = true;
-            while(parseParameter 
-                  //&& Current.Kind != TParRight
-                  && NotEndOfFile)
-            {
-                var paramType = ParseType(); 
-                var paramName = MatchKind(TIdentifier);
-                paramNames.Add( (paramType, paramName.Name!) );
-                if(Current.Kind == TComma)
-                {
-                    var comma = MatchKind(TComma);
-                } else 
-                {
-                    parseParameter = false;
-                }
-            }
-            var paramClose = MatchKind(TParRight);
-        }
-        var body = ParseBlockStatement();
-        return new FuncDeclaration(name, paramNames, body);
     }
 
     private Typ ParseType()
@@ -275,6 +309,12 @@ public class Parser
             TInt => new TypInt(),
             _ => new TypInvalid() //TODO: user-defined types
         };
+        if(Current.Kind == TBracketLeft)
+        {
+            var bracketOpen = NextToken();
+            var bracketClose = MatchKind(TBracketRight);
+            return new TypArray(typ);
+        }
         return typ;
     }
 
@@ -304,5 +344,47 @@ public class Parser
 
         var closePar = MatchKind(TParRight);
         return new CallExpression(nameToken, args);
+    }
+
+    private Access ParseAccess()
+    {
+        return (Current.Kind, Peek(1).Kind) switch 
+        {
+            (TIdentifier, TBracketLeft) => ParseSubscriptAccess(),
+            (TIdentifier,_) => ParseNameAccess(),
+            _ => new InvalidAccess()
+        };
+    }
+
+    private Access ParseNameAccess()
+    {
+        var nameToken = MatchKind(TIdentifier);
+        return new NameAccess(nameToken);
+    }
+
+    private Access ParseSubscriptAccess()
+    {
+        var nameToken = MatchKind(TIdentifier);
+        var bracketOpen = MatchKind(TBracketLeft);
+        var expr = ParseExpression();
+        var bracketClose = MatchKind(TBracketRight);
+        return new SubscriptAccess(new NameAccess(nameToken), expr);
+    }
+
+    private bool TryParseSubscriptAccess(out Access res)
+    {
+        var oldCur = currentToken;
+        var nameToken = NextToken();
+        var bracketOpen = NextToken();
+        var expr = ParseExpression();
+        var bracketClose = NextToken();
+        if(Current.Kind == TEqual)
+        {
+            res = new SubscriptAccess(new NameAccess(nameToken), expr);
+            return true;
+        }
+        currentToken = oldCur;
+        res = new InvalidAccess();
+        return false;
     }
 }

@@ -102,17 +102,47 @@ x;
         res.Should().BeEquivalentTo(expectedRes);
     }
 
-    [Fact(Skip = "Until we decide on whether or not a semicolon is mandatory")]
-    public void TestDeclarationShouldFail()
+    [Fact]
+    public void TestLexerForNumericFollowedByEOF()
     {
         //TODO: Does it need to tho? Should we really crash when there is no semi colon? :D
         //AAA
         string input = "int x = 25";
+        var expectedTokens = new List<SyntaxToken>()
+        {
+            MakeToken(TInt,1,1),
+            MakeToken(TIdentifier,1,5, "x"),
+            MakeToken(TEqual,1,7),
+            MakeToken(TConst,1,9, intValue:25)
+        };
 
         var lexer = GetLexer(input);
-        var action = lexer.Lex;
+        var tokens = lexer.Lex();
 
-        action.Should().Throw<Exception>();
+        tokens.Should().ContainInConsecutiveOrder(expectedTokens);
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerForIdentifierFollowedByEOF()
+    {
+        //TODO: Does it need to tho? Should we really crash when there is no semi colon? :D
+        //AAA
+        string input = "int x = yyyyyy";
+        var expectedTokens = new List<SyntaxToken>()
+        {
+            MakeToken(TInt,1,1),
+            MakeToken(TIdentifier,1,5, "x"),
+            MakeToken(TEqual,1,7),
+            MakeToken(TIdentifier,1,9, "yyyyyy"),
+            MakeToken(TEOF, 2,1)
+        };
+
+        var lexer = GetLexer(input);
+        var tokens = lexer.Lex();
+
+        tokens.Should().ContainInConsecutiveOrder(expectedTokens);
+        _diag.Should().BeEmpty();
     }
 
     [Theory]
@@ -159,13 +189,13 @@ x;
         string input = "int x = 5; x = 10;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
+            
+            new VarDeclarationExpression(new TypInt(), "x", new ConstExpression(5)),
             new ExprStatement(
-                new VarDeclarationExpression(new TypInt(), "x", new ConstExpression(5))
-            ),
-            new ExprStatement(
-                new VarAssignmentExpression(MakeToken(TIdentifier,0,0, "x"),
-                                            new ConstExpression(10)
-                                            )
+                new AssignmentExpression(
+                    new NameAccess(MakeToken(TIdentifier,0,0, "x")),
+                    new ConstExpression(10)
+                    )
             )
         });
 
@@ -185,51 +215,13 @@ x;
             new List<StatementNode>()
             {
                 new ExprStatement(
-                    new VarAssignmentExpression(expectedNameToken, expectedExpr)
+                    new AssignmentExpression(new NameAccess(expectedNameToken), expectedExpr)
                 )
             }
         );
 
         var lexer = GetLexer(input);
         var res = GetParser(lexer).Parse();
-
-        res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
-    }
-
-    [Fact]
-    public void TestLexerParserVariableAssignmentCursedState()
-    {
-        string input = "int x = 25; x = (int y = 3) + 4;x + y;";
-        var expectedNameToken = MakeToken(TIdentifier,0,1, "x");
-        var plusToken = MakeToken(TPlus, 0,0);
-        var expected = new BlockStatement(
-            new List<StatementNode>()
-            {
-                new ExprStatement(
-                    new VarDeclarationExpression(new TypInt(), "x", new ConstExpression(25))
-                ),
-                new ExprStatement(
-                    new VarAssignmentExpression(
-                        MakeToken(TIdentifier, 0,0, "x"), 
-                        new BinaryExpression
-                        (
-                            new VarDeclarationExpression(new TypInt(), "y", new ConstExpression(3)),
-                            MakeToken(TPlus, 0,0),
-                            new ConstExpression(4)
-                        )
-                    )
-                ),
-                new ExprStatement( new BinaryExpression(
-                    new VarExpression("x"),
-                    plusToken,
-                    new VarExpression("y")
-                ))
-            }
-        );
-
-        var lexer = GetLexer(input);
-        var tokens = lexer.Lex();
-        var res = GetParser(tokens).Parse();
 
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
@@ -331,19 +323,19 @@ x;
         var input = "function f(){ int x = 10; x; }";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new ExprStatement(new FuncDeclaration(
+            new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
                 new List<(Typ, string)>(),
                 new BlockStatement(new List<StatementNode>()
                 {
-                    new ExprStatement(new VarDeclarationExpression(
+                    new VarDeclarationExpression(
                         new TypInt(),
                         "x",
                         new ConstExpression(10)
-                    )),
-                    new ExprStatement(new VarExpression("x"))
+                    ),
+                    new ExprStatement(new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,1,"x"))))
                 })
-            ))
+            )
         });
 
         var lexer = GetLexer(input);
@@ -358,7 +350,7 @@ x;
         var input = "function f(int y, int z, int l){ int x = 10; x + y; }";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new ExprStatement(new FuncDeclaration(
+            new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
                 new List<(Typ, string)>() 
                 {
@@ -368,18 +360,18 @@ x;
                 },
                 new BlockStatement(new List<StatementNode>()
                 {
-                    new ExprStatement(new VarDeclarationExpression(
+                    new VarDeclarationExpression(
                         new TypInt(),
                         "x",
                         new ConstExpression(10)
-                    )),
+                    ),
                     new ExprStatement(new BinaryExpression(
-                        new VarExpression("x"),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
                         MakeToken(TPlus, 0,0),
-                        new VarExpression("y")
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"y")))
                     ))
                 })
-            ))
+            )
         });
 
         var lexer = GetLexer(input);
@@ -438,11 +430,9 @@ x;
         var input = "int x = -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new ExprStatement(
-                new VarDeclarationExpression(new TypInt(), "x",
-                    new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
-                )
-            ),
+            new VarDeclarationExpression(new TypInt(), "x",
+                new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
+            )
         });
 
         var lexer = GetLexer(input);
@@ -458,13 +448,11 @@ x;
         var input = "int x = - -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new ExprStatement(
-                new VarDeclarationExpression(new TypInt(), "x",
-                    new UnaryExpression(MakeToken(TMinus,0,0), 
-                        new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
-                    )
+            new VarDeclarationExpression(new TypInt(), "x",
+                new UnaryExpression(MakeToken(TMinus,0,0), 
+                    new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
                 )
-            ),
+            )
         });
 
         var lexer = GetLexer(input);
@@ -480,13 +468,11 @@ x;
         var input = "int x = + + 1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new ExprStatement(
-                new VarDeclarationExpression(new TypInt(), "x",
-                    new UnaryExpression(MakeToken(TPlus,0,0), 
-                        new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
-                    )
+            new VarDeclarationExpression(new TypInt(), "x",
+                new UnaryExpression(MakeToken(TPlus,0,0), 
+                    new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
                 )
-            ),
+            )
         });
 
         var lexer = GetLexer(input);
@@ -494,5 +480,125 @@ x;
         var res = parser.Parse();
 
         res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+    }
+
+    [Fact]
+    public void TestLexerParserForArrayInitialization()
+    {
+        var input = "int[] xs = [1,2,3+5]";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new VarDeclarationExpression(
+                new TypArray(new TypInt()),
+                "xs",
+                new ArrayInitExpression(new List<ExpressionNode>()
+                {
+                    new ConstExpression(1),
+                    new ConstExpression(2),
+                    new BinaryExpression(
+                        new ConstExpression(3),
+                        MakeToken(TPlus, 0,0),
+                        new ConstExpression(5)
+                    )
+                }))
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+    }
+
+    [Fact]
+    public void TestLexerParserForArraySubscript()
+    {
+        var input = "xs[2]";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new AccessExpression(
+                    new SubscriptAccess(
+                        new NameAccess(MakeToken(TIdentifier,0,0,"xs")),
+                        new ConstExpression(2)
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+    }
+
+    [Fact]
+    public void TestLexerParserForArrayElementAssignment()
+    {
+        var input = "xs[2] = 25;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new AssignmentExpression(
+                    new SubscriptAccess(
+                        new NameAccess(MakeToken(TIdentifier,0,0,"xs")),
+                        new ConstExpression(2)
+                    ),
+                    new ConstExpression(25)
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserArrayElementAssignmentEqualsArrayElement()
+    {
+        var input = "xs[2] = xs[10];";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new AssignmentExpression(
+                    new SubscriptAccess(
+                        new NameAccess(MakeToken(TIdentifier,0,0,"xs")),
+                        new ConstExpression(2)
+                    ),
+                    new AccessExpression(
+                        new SubscriptAccess(
+                            new NameAccess(MakeToken(TIdentifier,0,0,"xs")),
+                            new ConstExpression(10))
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserForEmptyArray()
+    {
+        var input = "int[] xs = [];";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new VarDeclarationExpression(
+                new TypArray(new TypInt()), "xs",
+                new ArrayInitExpression(new List<ExpressionNode>())
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
     }
 }

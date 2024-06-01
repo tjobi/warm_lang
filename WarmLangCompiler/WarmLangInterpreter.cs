@@ -1,6 +1,7 @@
 namespace WarmLangCompiler;
 
 using WarmLangCompiler.Interpreter;
+using WarmLangCompiler.Interpreter.Values;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.Typs;
@@ -16,7 +17,7 @@ public static class WarmLangInterpreter
             return returned;
         } catch (Exception e)
         {
-            return new StrValue(e.Message);
+            return new ErrValue(e.Message);
         }
     }
 
@@ -24,14 +25,17 @@ public static class WarmLangInterpreter
     {
         switch(node)
         {
-            case ConstExpression c: {
+            case ConstExpression c: 
+            {
                 return (new IntValue(c.Value), env, fenv);
             }
-            case VarExpression var: {
-                var value = env.Lookup(var.Name);
-                return (value, env, fenv);
+            case AccessExpression var: 
+            {
+                var (value, newVarEnv) = Access(var.Access, env, fenv);
+                return (value, newVarEnv, fenv);
             }
-            case BinaryExpression cur: {
+            case BinaryExpression cur: 
+            {
                 var (left, leftEnv, _) = Evaluate(cur.Left, env, fenv);
                 var (right, resEnv, _) = Evaluate(cur.Right, leftEnv, fenv);
 
@@ -45,37 +49,79 @@ public static class WarmLangInterpreter
                     ("==", IntValue i1, IntValue i2) => new IntValue(i1.Value == i2.Value ? 1 : 0), 
                     ("<", IntValue i1, IntValue i2) => new IntValue(i1.Value < i2.Value ? 1 : 0), 
                     ("<=", IntValue i1, IntValue i2) =>  new IntValue(i1.Value <= i2.Value ? 1 : 0),
-                    _ => throw new NotImplementedException($"Failed: Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
+                    _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
                 };
 
                 return (res, resEnv, fenv);
             }
-            case UnaryExpression unary: {
+            case UnaryExpression unary: 
+            {
                 var (exprValue, newVarEnv, newFuncEnv) = Evaluate(unary.Expression, env, fenv);
                 var value = (unary.Operation, exprValue) switch 
                 {
                     ("+", IntValue i) => i,  //do nothing for the (+1) cases
                     ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
-                    _ => throw new NotImplementedException($"Failed: Unary {unary.Operation} is not defined on {exprValue.GetType()}")
+                    _ => throw new NotImplementedException($"Unary {unary.Operation} is not defined on {exprValue.GetType()}")
                 };
                 return (value, newVarEnv, newFuncEnv);
             }
-            case VarDeclarationExpression decl: {
+            case VarDeclarationExpression decl: 
+            {
                 var name = decl.Name;
                 var (value, eEnv,_) = Evaluate(decl.RightHandSide, env, fenv);
                 var (_, nextEnv) = eEnv.Declare( name, value);
                 return (value, (VarEnv)nextEnv, fenv);
             }
-            case VarAssignmentExpression assignment: {
-                var name = assignment.Name;
-                var (value, eEnv,_) = Evaluate(assignment.RightHandSide, env, fenv);
-                var (res, nEnv) = eEnv.Assign(name, value);
-                return (res, (VarEnv)nEnv, fenv);
-                //Use eEnv because in the future we may want to allow something like
-                // var x = 10; var y = 5; x = y++;
-                // which would update both x and y.
+            case AssignmentExpression assignment: 
+            {
+                switch(assignment.Access)
+                {
+                    case NameAccess name:
+                    {
+                        var (value, eEnv,_) = Evaluate(assignment.RightHandSide, env, fenv);
+                        var (_,newVarEnv) = eEnv.Assign(name.Name, value);
+                        return (value, (VarEnv) newVarEnv, fenv);
+                    }
+                    case SubscriptAccess sa: 
+                    {
+                        var (target, _) = Access(sa.Target, env, fenv);
+                        var (index, newVarEnv, _) = Evaluate(sa.Index, env, fenv);
+                        if(target is ArrValue arr && index is IntValue iv)
+                        {
+                            var idx = iv.Value;
+                            if(idx < arr.Elements.Count && idx > 0)
+                            {
+                                var (value, newVarEnv2, _) = Evaluate(assignment.RightHandSide, newVarEnv, fenv);
+                                arr.Elements[idx] = value;
+                                return (value, newVarEnv2, fenv);
+                            } else 
+                            {
+                                throw new Exception("Index was out of range. Must be non-negative and less than size of collection");
+                            }
+                        } else 
+                        {
+                            throw new NotImplementedException($"Subscripting not implemented for {target.GetType().Name}");
+                        }
+                    }
+                    default:
+                        throw new NotImplementedException($"No interpreter support for access {assignment.Access.GetType().Name}");
+                }
             }
-            case CallExpression call: {
+            case ArrayInitExpression arrInitter: 
+            {
+                var values = new List<Value>();
+                foreach(var expr in arrInitter.Elements)
+                {
+                    var evaluatedResult = Evaluate(expr, env, fenv);
+                    values.Add(evaluatedResult.Item1);
+                    env  = evaluatedResult.Item2;
+                    fenv = evaluatedResult.Item3;
+                }
+                var res = new ArrValue(values);
+                return (res, env, fenv);
+            }
+            case CallExpression call: 
+            {
                 var name = call.Name;
                 var callArgs = call.Arguments;
                 var (functionParameters, funcBody) = fenv.Lookup(name);
@@ -102,7 +148,8 @@ public static class WarmLangInterpreter
                 var (returnedValue, retVarEnv, retFuncEnv) = Evaluate(funcBody,(VarEnv)callVarScope, callFunScope);
                 return (returnedValue, (VarEnv)retVarEnv.Pop(), retFuncEnv.Pop());
             }
-            case FuncDeclaration funDecl: {
+            case FuncDeclaration funDecl: 
+            {
                 var funcName = funDecl.Name;
                 var paramNames = funDecl.Params
                                         .Select(p => (p.Item1.ToTokenKind(), p.Item2))
@@ -111,10 +158,12 @@ public static class WarmLangInterpreter
                 var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
                 return (new IntValue(0), env, newFEnv);
             }
-            case ExprStatement expr: {
+            case ExprStatement expr: 
+            {
                 return Evaluate(expr.Expression, env, fenv);
             }
-            case BlockStatement block: {
+            case BlockStatement block: 
+            {
                 var expressions = block.Children;
                 var nenv = env.Push();
                 var nFuncEnv = fenv.Push();
@@ -130,7 +179,8 @@ public static class WarmLangInterpreter
                 var (lastValue, lastEnv, lastFuncEnv) = Evaluate(last, (VarEnv)nenv, nFuncEnv);
                 return (lastValue, (VarEnv)lastEnv.Pop(), lastFuncEnv.Pop()); //Return an unaltered environment - to throw away any variables declared in block.
             }
-            case IfStatement ifstmnt: {
+            case IfStatement ifstmnt: 
+            {
                 var ifScope = env.Push();
                 var ifFuncScope = fenv.Push();
                 var (condValue, cEnv, cFuncEnv) = Evaluate(ifstmnt.Condition, (VarEnv) ifScope, ifFuncScope);
@@ -138,7 +188,7 @@ public static class WarmLangInterpreter
                 bool doThenBranch = condValue switch //TODO: When we introduce booleans, look at this again :)
                 {
                     IntValue i => i.Value != 0,
-                    _ => throw new NotImplementedException($"Failed: value of {condValue.GetType()} cannot be used as boolean")
+                    _ => throw new NotImplementedException($"value of {condValue.GetType()} cannot be used as boolean")
                 };
 
                 if(!doThenBranch && ifstmnt.Else is null)
@@ -149,9 +199,45 @@ public static class WarmLangInterpreter
                 var (value, nEnv, nFuncEnv) = Evaluate(doThenBranch ? ifstmnt.Then : ifstmnt.Else!, cEnv, fenv);
                 return (value, (VarEnv)nEnv.Pop(), nFuncEnv.Pop());
             }
-            default: {
+            default: 
+            {
                 throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");
             }
+        }
+    }
+
+    public static (Value, IAssignableEnv<Value>) Access(Access acc, IAssignableEnv<Value> varEnv, IEnv<Funct> fenv)
+    {
+        switch(acc)
+        {
+            case NameAccess name:
+            {
+                return (varEnv.Lookup(name.Name), varEnv);
+            }
+            case SubscriptAccess sa:
+            {
+                var (target, _) = Access(sa.Target, varEnv, fenv);
+                var (index, newVarEnv, _) = Evaluate(sa.Index, varEnv, fenv);
+                switch(index)
+                {
+                    case IntValue iv:
+                    {
+                        var idx = iv.Value;
+                        var res = target switch 
+                        {
+                            ArrValue a when idx < a.Length && idx > 0 => a.Elements[idx],
+                            ArrValue a when idx >= a.Length || idx < 0 
+                                => throw new Exception($"Index was out of range. Must be non-negative and less than size of collection"),
+                            _ => throw new Exception($"Cannot subscript into type {target.GetType().Name}")
+                        };
+                        return (res, newVarEnv);
+                    }
+                    default: 
+                        throw new Exception($"Cannot subscript into '{sa.Target}' using {index.GetType().Name}");
+                }
+            }
+            default: 
+                throw new NotImplementedException($"Access: {acc.GetType().Name} is not implemented");
         }
     }
 }
