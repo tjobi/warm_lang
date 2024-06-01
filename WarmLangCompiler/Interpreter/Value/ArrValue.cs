@@ -9,6 +9,8 @@ public sealed class ArrValue : Value
         Elements = elements.ToList();
     }
 
+    public int Length => Elements.Count;
+
     public override string ToString()
     {
         var sb = new StringBuilder("Arr [");

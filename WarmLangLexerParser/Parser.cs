@@ -217,6 +217,9 @@ public class Parser
                 if(Peek(1).Kind == TParLeft)
                 {
                     return ParseCallExpression();
+                } else if (Peek(1).Kind == TBracketLeft)
+                {
+                    return ParseSubscriptExpression();
                 }
                 var identToken = MatchKind(TIdentifier);
                 return new VarExpression(identToken.Name!);
@@ -330,5 +333,14 @@ public class Parser
 
         var closePar = MatchKind(TParRight);
         return new CallExpression(nameToken, args);
+    }
+
+    private ExpressionNode ParseSubscriptExpression()
+    {
+        var nameToken = MatchKind(TIdentifier);
+        var bracketOpen = MatchKind(TBracketLeft);
+        var expr = ParseExpression();
+        var bracketClose = MatchKind(TBracketRight);
+        return new SubscriptExpression(nameToken, expr);
     }
 }

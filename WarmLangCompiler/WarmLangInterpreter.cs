@@ -1,5 +1,6 @@
 namespace WarmLangCompiler;
 
+using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Interpreter;
 using WarmLangCompiler.Interpreter.Values;
 using WarmLangLexerParser;
@@ -25,14 +26,17 @@ public static class WarmLangInterpreter
     {
         switch(node)
         {
-            case ConstExpression c: {
+            case ConstExpression c: 
+            {
                 return (new IntValue(c.Value), env, fenv);
             }
-            case VarExpression var: {
+            case VarExpression var: 
+            {
                 var value = env.Lookup(var.Name);
                 return (value, env, fenv);
             }
-            case BinaryExpression cur: {
+            case BinaryExpression cur: 
+            {
                 var (left, leftEnv, _) = Evaluate(cur.Left, env, fenv);
                 var (right, resEnv, _) = Evaluate(cur.Right, leftEnv, fenv);
 
@@ -51,7 +55,8 @@ public static class WarmLangInterpreter
 
                 return (res, resEnv, fenv);
             }
-            case UnaryExpression unary: {
+            case UnaryExpression unary: 
+            {
                 var (exprValue, newVarEnv, newFuncEnv) = Evaluate(unary.Expression, env, fenv);
                 var value = (unary.Operation, exprValue) switch 
                 {
@@ -61,7 +66,25 @@ public static class WarmLangInterpreter
                 };
                 return (value, newVarEnv, newFuncEnv);
             }
-            case ArrayInitExpression arrInitter: {
+            case VarDeclarationExpression decl: 
+            {
+                var name = decl.Name;
+                var (value, eEnv,_) = Evaluate(decl.RightHandSide, env, fenv);
+                var (_, nextEnv) = eEnv.Declare( name, value);
+                return (value, (VarEnv)nextEnv, fenv);
+            }
+            case VarAssignmentExpression assignment: 
+            {
+                var name = assignment.Name;
+                var (value, eEnv,_) = Evaluate(assignment.RightHandSide, env, fenv);
+                var (res, nEnv) = eEnv.Assign(name, value);
+                return (res, (VarEnv)nEnv, fenv);
+                //Use eEnv because in the future we may want to allow something like
+                // var x = 10; var y = 5; x = y++;
+                // which would update both x and y.
+            }
+            case ArrayInitExpression arrInitter: 
+            {
                 var values = new List<Value>();
                 foreach(var expr in arrInitter.Elements)
                 {
@@ -73,22 +96,29 @@ public static class WarmLangInterpreter
                 var res = new ArrValue(values);
                 return (res, env, fenv);
             }
-            case VarDeclarationExpression decl: {
-                var name = decl.Name;
-                var (value, eEnv,_) = Evaluate(decl.RightHandSide, env, fenv);
-                var (_, nextEnv) = eEnv.Declare( name, value);
-                return (value, (VarEnv)nextEnv, fenv);
+            case SubscriptExpression expr: 
+            {
+                var target = env.Lookup(expr.Name);
+                var (evalRes, newVarEnv, newFuncEnv) = Evaluate(expr.Subscript, env, fenv);
+                if(evalRes is IntValue index)
+                {
+                    var idx = index.Value;
+                    var res = target switch 
+                    {
+                        ArrValue a when idx < a.Length && idx > 0 
+                            => a.Elements[index.Value],
+                        ArrValue a when idx >= a.Length || idx < 0 
+                            => throw new Exception($"Index was out of range. Must be non-negative and less than size of collection"),
+                        _ => throw new Exception($"Cannot subscript into type {target.GetType().Name}")
+                    };
+                    return (res, newVarEnv, newFuncEnv);
+                } else
+                {
+                    throw new Exception($"Cannot subscript into '{expr.Name}' using {evalRes.GetType().Name}");
+                }
             }
-            case VarAssignmentExpression assignment: {
-                var name = assignment.Name;
-                var (value, eEnv,_) = Evaluate(assignment.RightHandSide, env, fenv);
-                var (res, nEnv) = eEnv.Assign(name, value);
-                return (res, (VarEnv)nEnv, fenv);
-                //Use eEnv because in the future we may want to allow something like
-                // var x = 10; var y = 5; x = y++;
-                // which would update both x and y.
-            }
-            case CallExpression call: {
+            case CallExpression call: 
+            {
                 var name = call.Name;
                 var callArgs = call.Arguments;
                 var (functionParameters, funcBody) = fenv.Lookup(name);
@@ -115,7 +145,8 @@ public static class WarmLangInterpreter
                 var (returnedValue, retVarEnv, retFuncEnv) = Evaluate(funcBody,(VarEnv)callVarScope, callFunScope);
                 return (returnedValue, (VarEnv)retVarEnv.Pop(), retFuncEnv.Pop());
             }
-            case FuncDeclaration funDecl: {
+            case FuncDeclaration funDecl: 
+            {
                 var funcName = funDecl.Name;
                 var paramNames = funDecl.Params
                                         .Select(p => (p.Item1.ToTokenKind(), p.Item2))
@@ -124,10 +155,12 @@ public static class WarmLangInterpreter
                 var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
                 return (new IntValue(0), env, newFEnv);
             }
-            case ExprStatement expr: {
+            case ExprStatement expr: 
+            {
                 return Evaluate(expr.Expression, env, fenv);
             }
-            case BlockStatement block: {
+            case BlockStatement block: 
+            {
                 var expressions = block.Children;
                 var nenv = env.Push();
                 var nFuncEnv = fenv.Push();
@@ -143,7 +176,8 @@ public static class WarmLangInterpreter
                 var (lastValue, lastEnv, lastFuncEnv) = Evaluate(last, (VarEnv)nenv, nFuncEnv);
                 return (lastValue, (VarEnv)lastEnv.Pop(), lastFuncEnv.Pop()); //Return an unaltered environment - to throw away any variables declared in block.
             }
-            case IfStatement ifstmnt: {
+            case IfStatement ifstmnt: 
+            {
                 var ifScope = env.Push();
                 var ifFuncScope = fenv.Push();
                 var (condValue, cEnv, cFuncEnv) = Evaluate(ifstmnt.Condition, (VarEnv) ifScope, ifFuncScope);
@@ -162,7 +196,8 @@ public static class WarmLangInterpreter
                 var (value, nEnv, nFuncEnv) = Evaluate(doThenBranch ? ifstmnt.Then : ifstmnt.Else!, cEnv, fenv);
                 return (value, (VarEnv)nEnv.Pop(), nFuncEnv.Pop());
             }
-            default: {
+            default: 
+            {
                 throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");
             }
         }

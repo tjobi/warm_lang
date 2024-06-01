@@ -525,4 +525,53 @@ x;
 
         res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
     }
+
+    [Fact]
+    public void TestLexerParserForArrayInitialization()
+    {
+        var input = "int[] xs = [1,2,3+5]";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new VarDeclarationExpression(
+                    new TypArray(new TypInt()),
+                    "xs",
+                    new ArrayInitExpression(new List<ExpressionNode>()
+                    {
+                        new ConstExpression(1),
+                        new ConstExpression(2),
+                        new BinaryExpression(
+                            new ConstExpression(3),
+                            MakeToken(TPlus, 0,0),
+                            new ConstExpression(5)
+                        )
+                    }))
+            ),
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+    }
+
+    [Fact]
+    public void TestLexerParserForArraySubscript()
+    {
+        var input = "xs[2]";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new SubscriptExpression(
+                    MakeToken(TIdentifier, 0,0,"xs"),
+                    new ConstExpression(2)
+                )
+            ),
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+    }
 }

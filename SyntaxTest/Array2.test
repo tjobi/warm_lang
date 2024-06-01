@@ -1,0 +1,6 @@
+function getArrayOf4()
+{
+    [0,1,2,3];
+}
+
+int[] arr = getArrayOf4();
