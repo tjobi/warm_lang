@@ -1,6 +1,5 @@
 namespace WarmLangCompiler;
 
-using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Interpreter;
 using WarmLangCompiler.Interpreter.Values;
 using WarmLangLexerParser;
