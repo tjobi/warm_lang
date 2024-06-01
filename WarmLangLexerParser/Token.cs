@@ -3,7 +3,7 @@ namespace WarmLangLexerParser;
 public enum TokenKind
 {
     TBadToken, 
-    TConst, 
+    TConst, TArray,
     TIdentifier, //Variable names, function names...
     TVar, TInt, //var x = 5, the keyword 'var'
     TSemiColon, TComma, TDot, TEOF,

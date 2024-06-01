@@ -22,7 +22,7 @@ public sealed class FuncEnv : IEnv<Funct>
             return (value, this);
         } catch
         {
-            throw new Exception("Failed: Function is already defined");
+            throw new Exception("Function is already defined");
         }
     }
 
@@ -36,7 +36,7 @@ public sealed class FuncEnv : IEnv<Funct>
                 return res;
             }
         }
-        throw new Exception($"Failed: Variable {name} has not been declared.");
+        throw new Exception($"Variable {name} has not been declared.");
     }
 
     public IEnv<Funct> Pop()

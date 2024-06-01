@@ -1,6 +1,7 @@
 namespace WarmLangCompiler;
 
 using WarmLangCompiler.Interpreter;
+using WarmLangCompiler.Interpreter.Values;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.Typs;
@@ -16,7 +17,7 @@ public static class WarmLangInterpreter
             return returned;
         } catch (Exception e)
         {
-            return new StrValue(e.Message);
+            return new ErrValue(e.Message);
         }
     }
 
@@ -45,7 +46,7 @@ public static class WarmLangInterpreter
                     ("==", IntValue i1, IntValue i2) => new IntValue(i1.Value == i2.Value ? 1 : 0), 
                     ("<", IntValue i1, IntValue i2) => new IntValue(i1.Value < i2.Value ? 1 : 0), 
                     ("<=", IntValue i1, IntValue i2) =>  new IntValue(i1.Value <= i2.Value ? 1 : 0),
-                    _ => throw new NotImplementedException($"Failed: Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
+                    _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
                 };
 
                 return (res, resEnv, fenv);
@@ -56,9 +57,21 @@ public static class WarmLangInterpreter
                 {
                     ("+", IntValue i) => i,  //do nothing for the (+1) cases
                     ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
-                    _ => throw new NotImplementedException($"Failed: Unary {unary.Operation} is not defined on {exprValue.GetType()}")
+                    _ => throw new NotImplementedException($"Unary {unary.Operation} is not defined on {exprValue.GetType()}")
                 };
                 return (value, newVarEnv, newFuncEnv);
+            }
+            case ArrayInitExpression arrInitter: {
+                var values = new List<Value>();
+                foreach(var expr in arrInitter.Elements)
+                {
+                    var evaluatedResult = Evaluate(expr, env, fenv);
+                    values.Add(evaluatedResult.Item1);
+                    env  = evaluatedResult.Item2;
+                    fenv = evaluatedResult.Item3;
+                }
+                var res = new ArrValue(values);
+                return (res, env, fenv);
             }
             case VarDeclarationExpression decl: {
                 var name = decl.Name;
@@ -138,7 +151,7 @@ public static class WarmLangInterpreter
                 bool doThenBranch = condValue switch //TODO: When we introduce booleans, look at this again :)
                 {
                     IntValue i => i.Value != 0,
-                    _ => throw new NotImplementedException($"Failed: value of {condValue.GetType()} cannot be used as boolean")
+                    _ => throw new NotImplementedException($"value of {condValue.GetType()} cannot be used as boolean")
                 };
 
                 if(!doThenBranch && ifstmnt.Else is null)

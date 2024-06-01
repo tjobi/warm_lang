@@ -26,10 +26,11 @@ public sealed class FuncDeclaration : ExpressionNode //should it be a different 
         var sb = new StringBuilder($"{Name} (");
         for (int i = 0; i < Params.Count; i++)
         {
-            var param = Params[i];
+            var (typ, name) = Params[i];
             if(i > 0)
                 sb.Append(',');
-            sb.Append(param);
+            sb.Append(typ.ToString()).Append(' ');
+            sb.Append(name);
         }
         sb.Append(") => ");
         sb.Append(Body);

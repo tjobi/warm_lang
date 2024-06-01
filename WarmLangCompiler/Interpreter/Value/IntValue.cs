@@ -1,4 +1,4 @@
-namespace WarmLangCompiler.Interpreter;
+namespace WarmLangCompiler.Interpreter.Values;
 
 
 public sealed class IntValue : Value

@@ -192,6 +192,26 @@ public class Parser
             case TFunc: {
                 return ParseFuncionDeclarationExpression();
             }
+            case TBracketLeft: {
+                //Allow list initialization like [] or [1,2,3,4]?
+                var bracketOpen = MatchKind(TBracketLeft);
+                var staticElements = new List<ExpressionNode>();
+                var isReading = true;
+                while(isReading && NotEndOfFile)
+                {
+                    var next = ParseExpression();
+                    staticElements.Add(next);
+                    if(Current.Kind != TComma)
+                    {
+                        isReading = false;
+                    } else
+                    {
+                        var comma = NextToken();
+                    }
+                }
+                var bracketClose = MatchKind(TBracketRight);
+                return new ArrayInitExpression(staticElements);
+            }
             case TIdentifier: {
                 //About to use a variable : x + 4 or call a function x()
                 if(Peek(1).Kind == TParLeft)
