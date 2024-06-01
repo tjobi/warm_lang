@@ -582,4 +582,23 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void TestLexerParserForEmptyArray()
+    {
+        var input = "int[] xs = [];";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new VarDeclarationExpression(
+                new TypArray(new TypInt()), "xs",
+                new ArrayInitExpression(new List<ExpressionNode>())
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }

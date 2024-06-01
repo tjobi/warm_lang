@@ -247,6 +247,11 @@ public class Parser
                 var bracketOpen = MatchKind(TBracketLeft);
                 var staticElements = new List<ExpressionNode>();
                 var isReading = true;
+                if(Current.Kind == TBracketRight) //empty array
+                {
+                    var _ = MatchKind(TBracketRight);
+                    return new ArrayInitExpression(staticElements);
+                }
                 while(isReading && NotEndOfFile)
                 {
                     var next = ParseExpression();
