@@ -5,7 +5,7 @@ namespace WarmLangLexerParser.AST;
 
 using ParameterList = IList<(Typ,string)> ;
 
-public sealed class FuncDeclaration : ExpressionNode //should it be a different thing entirely?
+public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {
     public override TokenKind Kind => TokenKind.TFunc;
 

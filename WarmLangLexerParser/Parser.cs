@@ -82,6 +82,9 @@ public class Parser
         {
             TCurLeft => ParseBlockStatement(),
             TIf => ParseIfStatement(),
+            //TODO: May be a problem when we introduce more types? -- what to do?
+            TInt => ParseVariableDeclaration(), 
+            TFunc =>  ParseFunctionDeclaration(),
             _ => ParseExpressionStatement()
         };
     }
@@ -113,16 +116,58 @@ public class Parser
         var __ = MatchKind(TCurRight);
         return new BlockStatement(statements);
     }
+
+    private StatementNode ParseVariableDeclaration()
+    {
+        var type = ParseType();
+        var name = MatchKind(TIdentifier);
+        var _ = NextToken(); // throw away the '='
+        var rhs = ParseExpression(); //Parse the right hand side of a "int x = rhs"
+        var semicolon = MatchKind(TSemiColon);
+        return new VarDeclarationExpression(type, name.Name!, rhs);
+    }
+
+
+    private StatementNode ParseFunctionDeclaration()
+    {
+        var funcKeyword = MatchKind(TFunc);
+        var name = MatchKind(TIdentifier);
+        var _ = MatchKind(TParLeft);
+        //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
+        List<(Typ,string)> paramNames = new(); 
+        if(Current.Kind == TParRight)
+        {
+            var parClose = NextToken();
+        } else 
+        {
+            var parseParameter = true;
+            while(parseParameter 
+                  //&& Current.Kind != TParRight
+                  && NotEndOfFile)
+            {
+                var paramType = ParseType(); 
+                var paramName = MatchKind(TIdentifier);
+                paramNames.Add( (paramType, paramName.Name!) );
+                if(Current.Kind == TComma)
+                {
+                    var comma = MatchKind(TComma);
+                } else 
+                {
+                    parseParameter = false;
+                }
+            }
+            var paramClose = MatchKind(TParRight);
+        }
+        var body = ParseBlockStatement();
+        return new FuncDeclaration(name, paramNames, body);
+    }
+
     private StatementNode ParseExpressionStatement()
     {
         //Lifts an expression to a statement, x + 5;
         // the semicolon makes it a statement.
         var expr = ParseExpression();
-        if(expr is not FuncDeclaration)
-        { 
-            //TODO: this is a bit of a hack lol, there's gotta be another way. Should functions be statements?
-            var semiColonToken = MatchKind(TSemiColon);
-        }
+        var semicolon = MatchKind(TSemiColon);
         return new ExprStatement(expr);
     }
 
@@ -183,14 +228,8 @@ public class Parser
             case TConst: {
                 return ParseConstExpression();
             }
-            case TInt: { //Variable binding : var x = 2;
-                return ParseVariableDeclarationExpression();
-            }
             case TParLeft: {
                 return ParseParenthesesExpression();
-            }
-            case TFunc: {
-                return ParseFuncionDeclarationExpression();
             }
             case TBracketLeft: {
                 //Allow list initialization like [] or [1,2,3,4]?
@@ -241,53 +280,10 @@ public class Parser
         return expr;
     }
 
-    private ExpressionNode ParseVariableDeclarationExpression()
-    {
-        var type = ParseType();
-        var name = MatchKind(TIdentifier);
-        var _ = NextToken(); // throw away the '='
-        var rhs = ParseBinaryExpression(); //Parse the right hand side of a "int x = rhs"
-        return new VarDeclarationExpression(type, name.Name!, rhs);
-    }
-
     private ExpressionNode ParseConstExpression()
     {
         var token = NextToken();
         return new ConstExpression(token.IntValue!.Value);
-    }
-
-    private ExpressionNode ParseFuncionDeclarationExpression()
-    {
-        var funcKeyword = MatchKind(TFunc);
-        var name = MatchKind(TIdentifier);
-        var _ = MatchKind(TParLeft);
-        //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        List<(Typ,string)> paramNames = new(); 
-        if(Current.Kind == TParRight)
-        {
-            var parClose = NextToken();
-        } else 
-        {
-            var parseParameter = true;
-            while(parseParameter 
-                  //&& Current.Kind != TParRight
-                  && NotEndOfFile)
-            {
-                var paramType = ParseType(); 
-                var paramName = MatchKind(TIdentifier);
-                paramNames.Add( (paramType, paramName.Name!) );
-                if(Current.Kind == TComma)
-                {
-                    var comma = MatchKind(TComma);
-                } else 
-                {
-                    parseParameter = false;
-                }
-            }
-            var paramClose = MatchKind(TParRight);
-        }
-        var body = ParseBlockStatement();
-        return new FuncDeclaration(name, paramNames, body);
     }
 
     private Typ ParseType()
