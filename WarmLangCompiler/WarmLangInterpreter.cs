@@ -30,10 +30,10 @@ public static class WarmLangInterpreter
             {
                 return (new IntValue(c.Value), env, fenv);
             }
-            case VarExpression var: 
+            case AccessExpression var: 
             {
-                var value = env.Lookup(var.Name);
-                return (value, env, fenv);
+                var (value, newVarEnv) = Access(var.Access, env, fenv);
+                return (value, newVarEnv, fenv);
             }
             case BinaryExpression cur: 
             {
@@ -73,15 +73,40 @@ public static class WarmLangInterpreter
                 var (_, nextEnv) = eEnv.Declare( name, value);
                 return (value, (VarEnv)nextEnv, fenv);
             }
-            case VarAssignmentExpression assignment: 
+            case AssignmentExpression assignment: 
             {
-                var name = assignment.Name;
-                var (value, eEnv,_) = Evaluate(assignment.RightHandSide, env, fenv);
-                var (res, nEnv) = eEnv.Assign(name, value);
-                return (res, (VarEnv)nEnv, fenv);
-                //Use eEnv because in the future we may want to allow something like
-                // var x = 10; var y = 5; x = y++;
-                // which would update both x and y.
+                switch(assignment.Access)
+                {
+                    case NameAccess name:
+                    {
+                        var (value, eEnv,_) = Evaluate(assignment.RightHandSide, env, fenv);
+                        var (_,newVarEnv) = eEnv.Assign(name.Name, value);
+                        return (value, (VarEnv) newVarEnv, fenv);
+                    }
+                    case SubscriptAccess sa: 
+                    {
+                        var (target, _) = Access(sa.Target, env, fenv);
+                        var (index, newVarEnv, _) = Evaluate(sa.Index, env, fenv);
+                        if(target is ArrValue arr && index is IntValue iv)
+                        {
+                            var idx = iv.Value;
+                            if(idx < arr.Elements.Count && idx > 0)
+                            {
+                                var (value, newVarEnv2, _) = Evaluate(assignment.RightHandSide, newVarEnv, fenv);
+                                arr.Elements[idx] = value;
+                                return (value, newVarEnv2, fenv);
+                            } else 
+                            {
+                                throw new Exception("Index was out of range. Must be non-negative and less than size of collection");
+                            }
+                        } else 
+                        {
+                            throw new NotImplementedException($"Subscripting not implemented for {target.GetType().Name}");
+                        }
+                    }
+                    default:
+                        throw new NotImplementedException($"No interpreter support for access {assignment.Access.GetType().Name}");
+                }
             }
             case ArrayInitExpression arrInitter: 
             {
@@ -95,27 +120,6 @@ public static class WarmLangInterpreter
                 }
                 var res = new ArrValue(values);
                 return (res, env, fenv);
-            }
-            case SubscriptExpression expr: 
-            {
-                var target = env.Lookup(expr.Name);
-                var (evalRes, newVarEnv, newFuncEnv) = Evaluate(expr.Subscript, env, fenv);
-                if(evalRes is IntValue index)
-                {
-                    var idx = index.Value;
-                    var res = target switch 
-                    {
-                        ArrValue a when idx < a.Length && idx > 0 
-                            => a.Elements[index.Value],
-                        ArrValue a when idx >= a.Length || idx < 0 
-                            => throw new Exception($"Index was out of range. Must be non-negative and less than size of collection"),
-                        _ => throw new Exception($"Cannot subscript into type {target.GetType().Name}")
-                    };
-                    return (res, newVarEnv, newFuncEnv);
-                } else
-                {
-                    throw new Exception($"Cannot subscript into '{expr.Name}' using {evalRes.GetType().Name}");
-                }
             }
             case CallExpression call: 
             {
@@ -200,6 +204,41 @@ public static class WarmLangInterpreter
             {
                 throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");
             }
+        }
+    }
+
+    public static (Value, IAssignableEnv<Value>) Access(Access acc, IAssignableEnv<Value> varEnv, IEnv<Funct> fenv)
+    {
+        switch(acc)
+        {
+            case NameAccess name:
+            {
+                return (varEnv.Lookup(name.Name), varEnv);
+            }
+            case SubscriptAccess sa:
+            {
+                var (target, _) = Access(sa.Target, varEnv, fenv);
+                var (index, newVarEnv, _) = Evaluate(sa.Index, varEnv, fenv);
+                switch(index)
+                {
+                    case IntValue iv:
+                    {
+                        var idx = iv.Value;
+                        var res = target switch 
+                        {
+                            ArrValue a when idx < a.Length && idx > 0 => a.Elements[idx],
+                            ArrValue a when idx >= a.Length || idx < 0 
+                                => throw new Exception($"Index was out of range. Must be non-negative and less than size of collection"),
+                            _ => throw new Exception($"Cannot subscript into type {target.GetType().Name}")
+                        };
+                        return (res, newVarEnv);
+                    }
+                    default: 
+                        throw new Exception($"Cannot subscript into '{sa.Target}' using {index.GetType().Name}");
+                }
+            }
+            default: 
+                throw new NotImplementedException($"Access: {acc.GetType().Name} is not implemented");
         }
     }
 }

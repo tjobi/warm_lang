@@ -179,12 +179,23 @@ public class Parser
         {
             switch(Peek(1).Kind) //Look ahead to next token, x = (<--) 5, look for a '=' 
             {
-                case TEqual: {
-                    var nameToken = NextToken();
-                    var equalToken = NextToken();
+                case TEqual:
+                {
+                    var access = ParseNameAccess();
+                    var equalToken = MatchKind(TEqual);
                     var rightHandSide = ParseBinaryExpression();
-                    return new VarAssignmentExpression(nameToken, rightHandSide);
+                    return new AssignmentExpression(access, rightHandSide);
                 }
+                case TBracketLeft: //Parsing xs[2] = expression;
+                {
+                    if(TryParseSubscriptAccess(out var access))
+                    {
+                        var equalToken = MatchKind(TEqual);
+                        var rightHandSide = ParseBinaryExpression();
+                        return new AssignmentExpression(access, rightHandSide);
+                    }
+                } break;
+                
             }
         }
 
@@ -253,15 +264,14 @@ public class Parser
             }
             case TIdentifier: {
                 //About to use a variable : x + 4 or call a function x()
-                if(Peek(1).Kind == TParLeft)
+                var peekKind = Peek(1).Kind;
+                if(peekKind == TParLeft)
                 {
                     return ParseCallExpression();
-                } else if (Peek(1).Kind == TBracketLeft)
-                {
-                    return ParseSubscriptExpression();
                 }
-                var identToken = MatchKind(TIdentifier);
-                return new VarExpression(identToken.Name!);
+                //var identToken = MatchKind(TIdentifier);
+                var access = ParseAccess();
+                return new AccessExpression(access);
             }
             default: {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
@@ -331,12 +341,45 @@ public class Parser
         return new CallExpression(nameToken, args);
     }
 
-    private ExpressionNode ParseSubscriptExpression()
+    private Access ParseAccess()
+    {
+        return (Current.Kind, Peek(1).Kind) switch 
+        {
+            (TIdentifier, TBracketLeft) => ParseSubscriptAccess(),
+            (TIdentifier,_) => ParseNameAccess(),
+            _ => new InvalidAccess()
+        };
+    }
+
+    private Access ParseNameAccess()
+    {
+        var nameToken = MatchKind(TIdentifier);
+        return new NameAccess(nameToken);
+    }
+
+    private Access ParseSubscriptAccess()
     {
         var nameToken = MatchKind(TIdentifier);
         var bracketOpen = MatchKind(TBracketLeft);
         var expr = ParseExpression();
         var bracketClose = MatchKind(TBracketRight);
-        return new SubscriptExpression(nameToken, expr);
+        return new SubscriptAccess(new NameAccess(nameToken), expr);
+    }
+
+    private bool TryParseSubscriptAccess(out Access res)
+    {
+        var oldCur = currentToken;
+        var nameToken = NextToken();
+        var bracketOpen = NextToken();
+        var expr = ParseExpression();
+        var bracketClose = NextToken();
+        if(Current.Kind == TEqual)
+        {
+            res = new SubscriptAccess(new NameAccess(nameToken), expr);
+            return true;
+        }
+        currentToken = oldCur;
+        res = new InvalidAccess();
+        return false;
     }
 }
