@@ -792,4 +792,27 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void TestLexerParseDoubleSubscript()
+    {
+        var input = "xs[1][1];";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new AccessExpression(
+                    new SubscriptAccess(
+                        new SubscriptAccess(new NameAccess(MakeToken(TIdentifier,0,0,"xs")), new ConstExpression(1)),
+                        new ConstExpression(1)
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }

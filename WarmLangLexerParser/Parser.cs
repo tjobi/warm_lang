@@ -382,7 +382,19 @@ public class Parser
         var bracketOpen = MatchKind(TBracketLeft);
         var expr = ParseExpression();
         var bracketClose = MatchKind(TBracketRight);
-        return new SubscriptAccess(new NameAccess(nameToken), expr);
+        var access = new SubscriptAccess(new NameAccess(nameToken), expr);
+        while(true)
+        {
+            if(Current.Kind != TBracketLeft)
+            {
+                break;
+            }
+            var _ = MatchKind(TBracketLeft);
+            var expr2 = ParseExpression();
+            _ = MatchKind(TBracketRight);
+            access = new SubscriptAccess(access, expr);
+        }
+        return access;
     }
 
     private bool TryParseSubscriptAccess(out Access res)
