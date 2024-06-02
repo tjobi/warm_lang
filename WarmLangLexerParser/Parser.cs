@@ -171,25 +171,7 @@ public class Parser
         return new ExprStatement(expr);
     }
 
-    private ExpressionNode ParseExpression() => ParseAA();
-
-    private ExpressionNode ParseAA()
-    {
-        var old = currentToken;
-        _diag.Mute();
-        var expr = ParsePrimaryExpression();
-        _diag.UnMute();
-        if(Current.Kind == TBracketLeft)
-        {
-            var open = MatchKind(TBracketLeft);
-            var subscript = ParsePrimaryExpression();
-            var close = MatchKind(TBracketRight);
-            var access = new ExprAccess(expr);
-            return new AccessExpression(new SubscriptAccess(access, subscript));
-        }
-        currentToken = old;
-        return ParseVariableAssignmentExpression();
-    }
+    private ExpressionNode ParseExpression() => ParseVariableAssignmentExpression();
 
     private ExpressionNode ParseVariableAssignmentExpression()
     {
@@ -225,7 +207,8 @@ public class Parser
         ExpressionNode left;
         var precedence = Current.Kind.GetUnaryPrecedence(); 
         //If it returns -1, it is certainly not a Unary operator, so go to else-branch and parse a normal BinaryExpression
-        if(precedence != -1 && precedence >= parentPrecedence)
+        if(Current.Kind.IsPrefixUnaryExpression() 
+            && precedence != -1 && precedence >= parentPrecedence)
         {
             var op = NextToken();
             var expr = ParseBinaryExpression(precedence);
@@ -246,6 +229,19 @@ public class Parser
             var operatorToken = NextToken();
             var right = ParseBinaryExpression(precedence);
             left = new BinaryExpression(left, operatorToken, right);
+        }
+
+        //Is this too hacky?, once we have a complete binary expression then look
+        // are there any suffix unary operators after the binary?
+        while(Current.Kind.IsSuffixUnaryExpression())
+        {
+            precedence = Current.Kind.GetUnaryPrecedence();
+            if(precedence == -1 || precedence <= parentPrecedence)
+            {
+                break;
+            }
+            var op = NextToken();
+            left = new UnaryExpression(op,left);
         }
         return left;
     }

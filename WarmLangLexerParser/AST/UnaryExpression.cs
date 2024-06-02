@@ -16,5 +16,12 @@ public sealed class UnaryExpression : ExpressionNode
 
     public override TokenKind Kind => _kind;
 
-    public override string ToString() => $"({Operation}{Expression})";
+    public override string ToString()
+    {
+        if(_kind.IsPrefixUnaryExpression())
+        {
+            return $"({Operation}{Expression})";
+        }
+        return $"({Expression}{Operation})";
+    }
 }
