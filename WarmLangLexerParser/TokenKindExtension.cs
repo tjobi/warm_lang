@@ -13,7 +13,7 @@ public static class TokenKindExtension
             TLessThan       => "<",
             TLessThanEqual  => "<=",
             TDoubleColon    => "::",
-            TColonBang    => ":!",
+            TColonBang      => ":!",
             _ => kind.ToString()
         };
     }
