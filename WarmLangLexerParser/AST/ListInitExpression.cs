@@ -3,13 +3,13 @@ using System.Text;
 
 namespace WarmLangLexerParser.AST;
 
-public sealed class ArrayInitExpression : ExpressionNode
+public sealed class ListInitExpression : ExpressionNode
 {
     public override TokenKind Kind => TokenKind.TArray;
 
     public ImmutableList<ExpressionNode> Elements { get; set; }
 
-    public ArrayInitExpression(IList<ExpressionNode> elements)
+    public ListInitExpression(IList<ExpressionNode> elements)
     {
         Elements = elements.ToImmutableList();
     }

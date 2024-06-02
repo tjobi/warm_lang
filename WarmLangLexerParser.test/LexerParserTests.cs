@@ -483,15 +483,15 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForArrayInitialization()
+    public void TestLexerParserForListInitialization()
     {
         var input = "int[] xs = [1,2,3+5]";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypArray(new TypInt()),
+                new TypList(new TypInt()),
                 "xs",
-                new ArrayInitExpression(new List<ExpressionNode>()
+                new ListInitExpression(new List<ExpressionNode>()
                 {
                     new ConstExpression(1),
                     new ConstExpression(2),
@@ -510,7 +510,7 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForArraySubscript()
+    public void TestLexerParserForListSubscript()
     {
         var input = "xs[2]";
         var expected = new BlockStatement(new List<StatementNode>()
@@ -532,7 +532,7 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForArrayElementAssignment()
+    public void TestLexerParserForListElementAssignment()
     {
         var input = "xs[2] = 25;";
         var expected = new BlockStatement(new List<StatementNode>()
@@ -556,7 +556,7 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserArrayElementAssignmentEqualsArrayElement()
+    public void TestLexerParserListElementAssignmentEqualsListElement()
     {
         var input = "xs[2] = xs[10];";
         var expected = new BlockStatement(new List<StatementNode>()
@@ -584,14 +584,84 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForEmptyArray()
+    public void TestLexerParserForEmptyList()
     {
         var input = "int[] xs = [];";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypArray(new TypInt()), "xs",
-                new ArrayInitExpression(new List<ExpressionNode>())
+                new TypList(new TypInt()), "xs",
+                new ListInitExpression(new List<ExpressionNode>())
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserAddElementToList()
+    {
+        var input = "int[] xs = []; xs :: 5;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new VarDeclarationExpression(
+                new TypList(new TypInt()), "xs",
+                new ListInitExpression(new List<ExpressionNode>())
+            ),
+            new ExprStatement(
+                new BinaryExpression(
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"xs"))),
+                    MakeToken(TDoubleColon,0,0),
+                    new ConstExpression(5)
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserRemoveElementFromList()
+    {
+        var input = ":! xs;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TColonBang,0,0),
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
+            ))
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserRemoveAddPrecedence()
+    {
+        var input = ":! xs :: 20;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new BinaryExpression(
+                    new UnaryExpression(
+                        MakeToken(TColonBang,0,0),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))),
+                    MakeToken(TDoubleColon,0,0),
+                    new ConstExpression(20)
+                )
             )
         });
 

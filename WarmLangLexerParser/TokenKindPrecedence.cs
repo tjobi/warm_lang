@@ -11,9 +11,10 @@ public static class TokenKindPrecedence
             // + 
             TokenKind.TPlus => 100,
             TokenKind.TMinus => 100,
-            TokenKind.TLessThan or 
-                TokenKind.TLessThanEqual => 75,
+            TokenKind.TLessThan 
+                or TokenKind.TLessThanEqual => 75,
             TokenKind.TEqualEqual => 50,
+            TokenKind.TDoubleColon => 40,
             //The rest shouldn't have any precedence - I think
             _ => -1
         };
@@ -25,6 +26,7 @@ public static class TokenKindPrecedence
         {
             TokenKind.TMinus 
             or TokenKind.TPlus => 10_000,
+            TokenKind.TColonBang => 40, //TODO: Very whacky!
             _ => -1
         };
     }

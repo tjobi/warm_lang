@@ -81,6 +81,25 @@ public class Lexer
                         } break;
                     }
                 } break;
+                case ':': {
+                    token = SyntaxToken.MakeToken(TColon, Line, Column);
+                    AdvanceText();
+                    switch(Current)
+                    {
+                        case ':': {
+                            token = SyntaxToken.MakeToken(TDoubleColon, Line, Column);
+                            AdvanceText();
+                        } break;
+                        case '!': {
+                            token = SyntaxToken.MakeToken(TColonBang, Line, Column);
+                            AdvanceText();
+                        } break;
+                    }
+                } break;
+                case '!': {
+                    token = SyntaxToken.MakeToken(TBang, Line, Column);
+                    AdvanceText();
+                } break;
                 case '+': {
                     token = SyntaxToken.MakeToken(TPlus, Line, Column);
                     AdvanceText();
