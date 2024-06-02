@@ -483,15 +483,15 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForArrayInitialization()
+    public void TestLexerParserForListInitialization()
     {
         var input = "int[] xs = [1,2,3+5]";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypArray(new TypInt()),
+                new TypList(new TypInt()),
                 "xs",
-                new ArrayInitExpression(new List<ExpressionNode>()
+                new ListInitExpression(new List<ExpressionNode>()
                 {
                     new ConstExpression(1),
                     new ConstExpression(2),
@@ -510,7 +510,7 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForArraySubscript()
+    public void TestLexerParserForListSubscript()
     {
         var input = "xs[2]";
         var expected = new BlockStatement(new List<StatementNode>()
@@ -532,7 +532,7 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForArrayElementAssignment()
+    public void TestLexerParserForListElementAssignment()
     {
         var input = "xs[2] = 25;";
         var expected = new BlockStatement(new List<StatementNode>()
@@ -556,7 +556,7 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserArrayElementAssignmentEqualsArrayElement()
+    public void TestLexerParserListElementAssignmentEqualsListElement()
     {
         var input = "xs[2] = xs[10];";
         var expected = new BlockStatement(new List<StatementNode>()
@@ -584,14 +584,14 @@ x;
     }
 
     [Fact]
-    public void TestLexerParserForEmptyArray()
+    public void TestLexerParserForEmptyList()
     {
         var input = "int[] xs = [];";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypArray(new TypInt()), "xs",
-                new ArrayInitExpression(new List<ExpressionNode>())
+                new TypList(new TypInt()), "xs",
+                new ListInitExpression(new List<ExpressionNode>())
             )
         });
 
@@ -609,8 +609,8 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypArray(new TypInt()), "xs",
-                new ArrayInitExpression(new List<ExpressionNode>())
+                new TypList(new TypInt()), "xs",
+                new ListInitExpression(new List<ExpressionNode>())
             ),
             new ExprStatement(
                 new BinaryExpression(

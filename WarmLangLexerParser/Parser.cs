@@ -247,10 +247,10 @@ public class Parser
                 var bracketOpen = MatchKind(TBracketLeft);
                 var staticElements = new List<ExpressionNode>();
                 var isReading = true;
-                if(Current.Kind == TBracketRight) //empty array
+                if(Current.Kind == TBracketRight) //empty list
                 {
                     var _ = MatchKind(TBracketRight);
-                    return new ArrayInitExpression(staticElements);
+                    return new ListInitExpression(staticElements);
                 }
                 while(isReading && NotEndOfFile)
                 {
@@ -265,7 +265,7 @@ public class Parser
                     }
                 }
                 var bracketClose = MatchKind(TBracketRight);
-                return new ArrayInitExpression(staticElements);
+                return new ListInitExpression(staticElements);
             }
             case TIdentifier: {
                 //About to use a variable : x + 4 or call a function x()
@@ -313,7 +313,7 @@ public class Parser
         {
             var bracketOpen = NextToken();
             var bracketClose = MatchKind(TBracketRight);
-            return new TypArray(typ);
+            return new TypList(typ);
         }
         return typ;
     }

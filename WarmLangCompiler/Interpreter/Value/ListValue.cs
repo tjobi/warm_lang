@@ -1,10 +1,10 @@
 namespace WarmLangCompiler.Interpreter.Values;
 using System.Text;
-public sealed class ArrValue : Value
+public sealed class ListValue : Value
 {
     public List<Value> Elements { get; }
 
-    public ArrValue(IList<Value> elements)
+    public ListValue(IList<Value> elements)
     {
         Elements = elements.ToList();
     }
@@ -24,7 +24,7 @@ public sealed class ArrValue : Value
         }
     }
 
-    public ArrValue Add(Value v)
+    public ListValue Add(Value v)
     {
         Elements.Add(v);
         return this;
@@ -42,7 +42,7 @@ public sealed class ArrValue : Value
 
     public override string ToString()
     {
-        var sb = new StringBuilder("Arr [");
+        var sb = new StringBuilder("List [");
         
         for(int i = 0; i < Elements.Count; i++)
         {

@@ -49,8 +49,8 @@ public static class WarmLangInterpreter
                     ("==", IntValue i1, IntValue i2) => new IntValue(i1.Value == i2.Value ? 1 : 0), 
                     ("<", IntValue i1, IntValue i2) => new IntValue(i1.Value < i2.Value ? 1 : 0), 
                     ("<=", IntValue i1, IntValue i2) =>  new IntValue(i1.Value <= i2.Value ? 1 : 0),
-                    ("::", ArrValue arr, IntValue i) => arr.Add(i),
-                    ("+", ArrValue a1, ArrValue a2) => new ArrValue(a1.Elements.Concat(a2.Elements).ToList()),
+                    ("::", ListValue arr, IntValue i) => arr.Add(i),
+                    ("+", ListValue a1, ListValue a2) => new ListValue(a1.Elements.Concat(a2.Elements).ToList()),
                     _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
                 };
 
@@ -63,7 +63,7 @@ public static class WarmLangInterpreter
                 {
                     ("+", IntValue i) => i,  //do nothing for the (+1) cases
                     ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
-                    (":!", ArrValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
+                    (":!", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
                     _ => throw new NotImplementedException($"Unary {unary.Operation} is not defined on {exprValue.GetType()}")
                 };
                 return (value, newVarEnv, newFuncEnv);
@@ -89,7 +89,7 @@ public static class WarmLangInterpreter
                     {
                         var (target, _) = Access(sa.Target, env, fenv);
                         var (index, newVarEnv, _) = Evaluate(sa.Index, env, fenv);
-                        if(target is ArrValue arr && index is IntValue iv)
+                        if(target is ListValue arr && index is IntValue iv)
                         {
                             var idx = iv.Value;
                             if(idx < arr.Elements.Count && idx > 0)
@@ -110,7 +110,7 @@ public static class WarmLangInterpreter
                         throw new NotImplementedException($"No interpreter support for access {assignment.Access.GetType().Name}");
                 }
             }
-            case ArrayInitExpression arrInitter: 
+            case ListInitExpression arrInitter: 
             {
                 var values = new List<Value>();
                 foreach(var expr in arrInitter.Elements)
@@ -120,7 +120,7 @@ public static class WarmLangInterpreter
                     env  = evaluatedResult.Item2;
                     fenv = evaluatedResult.Item3;
                 }
-                var res = new ArrValue(values);
+                var res = new ListValue(values);
                 return (res, env, fenv);
             }
             case CallExpression call: 
@@ -228,8 +228,8 @@ public static class WarmLangInterpreter
                         var idx = iv.Value;
                         var res = target switch 
                         {
-                            ArrValue a when idx < a.Length && idx > 0 => a.Elements[idx],
-                            ArrValue a when idx >= a.Length || idx < 0 
+                            ListValue a when idx < a.Length && idx > 0 => a.Elements[idx],
+                            ListValue a when idx >= a.Length || idx < 0 
                                 => throw new Exception($"Index was out of range. Must be non-negative and less than size of collection"),
                             _ => throw new Exception($"Cannot subscript into type {target.GetType().Name}")
                         };
