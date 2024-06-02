@@ -239,6 +239,11 @@ public static class WarmLangInterpreter
                         throw new Exception($"Cannot subscript into '{sa.Target}' using {index.GetType().Name}");
                 }
             }
+            case ExprAccess ae: 
+            {
+                var (value, _,_) = Evaluate(ae.Expression, varEnv, fenv);
+                return (value, varEnv);
+            }
             default: 
                 throw new NotImplementedException($"Access: {acc.GetType().Name} is not implemented");
         }

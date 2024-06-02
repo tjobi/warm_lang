@@ -6,10 +6,12 @@ namespace WarmLangLexerParser.ErrorReporting;
 public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
 {
     private readonly List<ReportedErrorWarning> _reported;
+    private bool isMuted;
 
     public ErrorWarrningBag()
     {
         _reported = new List<ReportedErrorWarning>();
+        isMuted = false;
     }
 
     public IEnumerator<ReportedErrorWarning> GetEnumerator() => _reported.GetEnumerator();
@@ -18,9 +20,15 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
 
     public void Clear() => _reported.Clear();
 
+    public void Mute() => isMuted = true;
+    public void UnMute() => isMuted = false;
+
     private void Report(string message, bool isError, int line, int col)
     {
-        _reported.Add(new ReportedErrorWarning(message, isError, line, col));
+        if(!isMuted)
+        {
+            _reported.Add(new ReportedErrorWarning(message, isError, line, col));
+        }
     }
 
     public void ReportInvalidCharacter(char c, int line, int col)

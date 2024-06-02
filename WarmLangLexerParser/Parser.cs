@@ -171,7 +171,25 @@ public class Parser
         return new ExprStatement(expr);
     }
 
-    private ExpressionNode ParseExpression() => ParseVariableAssignmentExpression();
+    private ExpressionNode ParseExpression() => ParseAA();
+
+    private ExpressionNode ParseAA()
+    {
+        var old = currentToken;
+        _diag.Mute();
+        var expr = ParsePrimaryExpression();
+        _diag.UnMute();
+        if(Current.Kind == TBracketLeft)
+        {
+            var open = MatchKind(TBracketLeft);
+            var subscript = ParsePrimaryExpression();
+            var close = MatchKind(TBracketRight);
+            var access = new ExprAccess(expr);
+            return new AccessExpression(new SubscriptAccess(access, subscript));
+        }
+        currentToken = old;
+        return ParseVariableAssignmentExpression();
+    }
 
     private ExpressionNode ParseVariableAssignmentExpression()
     {
@@ -290,7 +308,7 @@ public class Parser
     private ExpressionNode ParseParenthesesExpression()
     {
         var openPar = MatchKind(TParLeft);
-        var expr = ParseBinaryExpression();
+        var expr = ParseVariableAssignmentExpression();
         var closePar = MatchKind(TParRight);
         return expr;
     }

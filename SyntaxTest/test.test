@@ -1,5 +1,17 @@
+function getList(int size, int val)
+{
+    int[] res = [];
+    function inner(int s)
+    {
+        if s < size then 
+        {
+            res :: val;
+            inner(s+1);
+        }
+    }
+    inner(0);
+    res;
+}
+int size = 25;
 int[] xs = [];
-xs :: 5 :: 6 :: 12;
-
-:! :! :! xs;
-xs;
+(xs = getList(size,0))[2];
