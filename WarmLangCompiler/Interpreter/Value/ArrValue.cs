@@ -11,6 +11,35 @@ public sealed class ArrValue : Value
 
     public int Length => Elements.Count;
 
+    public Value this[int idx]
+    {
+        get
+        {
+            return Elements[idx];
+        }
+
+        set
+        {
+            Elements[idx] = value;
+        }
+    }
+
+    public ArrValue Add(Value v)
+    {
+        Elements.Add(v);
+        return this;
+    }
+
+    public Value RemoveLast()
+    {
+        if(Elements.Count == 0)
+        {
+            throw new Exception("Cannot remove elements from an empty array");
+        }
+        Elements.RemoveAt(Length-1);
+        return this;
+    }
+
     public override string ToString()
     {
         var sb = new StringBuilder("Arr [");

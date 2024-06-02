@@ -40,7 +40,7 @@ public static class WarmLangInterpreter
                 var (right, resEnv, _) = Evaluate(cur.Right, leftEnv, fenv);
 
                 var op = cur.Operation;
-                var res = (op,left,right) switch 
+                Value res = (op,left,right) switch 
                 {
                     ("+", IntValue i1, IntValue i2) => new IntValue(i1.Value + i2.Value),
                     ("*", IntValue i1, IntValue i2) => new IntValue(i1.Value * i2.Value),
@@ -49,6 +49,8 @@ public static class WarmLangInterpreter
                     ("==", IntValue i1, IntValue i2) => new IntValue(i1.Value == i2.Value ? 1 : 0), 
                     ("<", IntValue i1, IntValue i2) => new IntValue(i1.Value < i2.Value ? 1 : 0), 
                     ("<=", IntValue i1, IntValue i2) =>  new IntValue(i1.Value <= i2.Value ? 1 : 0),
+                    ("::", ArrValue arr, IntValue i) => arr.Add(i),
+                    ("+", ArrValue a1, ArrValue a2) => new ArrValue(a1.Elements.Concat(a2.Elements).ToList()),
                     _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
                 };
 
@@ -61,6 +63,7 @@ public static class WarmLangInterpreter
                 {
                     ("+", IntValue i) => i,  //do nothing for the (+1) cases
                     ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
+                    (":!", ArrValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
                     _ => throw new NotImplementedException($"Unary {unary.Operation} is not defined on {exprValue.GetType()}")
                 };
                 return (value, newVarEnv, newFuncEnv);
@@ -92,7 +95,7 @@ public static class WarmLangInterpreter
                             if(idx < arr.Elements.Count && idx > 0)
                             {
                                 var (value, newVarEnv2, _) = Evaluate(assignment.RightHandSide, newVarEnv, fenv);
-                                arr.Elements[idx] = value;
+                                arr[idx] = value;
                                 return (value, newVarEnv2, fenv);
                             } else 
                             {

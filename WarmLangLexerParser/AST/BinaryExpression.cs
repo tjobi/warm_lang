@@ -14,15 +14,7 @@ public class BinaryExpression : ExpressionNode
     {
         Left = left;
         Right = right;
-        Operation = op.Kind switch {
-            TPlus           => "+",
-            TStar           => "*",
-            TMinus          => "-",
-            TEqualEqual     => "==",
-            TLessThan       => "<",
-            TLessThanEqual  => "<=",
-            _ => throw new NotImplementedException($"BinaryExpression: {op.Kind} is not yet supported!")
-        };
+        Operation = op.Kind.AsString();
         _kind = op.Kind;
     }
 

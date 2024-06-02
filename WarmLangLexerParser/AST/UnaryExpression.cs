@@ -11,12 +11,7 @@ public sealed class UnaryExpression : ExpressionNode
     {
         Expression = expr;
         _kind = op.Kind;
-        Operation = op.Kind switch 
-        {
-            TokenKind.TMinus => "-",
-            TokenKind.TPlus => "+",
-            _ => throw new Exception($"On line {op.Line}, col: {op.Column} - Invalid Unary operator {op.Kind}")
-        };
+        Operation = op.Kind.AsString();
     }
 
     public override TokenKind Kind => _kind;

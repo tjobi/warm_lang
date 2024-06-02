@@ -601,4 +601,74 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void TestLexerParserAddElementToList()
+    {
+        var input = "int[] xs = []; xs :: 5;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new VarDeclarationExpression(
+                new TypArray(new TypInt()), "xs",
+                new ArrayInitExpression(new List<ExpressionNode>())
+            ),
+            new ExprStatement(
+                new BinaryExpression(
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"xs"))),
+                    MakeToken(TDoubleColon,0,0),
+                    new ConstExpression(5)
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserRemoveElementFromList()
+    {
+        var input = ":! xs;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TColonBang,0,0),
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
+            ))
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserRemoveAddPrecedence()
+    {
+        var input = ":! xs :: 20;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new BinaryExpression(
+                    new UnaryExpression(
+                        MakeToken(TColonBang,0,0),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))),
+                    MakeToken(TDoubleColon,0,0),
+                    new ConstExpression(20)
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }
