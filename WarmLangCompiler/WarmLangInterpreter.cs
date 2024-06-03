@@ -63,7 +63,7 @@ public static class WarmLangInterpreter
                 {
                     ("+", IntValue i) => i,  //do nothing for the (+1) cases
                     ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
-                    (":!", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
+                    ("<-", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
                     _ => throw new NotImplementedException($"Unary {unary.Operation} is not defined on {exprValue.GetType()}")
                 };
                 return (value, newVarEnv, newFuncEnv);
@@ -125,9 +125,13 @@ public static class WarmLangInterpreter
             }
             case CallExpression call: 
             {
-                var name = call.Name;
+                var toCall = call.Called;
                 var callArgs = call.Arguments;
-                var (functionParameters, funcBody) = fenv.Lookup(name);
+                if(toCall is not AccessExpression && ((AccessExpression) toCall).Access is not NameAccess)
+                {
+                    throw new NotImplementedException("Interpreter doesn't allow arbitrary function calls");
+                }
+                var (functionParameters, funcBody) = fenv.Lookup(((NameAccess) ((AccessExpression)toCall).Access).Name);
                 
                 var callVarScope = env.Push();
                 var callFunScope = fenv.Push();
@@ -141,7 +145,8 @@ public static class WarmLangInterpreter
                     //                  func(true)"  <-- true is not an int?!?!
                     var (_, nVarEnv) = (value, paramType) switch 
                     {
-                        (IntValue _, TokenKind.TInt) => nEnv.Declare(paramName, value),
+                        (IntValue, TypInt) => nEnv.Declare(paramName, value),
+                        (ListValue, TypList) => nEnv.Declare(paramName, value),
                         _ => throw new Exception($"Value of {value.GetType().Name} does not match function paramter type {paramType}")
                     };
                     
@@ -154,9 +159,7 @@ public static class WarmLangInterpreter
             case FuncDeclaration funDecl: 
             {
                 var funcName = funDecl.Name;
-                var paramNames = funDecl.Params
-                                        .Select(p => (p.Item1.ToTokenKind(), p.Item2))
-                                        .ToList();
+                var paramNames = funDecl.Params;
                 var body = funDecl.Body;
                 var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
                 return (new IntValue(0), env, newFEnv);
@@ -228,7 +231,7 @@ public static class WarmLangInterpreter
                         var idx = iv.Value;
                         var res = target switch 
                         {
-                            ListValue a when idx < a.Length && idx > 0 => a.Elements[idx],
+                            ListValue a when idx < a.Length && idx >= 0 => a.Elements[idx],
                             ListValue a when idx >= a.Length || idx < 0 
                                 => throw new Exception($"Index was out of range. Must be non-negative and less than size of collection"),
                             _ => throw new Exception($"Cannot subscript into type {target.GetType().Name}")
@@ -238,6 +241,11 @@ public static class WarmLangInterpreter
                     default: 
                         throw new Exception($"Cannot subscript into '{sa.Target}' using {index.GetType().Name}");
                 }
+            }
+            case ExprAccess ae: 
+            {
+                var (value, _,_) = Evaluate(ae.Expression, varEnv, fenv);
+                return (value, varEnv);
             }
             default: 
                 throw new NotImplementedException($"Access: {acc.GetType().Name} is not implemented");

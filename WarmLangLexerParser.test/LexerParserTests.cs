@@ -387,7 +387,9 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new CallExpression(MakeToken(TIdentifier, 0,0, "f"), new List<ExpressionNode>())
+                new CallExpression(
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier, 0,0, "f"))),
+                    new List<ExpressionNode>())
             )
         });
 
@@ -404,7 +406,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new CallExpression(MakeToken(TIdentifier, 0,0, "f"), new List<ExpressionNode>()
+                new CallExpression(new AccessExpression(new NameAccess(MakeToken(TIdentifier, 0,0, "f"))), new List<ExpressionNode>()
                 {
                     new BinaryExpression(
                         new ConstExpression(2),
@@ -631,12 +633,12 @@ x;
     [Fact]
     public void TestLexerParserRemoveElementFromList()
     {
-        var input = ":! xs;";
+        var input = "<-xs;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TColonBang,0,0),
+                    MakeToken(TLeftArrow,0,0),
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
             ))
         });
@@ -651,16 +653,186 @@ x;
     [Fact]
     public void TestLexerParserRemoveAddPrecedence()
     {
-        var input = ":! xs :: 20;";
+        var input = "<- xs :: 20;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new BinaryExpression(
+                new UnaryExpression(
+                    MakeToken(TLeftArrow,0,0),
+                    new BinaryExpression(
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs"))),
+                        MakeToken(TDoubleColon,0,0),
+                        new ConstExpression(20)
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParserSuffixUnaryPrecedence()
+    {
+        var input = "<- <- xs;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TLeftArrow,0,0),
                     new UnaryExpression(
-                        MakeToken(TColonBang,0,0),
-                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))),
-                    MakeToken(TDoubleColon,0,0),
-                    new ConstExpression(20)
+                        MakeToken(TLeftArrow,0,0),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParsePrefixAndSuffixPrecedence()
+    {
+        var input = "<- -xs;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TLeftArrow,0,0),
+                    new UnaryExpression(
+                        MakeToken(TMinus,0,0),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParseParanthesisAndUnaryOperator()
+    {
+        var input = "-(<- xs);";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TMinus,0,0),
+                    new UnaryExpression(
+                        MakeToken(TLeftArrow,0,0),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParseParanthesisAndFunctionCall()
+    {
+        var input = "-(func(2));";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TMinus,0,0),
+                    new CallExpression(
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "func"))),
+                        new List<ExpressionNode>(){new ConstExpression(2)}
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParseParanthesisAndVariableAssignment()
+    {
+        var input = "<-(xs = []);";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TLeftArrow,0,0),
+                    new AssignmentExpression(
+                        new NameAccess(MakeToken(TIdentifier,0,0, "xs")),
+                        new ListInitExpression(new List<ExpressionNode>())
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParseDoubleSubscript()
+    {
+        var input = "xs[1][1];";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new AccessExpression(
+                    new SubscriptAccess(
+                        new SubscriptAccess(new NameAccess(MakeToken(TIdentifier,0,0,"xs")), new ConstExpression(1)),
+                        new ConstExpression(1)
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParseSubscriptIntoCallExpression()
+    {
+        var input = "returnsList()[1];";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new AccessExpression(
+                    new SubscriptAccess(
+                        new ExprAccess(
+                            new CallExpression(
+                                new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"returnsList"))),
+                                new List<ExpressionNode>())),
+                        new ConstExpression(1)
+                    )
                 )
             )
         });

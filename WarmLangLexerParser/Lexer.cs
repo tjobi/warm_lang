@@ -79,6 +79,10 @@ public class Lexer
                             token = SyntaxToken.MakeToken(TLessThanEqual, Line, Column);
                             AdvanceText();
                         } break;
+                        case '-': {
+                            token = SyntaxToken.MakeToken(TLeftArrow, Line, Column);
+                            AdvanceText();
+                        } break;
                     }
                 } break;
                 case ':': {

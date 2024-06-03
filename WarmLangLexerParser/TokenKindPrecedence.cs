@@ -1,5 +1,5 @@
 namespace WarmLangLexerParser;
-
+using static TokenKind;
 public static class TokenKindPrecedence
 {
     public static int GetBinaryPrecedence(this TokenKind kind)
@@ -7,14 +7,14 @@ public static class TokenKindPrecedence
         return kind switch
         {
             // * 
-            TokenKind.TStar => 1000,
+            TStar => 1000,
             // + 
-            TokenKind.TPlus => 100,
-            TokenKind.TMinus => 100,
-            TokenKind.TLessThan 
-                or TokenKind.TLessThanEqual => 75,
-            TokenKind.TEqualEqual => 50,
-            TokenKind.TDoubleColon => 40,
+            TPlus => 100,
+            TMinus => 100,
+            TLessThan 
+                or TLessThanEqual => 75,
+            TEqualEqual => 50,
+            TDoubleColon => 40,
             //The rest shouldn't have any precedence - I think
             _ => -1
         };
@@ -24,10 +24,33 @@ public static class TokenKindPrecedence
     {
         return kind switch
         {
-            TokenKind.TMinus 
-            or TokenKind.TPlus => 10_000,
-            TokenKind.TColonBang => 40, //TODO: Very whacky!
+            TMinus 
+            or TPlus   => 10_000,
+            TLeftArrow => 35,
             _ => -1
+        };
+    }
+
+    public static bool IsUnaryExpression(this TokenKind kind)
+    {
+        return IsPrefixUnaryExpression(kind) || IsPostfixUnaryExpression(kind);
+    }
+
+    public static bool IsPrefixUnaryExpression(this TokenKind kind)
+    {
+        return kind switch 
+        {
+            TPlus or TMinus => true,
+            TLeftArrow => true,
+            _ => false
+        };
+    }
+
+    public static bool IsPostfixUnaryExpression(this TokenKind kind)
+    {
+        return kind switch 
+        {
+            _ => false
         };
     }
 }
