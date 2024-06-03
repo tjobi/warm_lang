@@ -145,7 +145,8 @@ public static class WarmLangInterpreter
                     //                  func(true)"  <-- true is not an int?!?!
                     var (_, nVarEnv) = (value, paramType) switch 
                     {
-                        (IntValue _, TokenKind.TInt) => nEnv.Declare(paramName, value),
+                        (IntValue, TypInt) => nEnv.Declare(paramName, value),
+                        (ListValue, TypList) => nEnv.Declare(paramName, value),
                         _ => throw new Exception($"Value of {value.GetType().Name} does not match function paramter type {paramType}")
                     };
                     
@@ -158,9 +159,7 @@ public static class WarmLangInterpreter
             case FuncDeclaration funDecl: 
             {
                 var funcName = funDecl.Name;
-                var paramNames = funDecl.Params
-                                        .Select(p => (p.Item1.ToTokenKind(), p.Item2))
-                                        .ToList();
+                var paramNames = funDecl.Params;
                 var body = funDecl.Body;
                 var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
                 return (new IntValue(0), env, newFEnv);
