@@ -171,38 +171,9 @@ public class Parser
         return new ExprStatement(expr);
     }
 
-    private ExpressionNode ParseExpression() => ParseVariableAssignmentExpression();
+    private ExpressionNode ParseExpression() => ParseSubExpression();
 
-    private ExpressionNode ParseVariableAssignmentExpression()
-    {
-        if(Current.Kind == TIdentifier)
-        {
-            switch(Peek(1).Kind) //Look ahead to next token, x = (<--) 5, look for a '=' 
-            {
-                case TEqual:
-                {
-                    var access = ParseNameAccess();
-                    var equalToken = MatchKind(TEqual);
-                    var rightHandSide = ParseBinaryExpression();
-                    return new AssignmentExpression(access, rightHandSide);
-                }
-                case TBracketLeft: //Parsing xs[2] = expression;
-                {
-                    if(TryParseSubscriptAccess(out var access))
-                    {
-                        var equalToken = MatchKind(TEqual);
-                        var rightHandSide = ParseBinaryExpression();
-                        return new AssignmentExpression(access, rightHandSide);
-                    }
-                } break;
-                
-            }
-        }
-
-        return ParseBinaryExpression();
-    }
-
-    private ExpressionNode ParseBinaryExpression(int parentPrecedence = 0)
+    private ExpressionNode ParseSubExpression(int parentPrecedence = 0)
     {
         ExpressionNode left;
         var precedence = Current.Kind.GetUnaryPrecedence(); 
@@ -211,37 +182,48 @@ public class Parser
             && precedence != -1 && precedence >= parentPrecedence)
         {
             var op = NextToken();
-            var expr = ParseBinaryExpression(precedence);
+            var expr = ParseSubExpression(precedence);
             left = new UnaryExpression(op, expr);
         }
         else 
         {
             left = ParsePrimaryExpression();
+            precedence = parentPrecedence;
         }
+        return ParseContinuedExpression(left, precedence);
+    }
 
+    private ExpressionNode ParseContinuedExpression(ExpressionNode left, int parentPrecedence = 0)
+    {
+        switch(Current.Kind)
+        {
+            case TEqual:
+            {
+                var op = NextToken();
+                var rhs = ParseSubExpression();
+                if(left is AccessExpression ae)
+                {
+                    return new AssignmentExpression(ae.Access, rhs);
+                }
+                return new AssignmentExpression(new ExprAccess(left), rhs);
+            }
+            default:
+                return ParseBinaryExpression(left,parentPrecedence);
+        }
+    }
+
+    private ExpressionNode ParseBinaryExpression(ExpressionNode left, int parentPrecedence = 0)
+    {
         while(true)
         {
-            precedence = Current.Kind.GetBinaryPrecedence();
+            var precedence = Current.Kind.GetBinaryPrecedence();
             if(precedence == -1 || precedence <= parentPrecedence) 
             {
                 break;
             }
             var operatorToken = NextToken();
-            var right = ParseBinaryExpression(precedence);
+            var right = ParseSubExpression(precedence);
             left = new BinaryExpression(left, operatorToken, right);
-        }
-
-        //Is this too hacky?, once we have a complete binary expression then look
-        // are there any suffix unary operators after the binary?
-        while(Current.Kind.IsPostfixUnaryExpression())
-        {
-            precedence = Current.Kind.GetUnaryPrecedence();
-            if(precedence == -1 || precedence <= parentPrecedence)
-            {
-                break;
-            }
-            var op = NextToken();
-            left = new UnaryExpression(op,left);
         }
         return left;
     }
@@ -299,6 +281,7 @@ public class Parser
 
     private ExpressionNode ParsePostfixExpression(ExpressionNode res)
     {
+        //TODO: how do we account for operator precedence? What if I want a postfix unary operator with some precedence?
         while(true)
         {
             switch(Current.Kind)
@@ -323,7 +306,7 @@ public class Parser
     private ExpressionNode ParseParenthesesExpression()
     {
         var openPar = MatchKind(TParLeft);
-        var expr = ParseVariableAssignmentExpression();
+        var expr = ParseSubExpression();
         var closePar = MatchKind(TParRight);
         return expr;
     }
@@ -414,22 +397,5 @@ public class Parser
             access = new SubscriptAccess(access, expr);
         }
         return access;
-    }
-
-    private bool TryParseSubscriptAccess(out Access res)
-    {
-        var oldCur = currentToken;
-        var nameToken = NextToken();
-        var bracketOpen = NextToken();
-        var expr = ParseExpression();
-        var bracketClose = NextToken();
-        if(Current.Kind == TEqual)
-        {
-            res = new SubscriptAccess(new NameAccess(nameToken), expr);
-            return true;
-        }
-        currentToken = oldCur;
-        res = new InvalidAccess();
-        return false;
     }
 }

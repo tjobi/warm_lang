@@ -24,10 +24,9 @@ public static class TokenKindPrecedence
     {
         return kind switch
         {
-            //TBracketLeft => 20_000, //xs[2]
             TMinus 
-            or TPlus => 10_000,
-            TColonBang => 35, //TODO: Very whacky!
+            or TPlus   => 10_000,
+            TLeftArrow => 35,
             _ => -1
         };
     }
@@ -42,6 +41,7 @@ public static class TokenKindPrecedence
         return kind switch 
         {
             TPlus or TMinus => true,
+            TLeftArrow => true,
             _ => false
         };
     }
@@ -50,7 +50,6 @@ public static class TokenKindPrecedence
     {
         return kind switch 
         {
-            TColonBang or TBracketLeft => true,
             _ => false
         };
     }

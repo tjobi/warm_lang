@@ -1,0 +1,18 @@
+function makeArr(int size, int step, int start)
+{
+    int[] res = [];
+    function inner(int i, int cur)
+    {
+        if i < size 
+        then 
+        {
+            int next = cur + step;
+            res :: next;
+            inner(i+1, next);
+        }
+    }
+    inner(0,start);
+    res;
+}
+
+makeArr(10,2,0);

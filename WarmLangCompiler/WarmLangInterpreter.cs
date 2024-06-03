@@ -63,7 +63,7 @@ public static class WarmLangInterpreter
                 {
                     ("+", IntValue i) => i,  //do nothing for the (+1) cases
                     ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
-                    (":!", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
+                    ("<-", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
                     _ => throw new NotImplementedException($"Unary {unary.Operation} is not defined on {exprValue.GetType()}")
                 };
                 return (value, newVarEnv, newFuncEnv);

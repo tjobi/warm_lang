@@ -36,8 +36,9 @@ public sealed class ListValue : Value
         {
             throw new Exception("Cannot remove elements from an empty array");
         }
+        var last = Elements[^1];
         Elements.RemoveAt(Length-1);
-        return this;
+        return last;
     }
 
     public override string ToString()

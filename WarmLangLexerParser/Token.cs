@@ -6,7 +6,7 @@ public enum TokenKind
     TConst, TArray,
     TIdentifier, //Variable names, function names...
     TVar, TInt, //var x = 5, the keyword 'var'
-    TSemiColon, TComma, TDot, TColon, TDoubleColon, TBang, TColonBang,
+    TSemiColon, TComma, TDot, TColon, TDoubleColon, TBang, TColonBang, TLeftArrow,
     TEqual, 
     TEqualEqual, TLessThan, TLessThanEqual, TPlus, TStar, TSlash, TMinus,
     TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
