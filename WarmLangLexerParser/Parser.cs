@@ -266,8 +266,8 @@ public class Parser
                 res = new ListInitExpression(staticElements);
             } break;
             case TIdentifier: {
-                var access = ParseAccess();
-                res = new AccessExpression(access);
+                var nameToken = NextToken();
+                res = new AccessExpression(new NameAccess(nameToken));
             } break;
             default: {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
@@ -295,7 +295,14 @@ public class Parser
                     var open = MatchKind(TBracketLeft);
                     var expr = ParsePrimaryExpression();
                     var close = MatchKind(TBracketRight);
-                    res = new AccessExpression(new SubscriptAccess(new ExprAccess(res), expr));
+                    if(res is AccessExpression ae)
+                    {
+                        res = new AccessExpression(new SubscriptAccess(ae.Access, expr));
+                    }
+                    else 
+                    {
+                        res = new AccessExpression(new SubscriptAccess(new ExprAccess(res), expr));
+                    }
                 } continue;
                 default:
                     return res;
@@ -360,42 +367,5 @@ public class Parser
 
         var closePar = MatchKind(TParRight);
         return new CallExpression(called, args);
-    }
-
-    private Access ParseAccess()
-    {
-        return (Current.Kind, Peek(1).Kind) switch 
-        {
-            (TIdentifier, TBracketLeft) => ParseSubscriptAccess(),
-            (TIdentifier,_) => ParseNameAccess(),
-            _=> new InvalidAccess()//new ExprAccess(ParsePrimaryExpression())
-        };
-    }
-
-    private Access ParseNameAccess()
-    {
-        var nameToken = MatchKind(TIdentifier);
-        return new NameAccess(nameToken);
-    }
-
-    private Access ParseSubscriptAccess()
-    {
-        var nameToken = MatchKind(TIdentifier);
-        var bracketOpen = MatchKind(TBracketLeft);
-        var expr = ParseExpression();
-        var bracketClose = MatchKind(TBracketRight);
-        var access = new SubscriptAccess(new NameAccess(nameToken), expr);
-        while(true)
-        {
-            if(Current.Kind != TBracketLeft)
-            {
-                break;
-            }
-            var _ = MatchKind(TBracketLeft);
-            var expr2 = ParseExpression();
-            _ = MatchKind(TBracketRight);
-            access = new SubscriptAccess(access, expr);
-        }
-        return access;
     }
 }
