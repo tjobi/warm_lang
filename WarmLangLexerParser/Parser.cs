@@ -233,7 +233,7 @@ public class Parser
 
         //Is this too hacky?, once we have a complete binary expression then look
         // are there any suffix unary operators after the binary?
-        while(Current.Kind.IsSuffixUnaryExpression())
+        while(Current.Kind.IsPostfixUnaryExpression())
         {
             precedence = Current.Kind.GetUnaryPrecedence();
             if(precedence == -1 || precedence <= parentPrecedence)
@@ -248,14 +248,15 @@ public class Parser
 
     private ExpressionNode ParsePrimaryExpression()
     {
+        ExpressionNode res;
         switch(Current.Kind)
         {
             case TConst: {
-                return ParseConstExpression();
-            }
+                res = ParseConstExpression();
+            } break;
             case TParLeft: {
-                return ParseParenthesesExpression();
-            }
+                res = ParseParenthesesExpression();
+            } break;
             case TBracketLeft: {
                 //Allow list initialization like [] or [1,2,3,4]?
                 var bracketOpen = MatchKind(TBracketLeft);
@@ -264,7 +265,8 @@ public class Parser
                 if(Current.Kind == TBracketRight) //empty list
                 {
                     var _ = MatchKind(TBracketRight);
-                    return new ListInitExpression(staticElements);
+                    res = new ListInitExpression(staticElements);
+                    break;
                 }
                 while(isReading && NotEndOfFile)
                 {
@@ -279,24 +281,41 @@ public class Parser
                     }
                 }
                 var bracketClose = MatchKind(TBracketRight);
-                return new ListInitExpression(staticElements);
-            }
+                res = new ListInitExpression(staticElements);
+            } break;
             case TIdentifier: {
-                //About to use a variable : x + 4 or call a function x()
-                var peekKind = Peek(1).Kind;
-                if(peekKind == TParLeft)
-                {
-                    return ParseCallExpression();
-                }
-                //var identToken = MatchKind(TIdentifier);
                 var access = ParseAccess();
-                return new AccessExpression(access);
-            }
+                res = new AccessExpression(access);
+            } break;
             default: {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
                 //var nextToken = Current;
                 _diag.ReportInvalidExpression(nextToken);
                 return new ErrorExpressionNode(nextToken.Line, nextToken.Column);
+            }
+        }
+        return ParsePostfixExpression(res);
+    }
+
+    private ExpressionNode ParsePostfixExpression(ExpressionNode res)
+    {
+        while(true)
+        {
+            switch(Current.Kind)
+            {
+                case TParLeft:
+                {
+                    res = ParseCallExpression(res);  
+                } continue;
+                case TBracketLeft:
+                {
+                    var open = MatchKind(TBracketLeft);
+                    var expr = ParsePrimaryExpression();
+                    var close = MatchKind(TBracketRight);
+                    res = new AccessExpression(new SubscriptAccess(new ExprAccess(res), expr));
+                } continue;
+                default:
+                    return res;
             }
         }
     }
@@ -332,9 +351,9 @@ public class Parser
         return typ;
     }
 
-    private ExpressionNode ParseCallExpression()
+    private ExpressionNode ParseCallExpression(ExpressionNode called)
     {
-        var nameToken = NextToken();
+        //var nameToken = NextToken();
         var openPar = MatchKind(TParLeft);
         var args = new List<ExpressionNode>();
         if(Current.Kind != TParRight)
@@ -357,7 +376,7 @@ public class Parser
         }
 
         var closePar = MatchKind(TParRight);
-        return new CallExpression(nameToken, args);
+        return new CallExpression(called, args);
     }
 
     private Access ParseAccess()
@@ -366,7 +385,7 @@ public class Parser
         {
             (TIdentifier, TBracketLeft) => ParseSubscriptAccess(),
             (TIdentifier,_) => ParseNameAccess(),
-            _ => new InvalidAccess()
+            _=> new InvalidAccess()//new ExprAccess(ParsePrimaryExpression())
         };
     }
 

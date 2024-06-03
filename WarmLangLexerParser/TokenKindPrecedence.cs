@@ -34,7 +34,7 @@ public static class TokenKindPrecedence
 
     public static bool IsUnaryExpression(this TokenKind kind)
     {
-        return IsPrefixUnaryExpression(kind) || IsSuffixUnaryExpression(kind);
+        return IsPrefixUnaryExpression(kind) || IsPostfixUnaryExpression(kind);
     }
 
     public static bool IsPrefixUnaryExpression(this TokenKind kind)
@@ -46,7 +46,7 @@ public static class TokenKindPrecedence
         };
     }
 
-    public static bool IsSuffixUnaryExpression(this TokenKind kind)
+    public static bool IsPostfixUnaryExpression(this TokenKind kind)
     {
         return kind switch 
         {

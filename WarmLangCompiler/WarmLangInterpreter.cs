@@ -125,9 +125,13 @@ public static class WarmLangInterpreter
             }
             case CallExpression call: 
             {
-                var name = call.Name;
+                var toCall = call.Called;
                 var callArgs = call.Arguments;
-                var (functionParameters, funcBody) = fenv.Lookup(name);
+                if(toCall is not AccessExpression && ((AccessExpression) toCall).Access is not NameAccess)
+                {
+                    throw new NotImplementedException("Interpreter doesn't allow arbitrary function calls");
+                }
+                var (functionParameters, funcBody) = fenv.Lookup(((NameAccess) ((AccessExpression)toCall).Access).Name);
                 
                 var callVarScope = env.Push();
                 var callFunScope = fenv.Push();
@@ -228,7 +232,7 @@ public static class WarmLangInterpreter
                         var idx = iv.Value;
                         var res = target switch 
                         {
-                            ListValue a when idx < a.Length && idx > 0 => a.Elements[idx],
+                            ListValue a when idx < a.Length && idx >= 0 => a.Elements[idx],
                             ListValue a when idx >= a.Length || idx < 0 
                                 => throw new Exception($"Index was out of range. Must be non-negative and less than size of collection"),
                             _ => throw new Exception($"Cannot subscript into type {target.GetType().Name}")

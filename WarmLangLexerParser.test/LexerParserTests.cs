@@ -387,7 +387,9 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new CallExpression(MakeToken(TIdentifier, 0,0, "f"), new List<ExpressionNode>())
+                new CallExpression(
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier, 0,0, "f"))),
+                    new List<ExpressionNode>())
             )
         });
 
@@ -404,7 +406,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new CallExpression(MakeToken(TIdentifier, 0,0, "f"), new List<ExpressionNode>()
+                new CallExpression(new AccessExpression(new NameAccess(MakeToken(TIdentifier, 0,0, "f"))), new List<ExpressionNode>()
                 {
                     new BinaryExpression(
                         new ConstExpression(2),
@@ -755,7 +757,7 @@ x;
                 new UnaryExpression(
                     MakeToken(TMinus,0,0),
                     new CallExpression(
-                        MakeToken(TIdentifier,0,0, "func"),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "func"))),
                         new List<ExpressionNode>(){new ConstExpression(2)}
                     )
                 )
@@ -803,6 +805,32 @@ x;
                 new AccessExpression(
                     new SubscriptAccess(
                         new SubscriptAccess(new NameAccess(MakeToken(TIdentifier,0,0,"xs")), new ConstExpression(1)),
+                        new ConstExpression(1)
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestLexerParseSubscriptIntoCallExpression()
+    {
+        var input = "returnsList()[1];";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new AccessExpression(
+                    new SubscriptAccess(
+                        new ExprAccess(
+                            new CallExpression(
+                                new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"returnsList"))),
+                                new List<ExpressionNode>())),
                         new ConstExpression(1)
                     )
                 )
