@@ -7,10 +7,11 @@ public static class ArgsParser
     private static void Help()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("\tprogram        - path to a .test file to lex, parse, and evaluate");
-        Console.WriteLine("\t--lex-debug    - enables debug information for lexer");
-        Console.WriteLine("\t--parser-debug - enables debug information for parser");
-        Console.WriteLine("\t--trace        - prints a stacktrace if an exception goes uncaught");
+        Console.WriteLine("\tprogram            - path to a .test file to lex, parse, and evaluate");
+        Console.WriteLine("\t-lh, --lang-help   - Show command line help");
+        Console.WriteLine("\t--lex-debug        - enables debug information for lexer");
+        Console.WriteLine("\t--parser-debug     - enables debug information for parser");
+        Console.WriteLine("\t--trace            - prints a stacktrace if an exception goes uncaught");
     }
 
     public static ParsedArgs? ParseArgs(string[] args, string defaultProgram)

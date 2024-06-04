@@ -13,3 +13,5 @@ Or you can provide a target by arguement:
 ```console
 dotnet run --project WarmLangCompiler <program>
 ```
+
+You can get command line help by using the `-lh` or `--lang-help` flag(s).
