@@ -843,4 +843,79 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void LexerParserLeftArrowFunctionCall()
+    {
+        var input = "<- f();";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new UnaryExpression(
+                    MakeToken(TLeftArrow,0,0),
+                    new CallExpression(
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"f"))),
+                        new List<ExpressionNode>()
+                    )
+                )
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserMissingSemicolon()
+    {
+        var input = "x+2";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new BinaryExpression(
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
+                    MakeToken(TPlus,0,0),
+                    new ConstExpression(2)
+                )
+            )
+        });
+        var expectedDiag = new ErrorWarrningBag();
+        expectedDiag.ReportUnexpectedToken(TSemiColon,TEOF,2,1);
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().ContainSingle();
+        _diag.Should().BeEquivalentTo(expectedDiag);
+    }
+
+    [Fact]
+    public void LexerParserMissingExpressionAndSemicolon()
+    {
+        var input = "x+;";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new ExprStatement(
+                new BinaryExpression(
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
+                    MakeToken(TPlus,0,0),
+                    new ErrorExpressionNode(MakeToken(TSemiColon,1,3))
+                )
+            )
+        });
+        var expectedDiag = new ErrorWarrningBag();
+        expectedDiag.ReportInvalidExpression(MakeToken(TSemiColon,1,3));
+        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, 2,1);
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().HaveCount(2);
+        _diag.Should().BeEquivalentTo(expectedDiag);
+    }
 }

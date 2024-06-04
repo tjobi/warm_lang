@@ -19,7 +19,7 @@ public sealed class ReportedErrorWarning
 
     public override string ToString()
     {
-        var pretext = IsError ? "ERROR:" : "WARNING:";
+        var pretext = IsError ? "ERROR" : "WARNING";
         return $"({Line},{Column}): {pretext}: {Message}";
     }
 
