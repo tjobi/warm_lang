@@ -7,10 +7,10 @@ public enum TokenKind
     TIdentifier, //Variable names, function names...
     TVar, TInt, //var x = 5, the keyword 'var'
     TSemiColon, TComma, TDot, TColon, TDoubleColon, TBang, TColonBang, TLeftArrow,
-    TEqual, 
+    TEqual, TAssign, //Assignment x = 10;
     TEqualEqual, TLessThan, TLessThanEqual, TPlus, TStar, TSlash, TMinus,
-    TBlock, TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
-    TAssign, //Assignment x = 10;
+    TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
+    TBlock, TWhile,
     TIfStmnt, TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
     TFunc, TCall, //function & function calls
 }

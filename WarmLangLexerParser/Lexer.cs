@@ -210,6 +210,7 @@ public class Lexer
             "then" => SyntaxToken.MakeToken(TThen, startLine, startColumn),
             "else" => SyntaxToken.MakeToken(TElse, startLine, startColumn),
             "int" => SyntaxToken.MakeToken(TInt, startLine, startColumn),
+            "while" => SyntaxToken.MakeToken(TWhile, startLine, startColumn),
             //"var" => SyntaxToken.MakeToken(TVar, startLine, startColumn),
             _ => SyntaxToken.MakeToken(TIdentifier, startLine, startColumn, name: name)
         };

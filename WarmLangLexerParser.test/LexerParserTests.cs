@@ -918,4 +918,114 @@ x;
         _diag.Should().HaveCount(2);
         _diag.Should().BeEquivalentTo(expectedDiag);
     }
+
+    [Fact]
+    public void LexerParserWhileStatement()
+    {
+        var input = "while x {}";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new WhileStatement(
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
+                new BlockStatement(new List<StatementNode>())
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserFaultyWhileStatement()
+    {
+        var input = "while x f();";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new WhileStatement(
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
+                new BlockStatement(new List<StatementNode>()
+                {
+                    new ExprStatement(
+                        new CallExpression(
+                            new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"f"))),
+                            new List<ExpressionNode>()
+                        )
+                    )
+                })
+            )
+        });
+        var expectedErrorBag = new ErrorWarrningBag();
+        expectedErrorBag.ReportWhileExpectedBlockStatement(MakeToken(TIdentifier,1,9));
+        expectedErrorBag.ReportUnexpectedToken(TCurLeft, TIdentifier,1,9);
+        expectedErrorBag.ReportUnexpectedToken(TCurRight, TEOF,2,1);
+
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void LexerParserWhileStatementWithCont()
+    {
+        var input = "while x : 2+2 {}";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new WhileStatement(
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
+                new BlockStatement(new List<StatementNode>()),
+                new List<ExpressionNode>()
+                {
+                    new BinaryExpression(
+                        new ConstExpression(2),
+                        MakeToken(TPlus,0,0),
+                        new ConstExpression(2)
+                    )
+                }
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserWhileStatementWithMoreThanOnecont()
+    {
+        var input = "while x : 2+2,5+5 {}";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new WhileStatement(
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
+                new BlockStatement(new List<StatementNode>()),
+                new List<ExpressionNode>()
+                {
+                    new BinaryExpression(
+                        new ConstExpression(2),
+                        MakeToken(TPlus,0,0),
+                        new ConstExpression(2)
+                    ),
+                    new BinaryExpression(
+                        new ConstExpression(5),
+                        MakeToken(TPlus,0,0),
+                        new ConstExpression(5)
+                    ),
+                }
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }
