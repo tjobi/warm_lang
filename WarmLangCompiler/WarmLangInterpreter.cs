@@ -2,7 +2,6 @@ namespace WarmLangCompiler;
 
 using WarmLangCompiler.Interpreter;
 using WarmLangCompiler.Interpreter.Values;
-using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.Typs;
 
@@ -19,6 +18,15 @@ public static class WarmLangInterpreter
         {
             return new ErrValue(e.Message);
         }
+    }
+
+    //TODO: Fix here when we get proper booleans :D
+    private static Value GetBoolishValue(bool cond) => new IntValue(cond ? 1 : 0);
+    private static bool IsValueTrue(Value v)
+    {
+        if (v is IntValue i)
+            return i.Value != 0;
+        throw new NotImplementedException($"value of {v.GetType()} cannot be used as boolean");
     }
 
     public static (Value, IAssignableEnv<Value>, IEnv<Funct>) Evaluate(ASTNode node, IAssignableEnv<Value> env, IEnv<Funct> fenv)
@@ -45,10 +53,9 @@ public static class WarmLangInterpreter
                     ("+", IntValue i1, IntValue i2) => new IntValue(i1.Value + i2.Value),
                     ("*", IntValue i1, IntValue i2) => new IntValue(i1.Value * i2.Value),
                     ("-", IntValue i1, IntValue i2) => new IntValue(i1.Value - i2.Value),
-                    //TODO: When we introduce booleans, change ones below
-                    ("==", IntValue i1, IntValue i2) => new IntValue(i1.Value == i2.Value ? 1 : 0), 
-                    ("<", IntValue i1, IntValue i2) => new IntValue(i1.Value < i2.Value ? 1 : 0), 
-                    ("<=", IntValue i1, IntValue i2) =>  new IntValue(i1.Value <= i2.Value ? 1 : 0),
+                    ("==", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value == i2.Value),
+                    ("<", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value < i2.Value), 
+                    ("<=", IntValue i1, IntValue i2) =>  GetBoolishValue(i1.Value <= i2.Value),
                     ("::", ListValue arr, IntValue i) => arr.Add(i),
                     ("+", ListValue a1, ListValue a2) => new ListValue(a1.Elements.Concat(a2.Elements).ToList()),
                     _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
@@ -162,7 +169,7 @@ public static class WarmLangInterpreter
                 var paramNames = funDecl.Params;
                 var body = funDecl.Body;
                 var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
-                return (new IntValue(0), env, newFEnv);
+                return (VoidValue.Instance, env, newFEnv);
             }
             case ExprStatement expr: 
             {
@@ -171,6 +178,10 @@ public static class WarmLangInterpreter
             case BlockStatement block: 
             {
                 var expressions = block.Children;
+                if(expressions.IsEmpty)
+                {
+                    return (VoidValue.Instance, env, fenv);
+                }
                 var nenv = env.Push();
                 var nFuncEnv = fenv.Push();
                 for (int i = 0; i < expressions.Count-1; i++)
@@ -191,11 +202,7 @@ public static class WarmLangInterpreter
                 var ifFuncScope = fenv.Push();
                 var (condValue, cEnv, cFuncEnv) = Evaluate(ifstmnt.Condition, (VarEnv) ifScope, ifFuncScope);
                 
-                bool doThenBranch = condValue switch //TODO: When we introduce booleans, look at this again :)
-                {
-                    IntValue i => i.Value != 0,
-                    _ => throw new NotImplementedException($"value of {condValue.GetType()} cannot be used as boolean")
-                };
+                bool doThenBranch = IsValueTrue(condValue);
 
                 if(!doThenBranch && ifstmnt.Else is null)
                 {
@@ -205,6 +212,28 @@ public static class WarmLangInterpreter
                 var (value, nEnv, nFuncEnv) = Evaluate(doThenBranch ? ifstmnt.Then : ifstmnt.Else!, cEnv, fenv);
                 return (value, (VarEnv)nEnv.Pop(), nFuncEnv.Pop());
             }
+            case WhileStatement whiile: 
+            {
+                var whileVarScope = (IAssignableEnv<Value>) env.Push();
+                var whileFuncScope = fenv.Push();
+                Value condValue;
+                while(true)
+                {
+                    (condValue, whileVarScope, whileFuncScope) = Evaluate(whiile.Condition, whileVarScope, whileFuncScope);
+                    if(!IsValueTrue(condValue))
+                    {
+                        break;
+                    }
+                    (_, whileVarScope, whileFuncScope) = Evaluate(whiile.Body, whileVarScope, whileFuncScope);
+                    foreach(var cont in whiile.Continue)
+                    {
+                        (_, whileVarScope, whileFuncScope) = Evaluate(cont,whileVarScope,whileFuncScope);
+                    }
+                }
+                return (VoidValue.Instance, 
+                        (IAssignableEnv<Value>)whileVarScope.Pop(), 
+                        whileFuncScope.Pop());
+            }
             default: 
             {
                 throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");
@@ -212,7 +241,7 @@ public static class WarmLangInterpreter
         }
     }
 
-    public static (Value, IAssignableEnv<Value>) Access(Access acc, IAssignableEnv<Value> varEnv, IEnv<Funct> fenv)
+    private static (Value, IAssignableEnv<Value>) Access(Access acc, IAssignableEnv<Value> varEnv, IEnv<Funct> fenv)
     {
         switch(acc)
         {
