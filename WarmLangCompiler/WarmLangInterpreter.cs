@@ -134,9 +134,10 @@ public static class WarmLangInterpreter
             {
                 var toCall = call.Called;
                 var callArgs = call.Arguments;
-                if(toCall is not AccessExpression && ((AccessExpression) toCall).Access is not NameAccess)
+                //var access = Access(toCall, env, fenv);
+                if(toCall is not AccessExpression || (toCall is AccessExpression expression && expression.Access is not NameAccess))
                 {
-                    throw new NotImplementedException("Interpreter doesn't allow arbitrary function calls");
+                    throw new NotImplementedException($"Not implemented -> Interpreter doesn't allow arbitrary function calls - Cannot call {toCall.GetType().Name}");
                 }
                 var (functionParameters, funcBody) = fenv.Lookup(((NameAccess) ((AccessExpression)toCall).Access).Name);
                 
