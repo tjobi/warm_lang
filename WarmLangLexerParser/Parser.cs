@@ -82,11 +82,42 @@ public class Parser
         {
             TCurLeft => ParseBlockStatement(),
             TIf => ParseIfStatement(),
+            TWhile => ParseWhileStatement(),
             //TODO: May be a problem when we introduce more types? -- what to do?
             TInt => ParseVariableDeclaration(), 
             TFunc =>  ParseFunctionDeclaration(),
             _ => ParseExpressionStatement()
         };
+    }
+
+    private StatementNode ParseWhileStatement()
+    {
+        var whileToken = MatchKind(TWhile);
+        var condition = ParseExpression();
+        var exprList = new List<ExpressionNode>();
+        if(Current.Kind == TColon) //Then it looks like "while condition : cont(,cont)*" 
+        {
+            var colon = MatchKind(TColon);
+            var parseCont = true;
+            do{
+                var expr = ParseExpression();
+                exprList.Add(expr);
+                if(Current.Kind == TComma)
+                {
+                    var comma = NextToken();
+                } else
+                {
+                    parseCont = false;
+                }
+            } while(NotEndOfFile && parseCont);
+        }
+        var tokenBeforeBody = Current;
+        var body = ParseBlockStatement();
+        if(tokenBeforeBody.Kind != TCurLeft)
+        {
+            _diag.ReportWhileExpectedBlockStatement(tokenBeforeBody);
+        }
+        return new WhileStatement(condition, body, exprList);
     }
 
     private StatementNode ParseIfStatement()

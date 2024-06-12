@@ -73,4 +73,10 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         var message = $"Invalid token expected to be in: '{sb}' but got '{received}'";
         Report(message, true, line, col);
     }
+
+    public void ReportWhileExpectedBlockStatement(SyntaxToken read)
+    {
+        var message = "The body of a while statement must be a block {}";
+        Report(message, true, read.Line, read.Column);
+    }
 }

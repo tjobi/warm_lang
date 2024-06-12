@@ -12,7 +12,37 @@ if(parsedArgs is null)
     return -1;
 }
 // To change the "default" value of the values below goto ArgsParser.ParseArgs :)
-var (program, parserDebug, lexerDebug, longExceptions) = (ParsedArgs) parsedArgs; //cast is okay-ish, we just did a null check
+var (program, parserDebug, lexerDebug, longExceptions, interactive) = (ParsedArgs) parsedArgs; //cast is okay-ish, we just did a null check
+
+if(interactive)
+{
+    for(string? input = Console.ReadLine(); input is not null; input = Console.ReadLine())
+    {
+        if(input == "q;;")
+        {
+            break;
+        }
+        var diagnostics = new ErrorWarrningBag();
+        var lexer = Lexer.FromString(input, diagnostics);
+        var tokens = lexer.Lex();
+        if(diagnostics.Any())
+        {
+            diagnostics.ToList().ForEach(Console.WriteLine);
+            diagnostics.Clear();
+        }
+        var parser = new Parser(tokens, diagnostics);
+        var parsed = parser.Parse();
+        if(diagnostics.Any())
+        {
+            diagnostics.ToList().ForEach(Console.WriteLine);
+        }
+
+        Console.WriteLine(parsed);
+        var run = WarmLangInterpreter.Run(parsed);
+        Console.WriteLine($"Evaluated to: {run}");
+    }
+    return 0;
+}
 
 try 
 {

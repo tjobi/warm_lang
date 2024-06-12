@@ -1,7 +1,12 @@
 namespace WarmLangCompiler;
 
-public record struct ParsedArgs(string Program, bool ParserDebug, bool LexerDebug, bool TraceExceptions);
-
+public record struct ParsedArgs(
+    string Program, 
+    bool ParserDebug = false, 
+    bool LexerDebug = false, 
+    bool TraceExceptions = false,
+    bool Interactive = false
+    );
 public static class ArgsParser
 {
     private static void Help()
@@ -12,14 +17,12 @@ public static class ArgsParser
         Console.WriteLine("\t--lex-debug        - enables debug information for lexer");
         Console.WriteLine("\t--parser-debug     - enables debug information for parser");
         Console.WriteLine("\t--trace            - prints a stacktrace if an exception goes uncaught");
+        Console.WriteLine("\t-is,--interactive  - enables interactive mode");
     }
 
     public static ParsedArgs? ParseArgs(string[] args, string defaultProgram)
     {
-        var program = defaultProgram;
-        var lexerDebug = false;
-        var longExceptions = false;
-        var parserDebug = false;
+        var parsedArgs = new ParsedArgs(defaultProgram);
 
         var isLookingForFile = true;
         var argsContainedProgram = false;
@@ -28,26 +31,33 @@ public static class ArgsParser
             switch(arg)
             {
                 case "-lh": //short for "lang help" otherwise it is caught by "dotnet run"
-                case "--lang-help": {
+                case "--lang-help": 
+                {
                     Help();
                     return null;
                 }
+                case "-is":
+                case "--interactive":
+                {
+                    parsedArgs.Interactive = true;
+                } break;
                 case "--lex-debug":
                 {
-                    lexerDebug = true;
+                    parsedArgs.LexerDebug = true;
                 } break;
                 case "--parser-debug":
                 {
-                    parserDebug = true;
+                    parsedArgs.ParserDebug = true;
                 } break;
                 case "--trace":
                 {
-                    longExceptions = true;
+                    parsedArgs.TraceExceptions = true;
                 } break;
-                default: {
+                default: 
+                {
                     if(File.Exists(arg) && isLookingForFile)
                     {
-                        program = arg;
+                        parsedArgs.Program = arg;
                         isLookingForFile = false;
                         argsContainedProgram = true;
                     } else 
@@ -56,23 +66,24 @@ public static class ArgsParser
                         Help();
                         return null;
                     }
-                }break;
+                } break;
             }
         }
-        if(program == defaultProgram && !argsContainedProgram)
+        if(parsedArgs.Program == defaultProgram && !argsContainedProgram)
         {
             Console.WriteLine("INFO ARGS: No program provided, using default: \"" + defaultProgram + "\"");
         }
-        return new ParsedArgs(program, parserDebug, lexerDebug, longExceptions);
+        return parsedArgs;
     }
 
     public static void Deconstruct(this ParsedArgs args, out string program, out bool parserDebug,
-                                   out bool lexerDebug, out bool longExceptions )
+                                   out bool lexerDebug, out bool longExceptions, out bool interactive )
     {
         program = args.Program;
         parserDebug = args.ParserDebug;
         lexerDebug = args.LexerDebug;
         longExceptions = args.TraceExceptions;
+        interactive = args.Interactive;
         return;
     }
 }
