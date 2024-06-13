@@ -1,10 +1,10 @@
 namespace WarmLangLexerParser.AST.Typs;
 
-public sealed class TypList : Typ
+public sealed class TypList : TypeClause
 {
-    public Typ InnerType { get; }
+    public TypeClause InnerType { get; }
 
-    public TypList(Typ typ)
+    public TypList(TypeClause typ)
     {
         InnerType = typ;
     }

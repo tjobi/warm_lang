@@ -1,8 +1,8 @@
 namespace WarmLangLexerParser.AST.Typs;
 
-public static class TypExtensions
+public static class TypeClauseExtensions
 {
-    public static TokenKind ToTokenKind(this Typ typ) => typ switch 
+    public static TokenKind ToTokenKind(this TypeClause typ) => typ switch 
     {
         TypInt => TokenKind.TInt,
         TypList => TokenKind.TArray,

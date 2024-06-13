@@ -1,6 +1,6 @@
 namespace WarmLangLexerParser.AST.Typs;
 
-public abstract class Typ
+public abstract class TypeClause
 {
     public abstract override string ToString();
 }

@@ -5,8 +5,8 @@ using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.Typs;
 
-public sealed record Funct(ImmutableList<(Typ, string)> ParamNames, StatementNode Body)
+public sealed record Funct(ImmutableList<(TypeClause, string)> ParamNames, StatementNode Body)
 {
     //Separate constructor to make IList to an immutable list, derp
-    public Funct(IList<(Typ, string)> paramss, StatementNode body) : this(paramss.ToImmutableList(), body) { }
+    public Funct(IList<(TypeClause, string)> paramss, StatementNode body) : this(paramss.ToImmutableList(), body) { }
 };

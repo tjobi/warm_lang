@@ -325,7 +325,7 @@ x;
         {
             new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<(Typ, string)>(),
+                new List<(TypeClause, string)>(),
                 new BlockStatement(new List<StatementNode>()
                 {
                     new VarDeclarationExpression(
@@ -352,7 +352,7 @@ x;
         {
             new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<(Typ, string)>() 
+                new List<(TypeClause, string)>() 
                 {
                     (new TypInt(), "y"), 
                     (new TypInt(), "z"), 

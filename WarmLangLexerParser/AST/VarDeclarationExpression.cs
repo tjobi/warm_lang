@@ -9,10 +9,10 @@ public sealed class VarDeclarationExpression : StatementNode
 
     public string Name { get; }
 
-    public Typ Type { get; set; }
+    public TypeClause Type { get; set; }
     public ExpressionNode RightHandSide { get; }
 
-    public VarDeclarationExpression(Typ type, string name, ExpressionNode rightHandSide)
+    public VarDeclarationExpression(TypeClause type, string name, ExpressionNode rightHandSide)
     {
         _kind = type.ToTokenKind();
         Name = name;

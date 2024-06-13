@@ -165,7 +165,7 @@ public class Parser
         var name = MatchKind(TIdentifier);
         var _ = MatchKind(TParLeft);
         //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        List<(Typ,string)> paramNames = new(); 
+        List<(TypeClause,string)> paramNames = new(); 
         if(Current.Kind == TParRight)
         {
             var parClose = NextToken();
@@ -355,13 +355,14 @@ public class Parser
         return new ConstExpression(token.IntValue!.Value);
     }
 
-    private Typ ParseType()
+    private TypeClause ParseType()
     {
-        var type = MatchKinds(TInt); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
-        Typ typ = type.Kind switch 
+        var type = MatchKinds(TInt, TIdentifier); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
+        TypeClause typ = type.Kind switch 
         {
             TInt => new TypInt(),
-            _ => new TypInvalid() //TODO: user-defined types
+            TIdentifier => new UTyp(type), //user-defined types
+            _ => new BadTyp()
         };
         if(Current.Kind == TBracketLeft)
         {
