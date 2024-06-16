@@ -159,11 +159,24 @@ public sealed class Binder
             BinaryExpression be => BindBinaryExpression(be),
             ListInitExpression le => BindListInitExpression(le),
             ConstExpression ce => BindConstantExpression(ce),
+            AssignmentExpression assignment => BindAssignmentExpression(assignment),
             ErrorExpressionNode => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"Bind expression failed on {expression.Kind}")
         };
     }
-    
+
+    private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
+    {
+        var boundAccess = BindAccess(assignment.Access);
+        var boundRightHandSide = BindExpression(assignment.RightHandSide);
+        if(boundAccess.Type != boundRightHandSide.Type)
+        {
+            _diag.ReportCannotImplicitlyConvertToType(boundAccess.Type, boundRightHandSide.Type);
+            return new BoundErrorExpression(assignment);
+        }
+        return new BoundAssignmentExpression(assignment, boundAccess, boundRightHandSide);
+    }
+
     private BoundExpression BindCallExpression(CallExpression ce)
     {
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(ce.Arguments.Count);
@@ -205,6 +218,10 @@ public sealed class Binder
     private BoundExpression BindAccessExpression(AccessExpression ae)
     {
         var boundAccess = BindAccess(ae.Access);
+        if(boundAccess is BoundInvalidAccess)
+        {
+            return new BoundErrorExpression(ae);
+        }
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 
@@ -229,6 +246,11 @@ public sealed class Binder
             case SubscriptAccess sa:
             {
                 var boundTarget = BindAccess(sa.Target);
+                if(boundTarget.Type is not ListTypeSymbol)
+                {
+                    _diag.ReportCannotSubscriptIntoType(boundTarget.Type);
+                    return new BoundInvalidAccess();
+                }
                 var boundIndexExpr = BindExpression(sa.Index);
                 return new BoundSubscriptAccess(boundTarget, boundIndexExpr);
             }

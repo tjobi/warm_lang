@@ -47,5 +47,13 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, 0,0);
     }
 
+    internal static void ReportCannotSubscriptIntoType(this ErrorWarrningBag bag, TypeSymbol badBoi)
+    {
+        var message = $"Cannot apply subscripting [] to expression of type '{badBoi.Name}'";
+        bag.Report(message, true, 0,0);
+    }
+
+    
+
     
 }

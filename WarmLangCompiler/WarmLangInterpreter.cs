@@ -99,7 +99,7 @@ public static class WarmLangInterpreter
                         if(target is ListValue arr && index is IntValue iv)
                         {
                             var idx = iv.Value;
-                            if(idx < arr.Elements.Count && idx > 0)
+                            if(idx < arr.Elements.Count && idx >= 0)
                             {
                                 var (value, newVarEnv2, _) = Evaluate(assignment.RightHandSide, newVarEnv, fenv);
                                 arr[idx] = value;

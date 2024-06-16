@@ -19,12 +19,12 @@ public sealed class BoundInvalidAccess : BoundAccess
 
 public sealed class BoundNameAccess : BoundAccess
 {
-    public BoundNameAccess(VariableSymbol name) : base(name.Type)
+    public BoundNameAccess(VariableSymbol symbol) : base(symbol.Type)
     {
-        Name = name;
+        Symbol = symbol;
     }
 
-    public VariableSymbol Name { get; }
+    public VariableSymbol Symbol { get; }
 }
 
 public sealed class BoundExprAccess : BoundAccess
