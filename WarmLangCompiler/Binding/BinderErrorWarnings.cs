@@ -23,9 +23,21 @@ internal static class BinderErrorWarnings
         var message = $"Variable '{name}' is already defined in this scope";
         bag.Report(message, true, 0,0);
     }
+
+    internal static void ReportFunctionAlreadyDeclared(this ErrorWarrningBag bag, string name)
+    {
+        var message = $"Function '{name}' is already defined in this scope";
+        bag.Report(message, true, 0,0);
+    }
     internal static void ReportVariableDoesNotExist(this ErrorWarrningBag bag, string name)
     {
         var message = $"Variable '{name}' does not exist in current scope";
+        bag.Report(message, true, 0,0);
+    }
+
+    internal static void ReportParameterDuplicateName(this ErrorWarrningBag bag, string name)
+    {
+        var message = $"The parameter '{name}' is a duplicate";
         bag.Report(message, true, 0,0);
     }
 

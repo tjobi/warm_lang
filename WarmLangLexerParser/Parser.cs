@@ -189,7 +189,7 @@ public class Parser
             }
             var paramClose = MatchKind(TParRight);
         }
-        var body = ParseBlockStatement();
+        var body = (BlockStatement) ParseBlockStatement();
         return new FuncDeclaration(name, paramNames, body);
     }
 
@@ -298,10 +298,13 @@ public class Parser
             } break;
             case TIdentifier: {
                 var nameToken = NextToken();
-                res = new AccessExpression(new NameAccess(nameToken));
                 if(Current.Kind == TParLeft)
                 {
-                    res = ParseCallExpression(res);
+                    res = ParseCallExpression(nameToken);
+                }
+                else 
+                {
+                    res = new AccessExpression(new NameAccess(nameToken));
                 }
             } break;
             default: {
@@ -379,9 +382,9 @@ public class Parser
         return typ;
     }
 
-    private ExpressionNode ParseCallExpression(ExpressionNode called)
+    private ExpressionNode ParseCallExpression(SyntaxToken called)
     {
-        //var nameToken = NextToken();
+        //var nameToken = called;
         var openPar = MatchKind(TParLeft);
         var args = new List<ExpressionNode>();
         if(Current.Kind != TParRight)

@@ -1,6 +1,6 @@
 namespace WarmLangCompiler.Symbols;
 
-public sealed class VariableSymbol : Symbol
+public class VariableSymbol : Symbol
 {
     public VariableSymbol(string name, TypeSymbol type) 
         : base(name)

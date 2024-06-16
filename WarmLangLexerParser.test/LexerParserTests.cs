@@ -388,7 +388,7 @@ x;
         {
             new ExprStatement(
                 new CallExpression(
-                    new AccessExpression(new NameAccess(MakeToken(TIdentifier, 0,0, "f"))),
+                    MakeToken(TIdentifier, 1,1, "f"),
                     new List<ExpressionNode>())
             )
         });
@@ -406,7 +406,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new ExprStatement(
-                new CallExpression(new AccessExpression(new NameAccess(MakeToken(TIdentifier, 0,0, "f"))), new List<ExpressionNode>()
+                new CallExpression(MakeToken(TIdentifier, 1,1, "f"), new List<ExpressionNode>()
                 {
                     new BinaryExpression(
                         new ConstExpression(2),
@@ -757,7 +757,7 @@ x;
                 new UnaryExpression(
                     MakeToken(TMinus,1,1),
                     new CallExpression(
-                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "func"))),
+                        MakeToken(TIdentifier,1,3, "func"),
                         new List<ExpressionNode>(){new ConstExpression(2)}
                     )
                 )
@@ -829,7 +829,7 @@ x;
                     new SubscriptAccess(
                         new ExprAccess(
                             new CallExpression(
-                                new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"returnsList"))),
+                                MakeToken(TIdentifier,1,1,"returnsList"),
                                 new List<ExpressionNode>())),
                         new ConstExpression(1)
                     )
@@ -854,7 +854,7 @@ x;
                 new UnaryExpression(
                     MakeToken(TLeftArrow,1,2),
                     new CallExpression(
-                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"f"))),
+                        MakeToken(TIdentifier,1,4,"f"),
                         new List<ExpressionNode>()
                     )
                 )
@@ -950,7 +950,7 @@ x;
                 {
                     new ExprStatement(
                         new CallExpression(
-                            new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"f"))),
+                            MakeToken(TIdentifier,1,9,"f"),
                             new List<ExpressionNode>()
                         )
                     )

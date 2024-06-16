@@ -3,7 +3,6 @@ namespace WarmLangCompiler.Binding;
 using System.Collections.Immutable;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
-using WarmLangLexerParser.AST.TypeSyntax;
 using WarmLangLexerParser.ErrorReporting;
 
 public sealed class Binder
@@ -76,7 +75,37 @@ public sealed class Binder
 
     private BoundStatement BindFunctionDeclaration(FuncDeclaration funcDecl)
     {
-        throw new NotImplementedException("BIND FUNCTION DECLARATION!");
+        var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
+        var uniqueParameterNames = new HashSet<string>();
+        foreach(var @param in funcDecl.Params)
+        {
+            var paramType = @param.type.ToTypeSymbol();
+            var paramName = @param.name;
+            if(uniqueParameterNames.Contains(paramName))
+            {
+                _diag.ReportParameterDuplicateName(paramName);
+            } else
+            {
+                parameters.Add(new ParameterSymbol(paramName, paramType));
+            }
+        }
+        
+        foreach(var @param in parameters)
+        {
+            var var = new VariableSymbol(@param.Name, @param.Type);
+            _scope.TryDeclareVariable(var);
+        }
+        var body = BindBlockStatement(funcDecl.Body);
+    
+        //TODO: Return of functions? For now it is always an int?
+        var returnType = TypeSymbol.Int;
+        var function = new FunctionSymbol(funcDecl.Name, parameters.ToImmutable(), returnType, body);
+        if(!_scope.TryDeclareFunction(function))
+        {
+            _diag.ReportFunctionAlreadyDeclared(function.Name);
+            return new BoundErrorStatement(funcDecl);
+        }
+        return new BoundFunctionDeclaration(funcDecl, function);
     }
 
     private BoundStatement BindIfStatement(IfStatement ifStatement)
@@ -130,19 +159,52 @@ public sealed class Binder
             BinaryExpression be => BindBinaryExpression(be),
             ListInitExpression le => BindListInitExpression(le),
             ConstExpression ce => BindConstantExpression(ce),
-            _ => throw new NotImplementedException($"Bind expression failed on {expression}")
+            ErrorExpressionNode => new BoundErrorExpression(expression),
+            _ => throw new NotImplementedException($"Bind expression failed on {expression.Kind}")
         };
     }
     
     private BoundExpression BindCallExpression(CallExpression ce)
     {
-        throw new NotImplementedException("BIND CALL EXPRESSION!");
+        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(ce.Arguments.Count);
+        foreach(var arg in ce.Arguments)
+        {
+            var bound = BindExpression(arg);
+            arguments.Add(bound);
+        }
+        
+        if(!_scope.TryLookup(ce.Called.Name!, out var symbol))
+        {
+            //REPORT not declared
+            return new BoundErrorExpression(ce);    
+        }
+
+        if (symbol is not FunctionSymbol function)
+        {
+            //RERPORT not a function
+            return new BoundErrorExpression(ce);
+        }
+        if(arguments.Count != function.Parameters.Length)
+        {
+            //report to many arguments
+            return new BoundErrorExpression(ce);
+        }
+
+        for (int i = 0; i < arguments.Count; i++)
+        {
+            var boundArg = arguments[i];
+            var functionParameter = function.Parameters[i];
+            if(boundArg.Type != functionParameter.Type)
+            {
+                _diag.ReportCannotImplicitlyConvertToType(functionParameter.Type, boundArg.Type);
+            }
+        }
+        return new BoundCallExpression(ce, function, arguments.ToImmutable());
     }
 
     private BoundExpression BindAccessExpression(AccessExpression ae)
     {
         var boundAccess = BindAccess(ae.Access);
-        Console.WriteLine($"Bound access to '{ae.Access}' with type '{boundAccess.Type}'");
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 

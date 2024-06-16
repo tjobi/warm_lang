@@ -24,11 +24,19 @@ public sealed class BoundSymbolScope
 
     public bool TryLookup(string name, out Symbol? type)
     {
-        var mostRecentScope = _scopeStack[^1];
-        return mostRecentScope.TryGetValue(name, out type);
+        for (int i = _scopeStack.Count - 1; i >= 0 ; i--)
+        {
+            var scope  = _scopeStack[i];
+            if(scope.TryGetValue(name, out type))
+                return true;
+        }
+        type = null;
+        return false;
     }
 
     public bool TryDeclareVariable(VariableSymbol variable) => TryDeclare(variable.Name, variable);
+
+    public bool TryDeclareFunction(FunctionSymbol function) => TryDeclare(function.Name, function);
 
     public bool TryDeclare(string name, Symbol type)
     {
@@ -39,5 +47,18 @@ public sealed class BoundSymbolScope
         }
         mostRecentScope.Add(name, type);
         return true;
+    }
+
+    public void Print()
+    {
+        for (int i = _scopeStack.Count-1; i >= 0; i--)
+        {
+            Console.WriteLine($"Scope: {i}");
+            var layer = _scopeStack[i];
+            foreach(var key in layer.Keys)
+            {
+                Console.WriteLine($"\t({key},{layer[key]})");
+            }
+        }
     }
 }

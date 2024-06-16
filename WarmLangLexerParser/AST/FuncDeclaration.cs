@@ -3,7 +3,7 @@ using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangLexerParser.AST;
 
-using ParameterList = IList<(ATypeSyntax,string)> ;
+using ParameterList = IList<(ATypeSyntax type,string name)> ;
 
 public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {
@@ -11,10 +11,10 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
 
     public string Name { get; }
     public ParameterList Params { get; set; }
-    public StatementNode Body { get; set; }
+    public BlockStatement Body { get; set; }
 
     //TODO: Remember to fix <parameters> when we add typing?
-    public FuncDeclaration(SyntaxToken nameToken, ParameterList parameters, StatementNode body)
+    public FuncDeclaration(SyntaxToken nameToken, ParameterList parameters, BlockStatement body)
     {
         Name = nameToken.Name!;
         Params = parameters;
