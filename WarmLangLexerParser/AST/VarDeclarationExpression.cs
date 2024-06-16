@@ -1,4 +1,4 @@
-using WarmLangLexerParser.AST.Typs;
+using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangLexerParser.AST;
 
@@ -9,10 +9,10 @@ public sealed class VarDeclarationExpression : StatementNode
 
     public string Name { get; }
 
-    public TypeClause Type { get; set; }
+    public TypeSyntax.ATypeSyntax Type { get; set; }
     public ExpressionNode RightHandSide { get; }
 
-    public VarDeclarationExpression(TypeClause type, string name, ExpressionNode rightHandSide)
+    public VarDeclarationExpression(TypeSyntax.ATypeSyntax type, string name, ExpressionNode rightHandSide)
     {
         _kind = type.ToTokenKind();
         Name = name;

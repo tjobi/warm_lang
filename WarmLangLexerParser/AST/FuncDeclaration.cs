@@ -1,9 +1,9 @@
 using System.Text;
-using WarmLangLexerParser.AST.Typs;
+using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangLexerParser.AST;
 
-using ParameterList = IList<(TypeClause,string)> ;
+using ParameterList = IList<(ATypeSyntax,string)> ;
 
 public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {

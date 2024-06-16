@@ -1,0 +1,11 @@
+namespace WarmLangLexerParser.AST.TypeSyntax;
+
+public static class TypeSyntaxExtensions
+{
+    public static TokenKind ToTokenKind(this ATypeSyntax typ) => typ switch 
+    {
+        TypeSyntaxInt => TokenKind.TInt,
+        TypeSyntaxList => TokenKind.TArray,
+        _ => TokenKind.TVar //TODO: user-defined types?
+    };
+}

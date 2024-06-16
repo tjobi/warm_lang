@@ -3,7 +3,7 @@ namespace WarmLangCompiler;
 using WarmLangCompiler.Interpreter;
 using WarmLangCompiler.Interpreter.Values;
 using WarmLangLexerParser.AST;
-using WarmLangLexerParser.AST.Typs;
+using WarmLangLexerParser.AST.TypeSyntax;
 
 public static class WarmLangInterpreter
 {
@@ -153,8 +153,8 @@ public static class WarmLangInterpreter
                     //                  func(true)"  <-- true is not an int?!?!
                     var (_, nVarEnv) = (value, paramType) switch 
                     {
-                        (IntValue, TypInt) => nEnv.Declare(paramName, value),
-                        (ListValue, TypList) => nEnv.Declare(paramName, value),
+                        (IntValue, TypeSyntaxInt) => nEnv.Declare(paramName, value),
+                        (ListValue, TypeSyntaxList) => nEnv.Declare(paramName, value),
                         _ => throw new Exception($"Value of {value.GetType().Name} does not match function paramter type {paramType}")
                     };
                     

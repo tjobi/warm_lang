@@ -4,7 +4,7 @@ using System.Text;
 using static SyntaxToken;
 using static TokenKind;
 using WarmLangLexerParser.ErrorReporting;
-using WarmLangLexerParser.AST.Typs;
+using WarmLangLexerParser.AST.TypeSyntax;
 
 public class LexerParserTests
 { 
@@ -190,7 +190,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             
-            new VarDeclarationExpression(new TypInt(), "x", new ConstExpression(5)),
+            new VarDeclarationExpression(new TypeSyntaxInt(), "x", new ConstExpression(5)),
             new ExprStatement(
                 new AssignmentExpression(
                     new NameAccess(MakeToken(TIdentifier,0,0, "x")),
@@ -325,11 +325,11 @@ x;
         {
             new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<(TypeClause, string)>(),
+                new List<(ATypeSyntax, string)>(),
                 new BlockStatement(new List<StatementNode>()
                 {
                     new VarDeclarationExpression(
-                        new TypInt(),
+                        new TypeSyntaxInt(),
                         "x",
                         new ConstExpression(10)
                     ),
@@ -352,16 +352,16 @@ x;
         {
             new FuncDeclaration(
                 MakeToken(TIdentifier,0,0,"f"),
-                new List<(TypeClause, string)>() 
+                new List<(ATypeSyntax, string)>() 
                 {
-                    (new TypInt(), "y"), 
-                    (new TypInt(), "z"), 
-                    (new TypInt(), "l")
+                    (new TypeSyntaxInt(), "y"), 
+                    (new TypeSyntaxInt(), "z"), 
+                    (new TypeSyntaxInt(), "l")
                 },
                 new BlockStatement(new List<StatementNode>()
                 {
                     new VarDeclarationExpression(
-                        new TypInt(),
+                        new TypeSyntaxInt(),
                         "x",
                         new ConstExpression(10)
                     ),
@@ -432,7 +432,7 @@ x;
         var input = "int x = -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(new TypInt(), "x",
+            new VarDeclarationExpression(new TypeSyntaxInt(), "x",
                 new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
             )
         });
@@ -450,7 +450,7 @@ x;
         var input = "int x = - -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(new TypInt(), "x",
+            new VarDeclarationExpression(new TypeSyntaxInt(), "x",
                 new UnaryExpression(MakeToken(TMinus,0,0), 
                     new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
                 )
@@ -470,7 +470,7 @@ x;
         var input = "int x = + + 1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(new TypInt(), "x",
+            new VarDeclarationExpression(new TypeSyntaxInt(), "x",
                 new UnaryExpression(MakeToken(TPlus,0,0), 
                     new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
                 )
@@ -491,7 +491,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypList(new TypInt()),
+                new TypeSyntaxList(new TypeSyntaxInt()),
                 "xs",
                 new ListInitExpression(new List<ExpressionNode>()
                 {
@@ -592,7 +592,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypList(new TypInt()), "xs",
+                new TypeSyntaxList(new TypeSyntaxInt()), "xs",
                 new ListInitExpression(new List<ExpressionNode>())
             )
         });
@@ -611,7 +611,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclarationExpression(
-                new TypList(new TypInt()), "xs",
+                new TypeSyntaxList(new TypeSyntaxInt()), "xs",
                 new ListInitExpression(new List<ExpressionNode>())
             ),
             new ExprStatement(

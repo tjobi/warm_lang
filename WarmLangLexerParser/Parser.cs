@@ -1,5 +1,5 @@
 using WarmLangLexerParser.AST;
-using WarmLangLexerParser.AST.Typs;
+using WarmLangLexerParser.AST.TypeSyntax;
 using WarmLangLexerParser.ErrorReporting;
 using static WarmLangLexerParser.TokenKind;
 
@@ -165,7 +165,7 @@ public class Parser
         var name = MatchKind(TIdentifier);
         var _ = MatchKind(TParLeft);
         //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        List<(TypeClause,string)> paramNames = new(); 
+        List<(ATypeSyntax,string)> paramNames = new(); 
         if(Current.Kind == TParRight)
         {
             var parClose = NextToken();
@@ -355,20 +355,20 @@ public class Parser
         return new ConstExpression(token.IntValue!.Value);
     }
 
-    private TypeClause ParseType()
+    private ATypeSyntax ParseType()
     {
         var type = MatchKinds(TInt, TIdentifier); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
-        TypeClause typ = type.Kind switch 
+        ATypeSyntax typ = type.Kind switch 
         {
-            TInt => new TypInt(),
-            TIdentifier => new UTyp(type), //user-defined types
-            _ => new BadTyp()
+            TInt => new TypeSyntaxInt(),
+            TIdentifier => new TypeSyntaxUserDefined(type), //user-defined types
+            _ => new BadTypeSyntax()
         };
         if(Current.Kind == TBracketLeft)
         {
             var bracketOpen = NextToken();
             var bracketClose = MatchKind(TBracketRight);
-            return new TypList(typ);
+            return new TypeSyntaxList(typ);
         }
         return typ;
     }
