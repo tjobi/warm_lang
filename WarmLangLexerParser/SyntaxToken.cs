@@ -1,20 +1,5 @@
 namespace WarmLangLexerParser;
 
-public enum TokenKind
-{
-    TBadToken, TEOF,
-    TConst, TArray,
-    TIdentifier, //Variable names, function names...
-    TVar, TInt, //var x = 5, the keyword 'var'
-    TSemiColon, TComma, TDot, TColon, TDoubleColon, TBang, TColonBang, TLeftArrow,
-    TEqual, TAssign, //Assignment x = 10;
-    TEqualEqual, TLessThan, TLessThanEqual, TPlus, TStar, TSlash, TMinus,
-    TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
-    TBlock, TWhile,
-    TIfStmnt, TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
-    TFunc, TCall, //function & function calls
-}
-
 public record SyntaxToken 
 {
     public TokenKind Kind { get; init; }
