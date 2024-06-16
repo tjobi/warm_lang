@@ -433,7 +433,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclaration(new TypeSyntaxInt(), "x",
-                new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
+                new UnaryExpression(MakeToken(TMinus, 1,9), new ConstExpression(1))
             )
         });
 
@@ -451,8 +451,8 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclaration(new TypeSyntaxInt(), "x",
-                new UnaryExpression(MakeToken(TMinus,0,0), 
-                    new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
+                new UnaryExpression(MakeToken(TMinus,1,9), 
+                    new UnaryExpression(MakeToken(TMinus,1,11), new ConstExpression(1))
                 )
             )
         });
@@ -471,8 +471,8 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             new VarDeclaration(new TypeSyntaxInt(), "x",
-                new UnaryExpression(MakeToken(TPlus,0,0), 
-                    new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
+                new UnaryExpression(MakeToken(TPlus,1,9), 
+                    new UnaryExpression(MakeToken(TPlus,1,11), new ConstExpression(1))
                 )
             )
         });
@@ -638,7 +638,7 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,0,0),
+                    MakeToken(TLeftArrow,1,2),
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
             ))
         });
@@ -658,7 +658,7 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,0,0),
+                    MakeToken(TLeftArrow,1,2),
                     new BinaryExpression(
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs"))),
                         MakeToken(TDoubleColon,1,8),
@@ -683,9 +683,9 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,0,0),
+                    MakeToken(TLeftArrow,1,2),
                     new UnaryExpression(
-                        MakeToken(TLeftArrow,0,0),
+                        MakeToken(TLeftArrow,1,5),
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
                     )
                 )
@@ -707,9 +707,9 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,0,0),
+                    MakeToken(TLeftArrow,1,2),
                     new UnaryExpression(
-                        MakeToken(TMinus,0,0),
+                        MakeToken(TMinus,1,4),
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
                     )
                 )
@@ -731,9 +731,9 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TMinus,0,0),
+                    MakeToken(TMinus,1,1),
                     new UnaryExpression(
-                        MakeToken(TLeftArrow,0,0),
+                        MakeToken(TLeftArrow,1,4),
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs")))
                     )
                 )
@@ -755,7 +755,7 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TMinus,0,0),
+                    MakeToken(TMinus,1,1),
                     new CallExpression(
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "func"))),
                         new List<ExpressionNode>(){new ConstExpression(2)}
@@ -779,7 +779,7 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,0,0),
+                    MakeToken(TLeftArrow,1,2),
                     new AssignmentExpression(
                         new NameAccess(MakeToken(TIdentifier,0,0, "xs")),
                         new ListInitExpression(new List<ExpressionNode>())
@@ -852,7 +852,7 @@ x;
         {
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,0,0),
+                    MakeToken(TLeftArrow,1,2),
                     new CallExpression(
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"f"))),
                         new List<ExpressionNode>()

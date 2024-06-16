@@ -2,23 +2,20 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class UnaryExpression : ExpressionNode
 {
-    public string Operation { get; }
     public ExpressionNode Expression { get; }
+    public SyntaxToken Operator { get; }
+    public override TokenKind Kind => Operator.Kind;
+    public string Operation => Kind.AsString();
 
-    private readonly TokenKind _kind;
 
     public UnaryExpression(SyntaxToken op, ExpressionNode expr)
     {
         Expression = expr;
-        _kind = op.Kind;
-        Operation = op.Kind.AsString();
+        Operator = op;
     }
-
-    public override TokenKind Kind => _kind;
-
     public override string ToString()
     {
-        if(_kind.IsPrefixUnaryExpression())
+        if(Operator.Kind.IsPrefixUnaryExpression())
         {
             return $"({Operation}{Expression})";
         }

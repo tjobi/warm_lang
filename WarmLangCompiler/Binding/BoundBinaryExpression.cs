@@ -9,11 +9,11 @@ public sealed class BoundBinaryExpression : BoundExpression
     : base(node, op.Type)
     {
         Left = left;
-        Op = op;
+        Operator = op;
         Right = right;
     }
 
     public BoundExpression Left { get; }
-    public BoundBinaryOperator Op { get; }
+    public BoundBinaryOperator Operator { get; }
     public BoundExpression Right { get; }
 }
