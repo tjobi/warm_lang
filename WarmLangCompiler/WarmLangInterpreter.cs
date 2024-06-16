@@ -75,7 +75,7 @@ public static class WarmLangInterpreter
                 };
                 return (value, newVarEnv, newFuncEnv);
             }
-            case VarDeclarationExpression decl: 
+            case VarDeclaration decl: 
             {
                 var name = decl.Name;
                 var (value, eEnv,_) = Evaluate(decl.RightHandSide, env, fenv);

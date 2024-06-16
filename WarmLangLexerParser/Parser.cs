@@ -65,7 +65,7 @@ public class Parser
         return left;
     }
 
-    public StatementNode ParseEntry()
+    private StatementNode ParseEntry()
     {
         var statements = new List<StatementNode>();
         while( NotEndOfFile && Current.Kind != TCurRight)
@@ -155,7 +155,7 @@ public class Parser
         var _ = NextToken(); // throw away the '='
         var rhs = ParseExpression(); //Parse the right hand side of a "int x = rhs"
         var semicolon = MatchKind(TSemiColon);
-        return new VarDeclarationExpression(type, name.Name!, rhs);
+        return new VarDeclaration(type, name.Name!, rhs);
     }
 
 

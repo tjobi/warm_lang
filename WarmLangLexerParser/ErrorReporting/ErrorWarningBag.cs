@@ -23,7 +23,7 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
     public void Mute() => isMuted = true;
     public void UnMute() => isMuted = false;
 
-    private void Report(string message, bool isError, int line, int col)
+    public void Report(string message, bool isError, int line, int col)
     {
         if(!isMuted)
         {

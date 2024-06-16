@@ -190,7 +190,7 @@ x;
         var expected = new BlockStatement(new List<StatementNode>()
         {
             
-            new VarDeclarationExpression(new TypeSyntaxInt(), "x", new ConstExpression(5)),
+            new VarDeclaration(new TypeSyntaxInt(), "x", new ConstExpression(5)),
             new ExprStatement(
                 new AssignmentExpression(
                     new NameAccess(MakeToken(TIdentifier,0,0, "x")),
@@ -328,7 +328,7 @@ x;
                 new List<(ATypeSyntax, string)>(),
                 new BlockStatement(new List<StatementNode>()
                 {
-                    new VarDeclarationExpression(
+                    new VarDeclaration(
                         new TypeSyntaxInt(),
                         "x",
                         new ConstExpression(10)
@@ -360,14 +360,14 @@ x;
                 },
                 new BlockStatement(new List<StatementNode>()
                 {
-                    new VarDeclarationExpression(
+                    new VarDeclaration(
                         new TypeSyntaxInt(),
                         "x",
                         new ConstExpression(10)
                     ),
                     new ExprStatement(new BinaryExpression(
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
-                        MakeToken(TPlus, 0,0),
+                        MakeToken(TPlus, 1,48),
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"y")))
                     ))
                 })
@@ -410,7 +410,7 @@ x;
                 {
                     new BinaryExpression(
                         new ConstExpression(2),
-                        MakeToken(TPlus, 0,0),
+                        MakeToken(TPlus, 1,4),
                         new ConstExpression(5)
                     ),
                     new ConstExpression(10)
@@ -432,7 +432,7 @@ x;
         var input = "int x = -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(new TypeSyntaxInt(), "x",
+            new VarDeclaration(new TypeSyntaxInt(), "x",
                 new UnaryExpression(MakeToken(TMinus, 0,0), new ConstExpression(1))
             )
         });
@@ -450,7 +450,7 @@ x;
         var input = "int x = - -1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(new TypeSyntaxInt(), "x",
+            new VarDeclaration(new TypeSyntaxInt(), "x",
                 new UnaryExpression(MakeToken(TMinus,0,0), 
                     new UnaryExpression(MakeToken(TMinus,0,0), new ConstExpression(1))
                 )
@@ -470,7 +470,7 @@ x;
         var input = "int x = + + 1;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(new TypeSyntaxInt(), "x",
+            new VarDeclaration(new TypeSyntaxInt(), "x",
                 new UnaryExpression(MakeToken(TPlus,0,0), 
                     new UnaryExpression(MakeToken(TPlus,0,0), new ConstExpression(1))
                 )
@@ -490,7 +490,7 @@ x;
         var input = "int[] xs = [1,2,3+5]";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(
+            new VarDeclaration(
                 new TypeSyntaxList(new TypeSyntaxInt()),
                 "xs",
                 new ListInitExpression(new List<ExpressionNode>()
@@ -499,7 +499,7 @@ x;
                     new ConstExpression(2),
                     new BinaryExpression(
                         new ConstExpression(3),
-                        MakeToken(TPlus, 0,0),
+                        MakeToken(TPlus, 1,18),
                         new ConstExpression(5)
                     )
                 }))
@@ -591,7 +591,7 @@ x;
         var input = "int[] xs = [];";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(
+            new VarDeclaration(
                 new TypeSyntaxList(new TypeSyntaxInt()), "xs",
                 new ListInitExpression(new List<ExpressionNode>())
             )
@@ -610,14 +610,14 @@ x;
         var input = "int[] xs = []; xs :: 5;";
         var expected = new BlockStatement(new List<StatementNode>()
         {
-            new VarDeclarationExpression(
+            new VarDeclaration(
                 new TypeSyntaxList(new TypeSyntaxInt()), "xs",
                 new ListInitExpression(new List<ExpressionNode>())
             ),
             new ExprStatement(
                 new BinaryExpression(
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"xs"))),
-                    MakeToken(TDoubleColon,0,0),
+                    MakeToken(TDoubleColon,1,20),
                     new ConstExpression(5)
                 )
             )
@@ -661,7 +661,7 @@ x;
                     MakeToken(TLeftArrow,0,0),
                     new BinaryExpression(
                         new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0, "xs"))),
-                        MakeToken(TDoubleColon,0,0),
+                        MakeToken(TDoubleColon,1,8),
                         new ConstExpression(20)
                     )
                 )
@@ -877,7 +877,7 @@ x;
             new ExprStatement(
                 new BinaryExpression(
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
-                    MakeToken(TPlus,0,0),
+                    MakeToken(TPlus,1,2),
                     new ConstExpression(2)
                 )
             )
@@ -902,7 +902,7 @@ x;
             new ExprStatement(
                 new BinaryExpression(
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,0,0,"x"))),
-                    MakeToken(TPlus,0,0),
+                    MakeToken(TPlus,1,2),
                     new ErrorExpressionNode(MakeToken(TSemiColon,1,3))
                 )
             )
@@ -983,7 +983,7 @@ x;
                 {
                     new BinaryExpression(
                         new ConstExpression(2),
-                        MakeToken(TPlus,0,0),
+                        MakeToken(TPlus,1,12),
                         new ConstExpression(2)
                     )
                 }
@@ -1010,12 +1010,12 @@ x;
                 {
                     new BinaryExpression(
                         new ConstExpression(2),
-                        MakeToken(TPlus,0,0),
+                        MakeToken(TPlus,1,12),
                         new ConstExpression(2)
                     ),
                     new BinaryExpression(
                         new ConstExpression(5),
-                        MakeToken(TPlus,0,0),
+                        MakeToken(TPlus,1,16),
                         new ConstExpression(5)
                     ),
                 }
