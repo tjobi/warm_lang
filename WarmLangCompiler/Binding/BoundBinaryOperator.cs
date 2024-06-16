@@ -43,7 +43,7 @@ public sealed class BoundBinaryOperator
         new(TLessThanEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Int),
         
         //builtin list operators
-        new(TDoubleColon, TypeSymbol.List, TypeSymbol.Int, TypeSymbol.List),
-        new(TPlus,TypeSymbol.List),
+        new(TDoubleColon, TypeSymbol.IntList, TypeSymbol.Int, TypeSymbol.IntList),
+        new(TPlus,TypeSymbol.IntList),
     };
 }

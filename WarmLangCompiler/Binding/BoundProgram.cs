@@ -7,4 +7,6 @@ public sealed class BoundProgram
         Statement = statement;
     }
     public BoundBlockStatement Statement { get; }
+
+    public override string ToString() => Statement.ToString();
 }

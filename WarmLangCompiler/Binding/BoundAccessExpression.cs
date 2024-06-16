@@ -5,11 +5,15 @@ namespace WarmLangCompiler.Binding;
 
 public sealed class BoundAccessExpression : BoundExpression
 {
-    public BoundAccessExpression(ExpressionNode node, VariableSymbol variable)
-    : base(node, variable.Type)
+    public BoundAccessExpression(ExpressionNode node, TypeSymbol type, BoundAccess access)
+    : base(node, type)
     {
-        Variable = variable;
+        Access = access;
     }
 
-    public VariableSymbol Variable { get; }
+    public BoundAccessExpression(ExpressionNode node, VariableSymbol symbol)
+    : this(node, symbol.Type, new BoundNameAccess(symbol))
+    { }
+
+    public BoundAccess Access { get; }
 }

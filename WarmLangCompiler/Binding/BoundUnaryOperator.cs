@@ -26,13 +26,23 @@ public sealed class BoundUnaryOperator
                 return dop;
             }
         }
-        return null;
+        return OperatorOnGenericType(op, left.Type);
     }
 
-    private static BoundUnaryOperator[] _definedOperators = new BoundUnaryOperator[]
+    private static BoundUnaryOperator? OperatorOnGenericType(TokenKind op, TypeSymbol left)
+    {
+        //TODO: Should we cache these?
+        return (op,left) switch
+        {
+            (TLeftArrow, ListTypeSymbol lts) => new BoundUnaryOperator(op, left, lts.InnerType),
+            _ => null, 
+        };
+    }
+
+    private static readonly BoundUnaryOperator[] _definedOperators = new BoundUnaryOperator[]
     {
         new(TPlus, TypeSymbol.Int, TypeSymbol.Int),
         new(TMinus, TypeSymbol.Int, TypeSymbol.Int),
-        new(TLeftArrow, TypeSymbol.List, TypeSymbol.Int) //TODO: Generic lists?
+        new(TLeftArrow, TypeSymbol.IntList, TypeSymbol.Int) //TODO: Generic lists?
     };
 }

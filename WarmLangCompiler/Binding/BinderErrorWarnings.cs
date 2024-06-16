@@ -23,6 +23,11 @@ internal static class BinderErrorWarnings
         var message = $"Variable '{name}' is already defined in this scope";
         bag.Report(message, true, 0,0);
     }
+    internal static void ReportVariableDoesNotExist(this ErrorWarrningBag bag, string name)
+    {
+        var message = $"Variable '{name}' does not exist in current scope";
+        bag.Report(message, true, 0,0);
+    }
 
     internal static void ReportCannotImplicitlyConvertToType(this ErrorWarrningBag bag, TypeSymbol expected, TypeSymbol badBoi)
     {

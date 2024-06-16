@@ -299,6 +299,10 @@ public class Parser
             case TIdentifier: {
                 var nameToken = NextToken();
                 res = new AccessExpression(new NameAccess(nameToken));
+                if(Current.Kind == TParLeft)
+                {
+                    res = ParseCallExpression(res);
+                }
             } break;
             default: {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
@@ -317,10 +321,12 @@ public class Parser
         {
             switch(Current.Kind)
             {
-                case TParLeft:
-                {
-                    res = ParseCallExpression(res);  
-                } continue;
+                //TODO: Enable again, once we allow functions as types
+                    //So we can do something like myFuncList[2](parameter1, parameter2);
+                // case TParLeft:
+                // {
+                //     res = ParseCallExpression(res);  
+                // } continue;
                 case TBracketLeft:
                 {
                     var open = MatchKind(TBracketLeft);
@@ -364,11 +370,11 @@ public class Parser
             TIdentifier => new TypeSyntaxUserDefined(type), //user-defined types
             _ => new BadTypeSyntax()
         };
-        if(Current.Kind == TBracketLeft)
+        while(Current.Kind == TBracketLeft)
         {
             var bracketOpen = NextToken();
             var bracketClose = MatchKind(TBracketRight);
-            return new TypeSyntaxList(typ);
+            typ = new TypeSyntaxList(typ);
         }
         return typ;
     }
