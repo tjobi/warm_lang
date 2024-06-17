@@ -4,11 +4,11 @@ namespace WarmLangCompiler.Binding;
 
 public class BoundExprStatement : BoundStatement
 {
-    public BoundExprStatement(StatementNode syntax, BoundExpression bound)
+    public BoundExprStatement(StatementNode syntax, BoundExpression expression)
         :base(syntax)
     {
-        Bound = bound;
+        Expression = expression;
     }
 
-    public BoundExpression Bound { get; }
+    public BoundExpression Expression { get; }
 }
