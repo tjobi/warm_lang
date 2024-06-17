@@ -97,8 +97,7 @@ public sealed class Binder
         }
         var body = BindBlockStatement(funcDecl.Body);
     
-        //TODO: Return of functions? For now it is always an int?
-        var returnType = TypeSymbol.Int;
+        var returnType = funcDecl.ReturnType.ToTypeSymbol();
         var function = new FunctionSymbol(funcDecl.Name, parameters.ToImmutable(), returnType, body);
         if(!_scope.TryDeclareFunction(function))
         {

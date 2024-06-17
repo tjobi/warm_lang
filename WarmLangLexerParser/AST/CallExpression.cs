@@ -18,7 +18,7 @@ public sealed class CallExpression : ExpressionNode
     
     public override string ToString()
     {
-        var sb = new StringBuilder($"(Call {Called}(");
+        var sb = new StringBuilder($"(Call {Called.Name}(");
         for (int i = 0; i < Arguments.Count; i++)
         {
             if(i > 0)

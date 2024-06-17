@@ -19,8 +19,12 @@ public static class BinderTypeSyntaxExtensions
             _ => throw new NotImplementedException($"BinderTypeExtensions-ResolveNestedTypeSyntax doesn't know {aType}"),
         };
     }
-    public static TypeSymbol ToTypeSymbol(this ATypeSyntax type)
+    public static TypeSymbol ToTypeSymbol(this ATypeSyntax? type)
     {
+        if(type is null)
+        {
+            return TypeSymbol.Void;
+        }
         switch(type)
         {
             case TypeSyntaxInt: 

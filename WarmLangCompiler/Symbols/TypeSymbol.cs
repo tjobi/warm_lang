@@ -5,6 +5,7 @@ public class TypeSymbol : Symbol
     public static readonly TypeSymbol Int = new("int");
     public static readonly TypeSymbol IntList = new ListTypeSymbol("list<int>", Int); //TODO: how to generic?
     public static readonly TypeSymbol EmptyList = new("list<empty>");
+    public static readonly TypeSymbol Void = new("void");
     public static readonly TypeSymbol Error = new("err");
 
     public static readonly TypeSymbol Bool = Int; //TODO: Add bools.

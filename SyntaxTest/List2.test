@@ -1,4 +1,4 @@
-function getArrayOf4()
+function getArrayOf4() int[]
 {
     [0,1,2,3];
 }

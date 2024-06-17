@@ -1,6 +1,6 @@
-function makeArr(int size, int step, int start)
+function makeArr(int size, int step, int start) int[]
 {
-    function inner(int i, int cur, int[] res)
+    function inner(int i, int cur, int[] res) int[]
     {
         if i < size 
         then 

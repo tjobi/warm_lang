@@ -1028,4 +1028,28 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void LexerParserFunctionWithReturnType()
+    {
+        var input = "function f() int {2;}";
+        var expected = new BlockStatement(new List<StatementNode>()
+        {
+            new FuncDeclaration(
+                MakeToken(TIdentifier,1,1, "f"),
+                new List<(ATypeSyntax, string)>(),
+                new TypeSyntaxInt(),
+                new BlockStatement(new List<StatementNode>()
+                {
+                    new ExprStatement(new ConstExpression(2)),
+                })
+            )
+        });
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }

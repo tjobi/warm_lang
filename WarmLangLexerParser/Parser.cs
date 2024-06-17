@@ -189,8 +189,13 @@ public class Parser
             }
             var paramClose = MatchKind(TParRight);
         }
+        ATypeSyntax? returnType = null;
+        if(Current.Kind != TCurLeft)
+        {
+            returnType = ParseType();
+        }
         var body = (BlockStatement) ParseBlockStatement();
-        return new FuncDeclaration(name, paramNames, body);
+        return new FuncDeclaration(name, paramNames, returnType, body);
     }
 
     private StatementNode ParseExpressionStatement()

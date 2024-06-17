@@ -10,14 +10,20 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
     public override TokenKind Kind => TokenKind.TFunc;
 
     public string Name { get; }
-    public ParameterList Params { get; set; }
-    public BlockStatement Body { get; set; }
+    public ParameterList Params { get; }
+    public ATypeSyntax? ReturnType { get; }
+    public BlockStatement Body { get; }
 
     //TODO: Remember to fix <parameters> when we add typing?
     public FuncDeclaration(SyntaxToken nameToken, ParameterList parameters, BlockStatement body)
+    :this(nameToken, parameters, null, body) 
+    { }
+
+    public FuncDeclaration(SyntaxToken nameToken, ParameterList parameters, ATypeSyntax? returnType, BlockStatement body)
     {
         Name = nameToken.Name!;
         Params = parameters;
+        ReturnType = returnType;
         Body = body;
     }
 
@@ -32,7 +38,13 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
             sb.Append(typ.ToString()).Append(' ');
             sb.Append(name);
         }
-        sb.Append(") => ");
+        if(ReturnType is not null)
+        {
+            sb.Append($") : {ReturnType} => ");
+        } else 
+        {
+            sb.Append(") => ");
+        }
         sb.Append(Body);
         return sb.ToString();
     }
