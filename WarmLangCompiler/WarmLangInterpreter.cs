@@ -56,7 +56,7 @@ public static class WarmLangInterpreter
                     ("==", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value == i2.Value),
                     ("<", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value < i2.Value), 
                     ("<=", IntValue i1, IntValue i2) =>  GetBoolishValue(i1.Value <= i2.Value),
-                    ("::", ListValue arr, IntValue i) => arr.Add(i),
+                    ("::", ListValue arr,_) => arr.Add(right),
                     ("+", ListValue a1, ListValue a2) => new ListValue(a1.Elements.Concat(a2.Elements).ToList()),
                     _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
                 };

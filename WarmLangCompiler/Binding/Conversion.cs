@@ -30,7 +30,7 @@ public sealed class Conversion
         if(from == to)
             return Identity;
         
-        if(from == TypeSymbol.EmptyList && to is ListTypeSymbol)
+        if(from.ResolveNestedType() == TypeSymbol.EmptyList && to is ListTypeSymbol)
         {
             return Implicit;
         }

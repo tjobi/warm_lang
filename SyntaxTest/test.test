@@ -1,6 +1,5 @@
-function f(int x, int[] y) int[] 
-{
-    y :: x;
-}
+int[][] xs = [];
 
-int[] x = f(2,[]);
+xs :: [2];
+
+

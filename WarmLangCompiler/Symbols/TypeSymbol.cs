@@ -14,6 +14,18 @@ public class TypeSymbol : Symbol
 
     public override string ToString() => Name;
 
+
+    public TypeSymbol ResolveNestedType() => Resolver(this);
+
+    private TypeSymbol Resolver(TypeSymbol t)
+    {
+        if(t is ListTypeSymbol lts)
+        {
+            return Resolver(lts.InnerType);
+        }
+        return t;
+    }
+
     public static bool operator ==(TypeSymbol a, TypeSymbol b)
     {
         return a.Name == b.Name;

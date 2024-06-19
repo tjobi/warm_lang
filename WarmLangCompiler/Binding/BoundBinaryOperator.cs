@@ -43,6 +43,7 @@ public sealed class BoundBinaryOperator
             (TPlus, _, ListTypeSymbol _) when left == TypeSymbol.EmptyList => new BoundBinaryOperator(op, left, right, right),
             (TPlus, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType
                 => new BoundBinaryOperator(op, left, right, lts2.InnerType),
+            (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, left, right, left),
             _ => null, 
         };
     }
@@ -57,6 +58,7 @@ public sealed class BoundBinaryOperator
         
         //builtin list operators
         new(TDoubleColon, TypeSymbol.IntList, TypeSymbol.Int, TypeSymbol.IntList),
+        new(TDoubleColon, TypeSymbol.EmptyList, TypeSymbol.Int, TypeSymbol.IntList),
         new(TPlus,TypeSymbol.IntList),
     };
 }
