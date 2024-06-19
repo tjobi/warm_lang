@@ -57,13 +57,8 @@ public sealed class Binder
     {
         var type = varDecl.Type.ToTypeSymbol();
         var name = varDecl.Name;
-        var rightHandSide = BindExpression(varDecl.RightHandSide);
-        if(type != rightHandSide.Type)
-        {
-            _diag.ReportCannotImplicitlyConvertToType(type, rightHandSide.Type);
-            return new BoundErrorStatement(varDecl);
-        }
-        
+        var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
+       
         var variable = new VariableSymbol(name, rightHandSide.Type);
         if(!_scope.TryDeclareVariable(variable))
         {
@@ -184,21 +179,21 @@ public sealed class Binder
             var bound = BindExpression(arg);
             arguments.Add(bound);
         }
-        
-        if(!_scope.TryLookup(ce.Called.Name!, out var symbol))
+        var functionName = ce.Called.Name!;
+        if(!_scope.TryLookup(functionName, out var symbol))
         {
-            //REPORT not declared
+            _diag.ReportNameDoesNotExist(functionName);
             return new BoundErrorExpression(ce);    
         }
 
         if (symbol is not FunctionSymbol function)
         {
-            //RERPORT not a function
+            _diag.ReportNameIsNotAFunction(functionName);
             return new BoundErrorExpression(ce);
         }
         if(arguments.Count != function.Parameters.Length)
         {
-            //report to many arguments
+            _diag.ReportFunctionCalMissingArguments(functionName, function.Parameters.Length, arguments.Count);
             return new BoundErrorExpression(ce);
         }
 
@@ -206,10 +201,7 @@ public sealed class Binder
         {
             var boundArg = arguments[i];
             var functionParameter = function.Parameters[i];
-            if(boundArg.Type != functionParameter.Type)
-            {
-                _diag.ReportCannotImplicitlyConvertToType(functionParameter.Type, boundArg.Type);
-            }
+            arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
         }
         return new BoundCallExpression(ce, function, arguments.ToImmutable());
     }
@@ -234,7 +226,7 @@ public sealed class Binder
                 {
                     return new BoundNameAccess((VariableSymbol)symbol);
                 }
-                _diag.ReportVariableDoesNotExist(na.Name);
+                _diag.ReportNameDoesNotExist(na.Name);
                 return new BoundInvalidAccess();
             }
             case ExprAccess exprAccess: 
@@ -316,5 +308,30 @@ public sealed class Binder
     {
         var type = TypeSymbol.Int; //TODO: more constants?
         return new BoundConstantExpression(ce, type);
+    }
+
+    private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to)
+    {
+        var boundExpression = BindExpression(expr);
+        return BindTypeConversion(boundExpression, to);
+    }
+
+    private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to)
+    {
+        var conversion = Conversion.GetConversion(expr.Type, to);
+        if(!conversion.Exists)
+        {
+            if(to != TypeSymbol.Error && expr.Type != TypeSymbol.Error)
+            {
+                _diag.ReportCannotConvertToType(to,expr.Type);
+            }
+            return new BoundErrorExpression(expr.Node);
+        }
+        if(to != expr.Type && conversion.IsExplicit)
+        {
+            _diag.ReportCannotImplicitlyConvertToType(to, expr.Type);
+            return new BoundErrorExpression(expr.Node);
+        }
+        return new BoundTypeConversionExpression(expr.Node, to, expr);
     }
 }

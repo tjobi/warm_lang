@@ -103,7 +103,7 @@ public class BinderTests
             new BoundExprStatement(new ExprStatement(accessExpr),new BoundErrorExpression(accessExpr))
         );
         var expectedErrorBag = new ErrorWarrningBag();
-        expectedErrorBag.ReportVariableDoesNotExist("x");
+        expectedErrorBag.ReportNameDoesNotExist("x");
 
         var boundProgram = _binder.BindProgram(input);
 

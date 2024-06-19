@@ -11,6 +11,6 @@ public sealed class TypeSyntaxList : ATypeSyntax
     public override string ToString()
     {
         var innerStr = InnerType.ToString();
-        return $"arr<{innerStr}>";
+        return $"list<{innerStr}>";
     }
 }
