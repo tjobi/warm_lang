@@ -12,7 +12,9 @@ public sealed class ErrorExpressionNode : ExpressionNode
         Column = col;
     }
 
-    public ErrorExpressionNode(SyntaxToken token) :this(token.Line, token.Column) { }
+    public ErrorExpressionNode(SyntaxToken token) :this(token.Location) { }
+
+    public ErrorExpressionNode(TextLocation loc) :this(loc.StartLine, loc.StartColumn) { }
 
     public override string ToString() => $"ParseErr({Line},{Column})";
 }

@@ -9,13 +9,13 @@ internal static class BinderErrorWarnings
     internal static void ReportBinaryOperatorCannotBeApplied(this ErrorWarrningBag bag, SyntaxToken op, TypeSymbol left, TypeSymbol right)
     {
         var message = $"Operator '{op.Kind.AsString()}' cannot be applied to type '{left.Name}' and '{right.Name}' ";
-        bag.Report(message, true, op.Line, op.Column);
+        bag.Report(message, true, op.Location);
     }
 
     internal static void ReportUnaryOperatorCannotBeApplied(this ErrorWarrningBag bag, SyntaxToken op, TypeSymbol left)
     {
         var message = $"Operator '{op.Kind.AsString()}' cannot be applied to type '{left.Name}'";
-        bag.Report(message, true, op.Line, op.Column);
+        bag.Report(message, true, op.Location);
     }
 
     internal static void ReportVariableAlreadyDeclared(this ErrorWarrningBag bag, string name)

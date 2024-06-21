@@ -13,5 +13,5 @@ public class ParserException : Exception
         message = $"Parser failed: On line {line}, column {col} with message \"{msg}\"";
     }
 
-    public ParserException(string msg, SyntaxToken token) : this(msg, token.Line, token.Column) { }
+    public ParserException(string msg, SyntaxToken token) : this(msg, token.Location.StartLine, token.Location.StartColumn) { }
 }

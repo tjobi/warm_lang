@@ -39,10 +39,8 @@ public class Parser
         {
             return NextToken();
         }
-        int line = Current.Line;
-        int col = Current.Column;
-        _diag.ReportUnexpectedToken(kind, Current.Kind, line, col);
-        return new SyntaxToken(TBadToken, line, col);
+        _diag.ReportUnexpectedToken(kind, Current.Kind, Current.Location);
+        return new SyntaxToken(TBadToken, Current.Location);
     }
 
     private SyntaxToken MatchKinds(params TokenKind[] kinds)
@@ -51,10 +49,8 @@ public class Parser
         {
             return NextToken();
         }
-        int line = Current.Line;
-        int col = Current.Column;
-        _diag.ReportUnexpectedTokenFromMany(kinds, Current.Kind, line, col);
-        return new SyntaxToken(TBadToken, line, col);
+        _diag.ReportUnexpectedTokenFromMany(kinds, Current.Kind, Current.Location);
+        return new SyntaxToken(TBadToken, Current.Location);
     }
 
     public ASTNode Parse()
@@ -316,7 +312,7 @@ public class Parser
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
                 //var nextToken = Current;
                 _diag.ReportInvalidExpression(nextToken);
-                return new ErrorExpressionNode(nextToken.Line, nextToken.Column);
+                return new ErrorExpressionNode(nextToken);
             }
         }
         return ParsePostfixExpression(res);

@@ -883,7 +883,7 @@ x;
             )
         });
         var expectedDiag = new ErrorWarrningBag();
-        expectedDiag.ReportUnexpectedToken(TSemiColon,TEOF,1,4);
+        expectedDiag.ReportUnexpectedToken(TSemiColon,TEOF, new TextLocation(1,4));
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
@@ -909,7 +909,7 @@ x;
         });
         var expectedDiag = new ErrorWarrningBag();
         expectedDiag.ReportInvalidExpression(MakeToken(TSemiColon,1,3));
-        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, 1,4);
+        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, new TextLocation(1,4));
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
@@ -959,14 +959,15 @@ x;
         });
         var expectedErrorBag = new ErrorWarrningBag();
         expectedErrorBag.ReportWhileExpectedBlockStatement(MakeToken(TIdentifier,1,9));
-        expectedErrorBag.ReportUnexpectedToken(TCurLeft, TIdentifier,1,9);
-        expectedErrorBag.ReportUnexpectedToken(TCurRight, TEOF,2,1);
+        expectedErrorBag.ReportUnexpectedToken(TCurLeft, TIdentifier, new TextLocation(1,9));
+        expectedErrorBag.ReportUnexpectedToken(TCurRight, TEOF, new TextLocation(1,13));
 
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
 
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEquivalentTo(expectedErrorBag);
         _diag.Should().HaveCount(3);
     }
 
