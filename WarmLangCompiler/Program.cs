@@ -49,10 +49,6 @@ try
 {
     var diagnostics = new ErrorWarrningBag();
     var lexer = Lexer.FromFile(program, diagnostics);
-//     var lexer = Lexer.FromString(
-// @"//hello
-// y
-// x", diagnostics);
     var tokens = lexer.Lex();
     if(lexerDebug)
     {

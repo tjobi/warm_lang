@@ -32,13 +32,12 @@ public sealed class StringWindow : TextWindow
 
     public override void AdvanceText()
     {
-        _index++;
         UpdateColumnCounter();
         if(!IsEndOfFile && CurChar == '\n') 
         { 
             UpdateLineCounter(); 
-            _index++;
         }
+        _index++;
     }
 
     public override char Peek()
