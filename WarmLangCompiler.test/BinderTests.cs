@@ -33,7 +33,9 @@ public class BinderTests
         var expected = new BoundProgram(new BoundBlockStatement(input, new BoundStatement[]
         {
             new BoundVarDeclaration(new VarDeclaration(_syntaxInt,"x",new ConstExpression(5)),"x",
-                new BoundConstantExpression(new ConstExpression(5), TypeSymbol.Int)
+                new BoundTypeConversionExpression(new ConstExpression(5), TypeSymbol.Int,
+                    new BoundConstantExpression(new ConstExpression(5), TypeSymbol.Int)
+                )
             ),
         }.ToImmutableArray())
         );
@@ -63,7 +65,7 @@ public class BinderTests
             )
         ));
         var expectedErrorBag = new ErrorWarrningBag();
-        expectedErrorBag.ReportCannotImplicitlyConvertToType(TypeSymbol.Int, TypeSymbol.IntList);
+        expectedErrorBag.ReportCannotConvertToType(TypeSymbol.Int, TypeSymbol.IntList);
 
         var boundProgram = _binder.BindProgram(input);
 
@@ -71,7 +73,7 @@ public class BinderTests
         _diag.Should().BeEquivalentTo(expectedErrorBag);
     }
 
-    [Fact(Skip = "We need to implement type conversion")]
+    [Fact]
     public void BindVariableDeclarationOfEmptyList()
     {
         var rhs = new ListInitExpression(new List<ExpressionNode>());
@@ -80,10 +82,11 @@ public class BinderTests
         var expected = new BoundProgram(
             CreateBoundBlockStatement(input,
                 new BoundVarDeclaration(varDecl,"x",
-                    new BoundListExpression(
-                        rhs,
-                        TypeSymbol.IntList,
-                        new BoundExpression[]{new BoundConstantExpression(new ConstExpression(5), TypeSymbol.Int)}.ToImmutableArray())
+                    new BoundTypeConversionExpression(rhs, TypeSymbol.IntList,
+                        new BoundListExpression(
+                            rhs,
+                            TypeSymbol.EmptyList, new ImmutableArray<BoundExpression>())
+                    )
                 )
             ));
 
