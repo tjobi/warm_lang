@@ -43,7 +43,7 @@ public class LexerParserTests
             MakeToken(TPlus,2,3),
             MakeToken(TConst,2,5, intValue: 2),
             MakeToken(TSemiColon,2,6),
-            MakeToken(TEOF, 4,1)
+            MakeToken(TEOF, 3,14)
         };
 
         var lexer = GetLexer(input);
@@ -93,7 +93,7 @@ x;
             MakeToken(TEqual,1,7),
             MakeToken(TConst,1,9, intValue:25),
             MakeToken(TSemiColon,1,11),
-            MakeToken(TEOF,2,1),
+            MakeToken(TEOF,1,12),
         };
 
         var lexer = GetLexer(input);
@@ -135,7 +135,7 @@ x;
             MakeToken(TIdentifier,1,5, "x"),
             MakeToken(TEqual,1,7),
             MakeToken(TIdentifier,1,9, "yyyyyy"),
-            MakeToken(TEOF, 2,1)
+            MakeToken(TEOF, 1,15)
         };
 
         var lexer = GetLexer(input);
@@ -174,7 +174,7 @@ x;
             MakeToken(TEqual,1,14),
             MakeToken(TConst,1,16, intValue: 10),
             MakeToken(TSemiColon,1,18),
-            MakeToken(TEOF,2,1)
+            MakeToken(TEOF,1,19)
         };
 
         var lexer = GetLexer(input);
@@ -240,7 +240,7 @@ x;
             MakeToken(TElse,1,14),
             MakeToken(TConst,1,19,intValue:5),
             MakeToken(TSemiColon,1,20),
-            MakeToken(TEOF, 2,1)
+            MakeToken(TEOF, 1,21)
         };
 
         var lexer = GetLexer(input);
@@ -308,7 +308,7 @@ x;
             MakeToken(TIdentifier,1,27,"x"),
             MakeToken(TSemiColon,1,28),
             MakeToken(TCurRight,1,30),
-            MakeToken(TEOF,2,1),
+            MakeToken(TEOF,1,31),
         };
 
         var lexer = GetLexer(input);
@@ -883,7 +883,7 @@ x;
             )
         });
         var expectedDiag = new ErrorWarrningBag();
-        expectedDiag.ReportUnexpectedToken(TSemiColon,TEOF,2,1);
+        expectedDiag.ReportUnexpectedToken(TSemiColon,TEOF,1,4);
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
@@ -909,7 +909,7 @@ x;
         });
         var expectedDiag = new ErrorWarrningBag();
         expectedDiag.ReportInvalidExpression(MakeToken(TSemiColon,1,3));
-        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, 2,1);
+        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, 1,4);
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
