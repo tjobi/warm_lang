@@ -162,10 +162,10 @@ public static class WarmLangInterpreter
             }
             case FuncDeclaration funDecl: 
             {
-                var funcName = funDecl.Name;
+                var funcName = funDecl.NameToken;
                 var paramNames = funDecl.Params;
                 var body = funDecl.Body;
-                var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
+                var (function, newFEnv) = fenv.Declare(funcName.Name!, new Funct(paramNames, body));
                 return (VoidValue.Instance, env, newFEnv);
             }
             case ExprStatement expr: 

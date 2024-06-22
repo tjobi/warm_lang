@@ -62,7 +62,7 @@ public sealed class Binder
         var variable = new VariableSymbol(name, rightHandSide.Type);
         if(!_scope.TryDeclareVariable(variable))
         {
-            _diag.ReportVariableAlreadyDeclared(varDecl.Identifier);
+            _diag.ReportNameAlreadyDeclared(varDecl.Identifier);
             return new BoundErrorStatement(varDecl);
         }
         return new BoundVarDeclaration(varDecl, name, rightHandSide);
@@ -93,10 +93,10 @@ public sealed class Binder
         var body = BindBlockStatement(funcDecl.Body);
     
         var returnType = funcDecl.ReturnType.ToTypeSymbol();
-        var function = new FunctionSymbol(funcDecl.Name, parameters.ToImmutable(), returnType, body);
+        var function = new FunctionSymbol(funcDecl.NameToken, parameters.ToImmutable(), returnType, body);
         if(!_scope.TryDeclareFunction(function))
         {
-            _diag.ReportFunctionAlreadyDeclared(funcDecl.Location, function.Name);
+            _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
             return new BoundErrorStatement(funcDecl);
         }
         return new BoundFunctionDeclaration(funcDecl, function);

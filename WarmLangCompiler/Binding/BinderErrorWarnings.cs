@@ -18,20 +18,15 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, loc);
     }
 
-    internal static void ReportVariableAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
+    internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
     {
-        var message = $"Variable '{name}' is already defined in this scope";
+        var message = $"A variable or function named '{name}' is already defined in this scope";
         bag.Report(message, true, location);
     }
 
-    internal static void ReportVariableAlreadyDeclared(this ErrorWarrningBag bag, SyntaxToken token)
-    => ReportVariableAlreadyDeclared(bag,token.Location, token.Name!);
+    internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, SyntaxToken token)
+    => ReportNameAlreadyDeclared(bag,token.Location, token.Name!);
 
-    internal static void ReportFunctionAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
-    {
-        var message = $"Function '{name}' is already defined in this scope";
-        bag.Report(message, true, location);
-    }
     internal static void ReportNameDoesNotExist(this ErrorWarrningBag bag, TextLocation location, string name)
     {
         var message = $"The name '{name}' does not exist in current scope";

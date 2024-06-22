@@ -7,7 +7,7 @@ using ParameterList = IList<(ATypeSyntax type, SyntaxToken name)> ;
 
 public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {
-    public string Name { get; }
+    public SyntaxToken NameToken { get; }
     public ParameterList Params { get; }
     public ATypeSyntax? ReturnType { get; }
     public BlockStatement Body { get; }
@@ -20,7 +20,7 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
     public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, ATypeSyntax? returnType, BlockStatement body)
     : base(TextLocation.FromTo(funcKeyword.Location, body.Location))
     {
-        Name = nameToken.Name!;
+        NameToken = nameToken;
         Params = parameters;
         ReturnType = returnType;
         Body = body;
@@ -28,7 +28,7 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
 
     public override string ToString()
     {
-        var sb = new StringBuilder($"{Name} (");
+        var sb = new StringBuilder($"{NameToken} (");
         for (int i = 0; i < Params.Count; i++)
         {
             var (typ, name) = Params[i];

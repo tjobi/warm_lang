@@ -366,7 +366,7 @@ x;
         var expected = MakeEntryBlock(input,
             new FuncDeclaration(
                 MakeToken(TFunc,1,1,1,9),
-                MakeToken(TIdentifier,1,11,"f"),
+                MakeToken(TIdentifier,1,10,"f"),
                 new List<(ATypeSyntax, SyntaxToken)>() 
                 {
                     (new TypeSyntaxInt(new TextLocation(1,12,length:3)), MakeToken(TIdentifier,1,16,"y")), 
