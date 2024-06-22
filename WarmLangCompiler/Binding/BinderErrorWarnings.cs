@@ -6,16 +6,16 @@ namespace WarmLangCompiler.Binding;
 
 internal static class BinderErrorWarnings
 {
-    internal static void ReportBinaryOperatorCannotBeApplied(this ErrorWarrningBag bag, SyntaxToken op, TypeSymbol left, TypeSymbol right)
+    internal static void ReportBinaryOperatorCannotBeApplied(this ErrorWarrningBag bag, TextLocation loc, SyntaxToken op, TypeSymbol left, TypeSymbol right)
     {
         var message = $"Operator '{op.Kind.AsString()}' cannot be applied to type '{left.Name}' and '{right.Name}' ";
-        bag.Report(message, true, op.Location);
+        bag.Report(message, true, loc);
     }
 
-    internal static void ReportUnaryOperatorCannotBeApplied(this ErrorWarrningBag bag, SyntaxToken op, TypeSymbol left)
+    internal static void ReportUnaryOperatorCannotBeApplied(this ErrorWarrningBag bag, TextLocation loc, SyntaxToken op, TypeSymbol left)
     {
         var message = $"Operator '{op.Kind.AsString()}' cannot be applied to type '{left.Name}'";
-        bag.Report(message, true, op.Location);
+        bag.Report(message, true, loc);
     }
 
     internal static void ReportVariableAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
@@ -23,6 +23,9 @@ internal static class BinderErrorWarnings
         var message = $"Variable '{name}' is already defined in this scope";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportVariableAlreadyDeclared(this ErrorWarrningBag bag, SyntaxToken token)
+    => ReportVariableAlreadyDeclared(bag,token.Location, token.Name!);
 
     internal static void ReportFunctionAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
     {
@@ -55,10 +58,10 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportCannotSubscriptIntoType(this ErrorWarrningBag bag, TypeSymbol badBoi)
+    internal static void ReportCannotSubscriptIntoType(this ErrorWarrningBag bag, TextLocation location, TypeSymbol badBoi)
     {
         var message = $"Cannot apply subscripting [] to expression of type '{badBoi.Name}'";
-        bag.Report(message, true, 0,0);
+        bag.Report(message, true, location);
     }
 
     internal static void ReportFunctionCalMissingArguments(this ErrorWarrningBag bag, SyntaxToken called, int expectedNumArgs, int realNumArgs)

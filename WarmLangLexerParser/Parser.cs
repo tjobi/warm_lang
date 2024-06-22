@@ -151,7 +151,7 @@ public class Parser
         var equal = NextToken(); // throw away the '='
         var rhs = ParseExpression(); //Parse the right hand side of a "int x = rhs"
         var semicolon = MatchKind(TSemiColon);
-        return new VarDeclaration(type, name.Name!, equal, rhs);
+        return new VarDeclaration(type, name, equal, rhs);
     }
 
 

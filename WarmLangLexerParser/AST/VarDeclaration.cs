@@ -4,27 +4,27 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class VarDeclaration : StatementNode
 {
-    public string Name { get; }
+    public SyntaxToken Identifier { get; }
 
     public ATypeSyntax Type { get; set; }
     public ExpressionNode RightHandSide { get; }
 
 
-    public VarDeclaration(ATypeSyntax type, string name, ExpressionNode rightHandSide)
+    public VarDeclaration(ATypeSyntax type, SyntaxToken name, ExpressionNode rightHandSide)
     :base(TextLocation.FromTo(type.Location, rightHandSide.Location))
     {
-        Name = name;
+        Identifier = name;
         RightHandSide = rightHandSide;
         Type = type;
     }
 
-    public VarDeclaration(ATypeSyntax type, string name, SyntaxToken equal, ExpressionNode rightHandSide)
+    public VarDeclaration(ATypeSyntax type, SyntaxToken name, SyntaxToken equal, ExpressionNode rightHandSide)
     :this(type, name, rightHandSide){ }
 
     public override string ToString()
     {
         var rhs = RightHandSide.ToString();
-        return $"({Name}:{Type} = {rhs})";
+        return $"({Identifier}:{Type} = {rhs})";
     }
 
 }

@@ -56,13 +56,13 @@ public sealed class Binder
     private BoundStatement BindVarDeclaration(VarDeclaration varDecl)
     {
         var type = varDecl.Type.ToTypeSymbol();
-        var name = varDecl.Name;
+        var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
 
         var variable = new VariableSymbol(name, rightHandSide.Type);
         if(!_scope.TryDeclareVariable(variable))
         {
-            _diag.ReportVariableAlreadyDeclared(varDecl.Location, name);
+            _diag.ReportVariableAlreadyDeclared(varDecl.Identifier);
             return new BoundErrorStatement(varDecl);
         }
         return new BoundVarDeclaration(varDecl, name, rightHandSide);
@@ -234,7 +234,7 @@ public sealed class Binder
                 var boundTarget = BindAccess(sa.Target);
                 if(boundTarget.Type is not ListTypeSymbol)
                 {
-                    _diag.ReportCannotSubscriptIntoType(boundTarget.Type);
+                    _diag.ReportCannotSubscriptIntoType(sa.Location, boundTarget.Type);
                     return new BoundInvalidAccess();
                 }
                 var boundIndexExpr = BindExpression(sa.Index);
@@ -257,7 +257,7 @@ public sealed class Binder
         var boundOperator = BoundUnaryOperator.Bind(ue.Operator.Kind, bound);
         if(boundOperator is null)
         {
-            _diag.ReportUnaryOperatorCannotBeApplied(ue.Operator, bound.Type);
+            _diag.ReportUnaryOperatorCannotBeApplied(ue.Location, ue.Operator, bound.Type);
             return new BoundErrorExpression(ue);
         }
         return new BoundUnaryExpression(ue, boundOperator, bound);
@@ -276,7 +276,7 @@ public sealed class Binder
         var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Operator.Kind, boundLeft, boundRight);
         if(boundOperator is null)
         {
-            _diag.ReportBinaryOperatorCannotBeApplied(binaryExpr.Operator, boundLeft.Type, boundRight.Type);
+            _diag.ReportBinaryOperatorCannotBeApplied(binaryExpr.Location, binaryExpr.Operator, boundLeft.Type, boundRight.Type);
             return new BoundErrorExpression(binaryExpr);
         }
         return new BoundBinaryExpression(binaryExpr,boundLeft, boundOperator, boundRight);

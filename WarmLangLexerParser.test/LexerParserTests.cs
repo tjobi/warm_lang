@@ -200,7 +200,7 @@ x;
         var expected = MakeEntryBlock(input,
             new VarDeclaration(
                 new TypeSyntaxInt(new TextLocation(1,1,length:3)),
-                "x",
+                MakeToken(TIdentifier,new TextLocation(1,5), "x"),
                 new ConstExpression(MakeToken(TConst, new TextLocation(1,9), intValue:5))),
             new ExprStatement(
                 new AssignmentExpression(
@@ -344,7 +344,7 @@ x;
                 {
                     new VarDeclaration(
                         new TypeSyntaxInt(new TextLocation(1,15,length:3)),
-                        "x",
+                        MakeToken(TIdentifier,1,19, "x"),
                         new ConstExpression(MakeToken(TConst,new TextLocation(1,23, length:2), intValue:10))
                     ),
                     new ExprStatement(new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,27,"x"))))
@@ -378,8 +378,8 @@ x;
                     new List<StatementNode>()
                     {
                         new VarDeclaration(
-                            new TypeSyntaxInt(new TextLocation(1,34,1,37)),
-                            "x",
+                            new TypeSyntaxInt(new TextLocation(1,34, length:3)),
+                            MakeToken(TIdentifier,1,38, "x"),
                             new ConstExpression(10, new TextLocation(1,42,1,44))
                         ),
                         new ExprStatement(new BinaryExpression(
@@ -454,8 +454,8 @@ x;
         var input = "int x = -1;";
         var expected = MakeEntryBlock(input,
             new VarDeclaration(
-                new TypeSyntaxInt(new TextLocation(1,1,1,4)),
-                "x",
+                new TypeSyntaxInt(new TextLocation(1,1,length:3)),
+                MakeToken(TIdentifier,1,5,"x"),
                 new UnaryExpression(
                     MakeToken(TMinus, 1,9),
                     new ConstExpression(1, new TextLocation(1,10)))
@@ -474,7 +474,9 @@ x;
     {
         var input = "int x = - -1;";
         var expected = MakeEntryBlock(input,
-            new VarDeclaration(new TypeSyntaxInt(new TextLocation(1,1,1,4)), "x",
+            new VarDeclaration(
+                new TypeSyntaxInt(new TextLocation(1,1,length:3)),
+                MakeToken(TIdentifier,1,5, "x"),
                 new UnaryExpression(MakeToken(TMinus,1,9), 
                     new UnaryExpression(MakeToken(TMinus,1,11), new ConstExpression(1, new TextLocation(1,12)))
                 )
@@ -495,7 +497,7 @@ x;
         var expected = MakeEntryBlock(input,
             new VarDeclaration(
                 new TypeSyntaxInt(new TextLocation(1,1, length:3)),
-                "x",
+                MakeToken(TIdentifier,1,5,"x"),
                 new UnaryExpression(MakeToken(TPlus,1,9), 
                     new UnaryExpression(MakeToken(TPlus,1,11), new ConstExpression(1, new TextLocation(1,13)))
                 )
@@ -515,9 +517,9 @@ x;
         var input = "int[] xs = [1,2,3+5];";
         var expected = MakeEntryBlock(input,
             new VarDeclaration(
-                new TypeSyntaxList(new TextLocation(1,1,1,6),
-                    new TypeSyntaxInt(new TextLocation(1,1,1,4))),
-                "xs",
+                new TypeSyntaxList(new TextLocation(1,1,length:5),
+                    new TypeSyntaxInt(new TextLocation(1,1,length:3))),
+                MakeToken(TIdentifier,new TextLocation(1,7,length:2), "xs"),
                 new ListInitExpression(
                     MakeToken(TBracketLeft,1,12),
                     new List<ExpressionNode>()
@@ -621,7 +623,7 @@ x;
             new VarDeclaration(
                 new TypeSyntaxList(
                     new TextLocation(1,1,length:3+2), new TypeSyntaxInt(new TextLocation(1,1, length:3))),
-                "xs",
+                MakeToken(TIdentifier,new TextLocation(1,7,length:2), "xs"),
                 new ListInitExpression(
                     MakeToken(TBracketLeft,1,12),
                     new List<ExpressionNode>(),
@@ -645,7 +647,7 @@ x;
                 new TypeSyntaxList(
                     new TextLocation(1,1, length:3+2), 
                     new TypeSyntaxInt(new TextLocation(1,1,length:3))),
-                "xs",
+                MakeToken(TIdentifier,new TextLocation(1,7,length:2), "xs"),
                 new ListInitExpression(
                     MakeToken(TBracketLeft,1,12),
                     new List<ExpressionNode>(),

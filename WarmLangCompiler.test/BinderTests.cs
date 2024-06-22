@@ -24,16 +24,19 @@ public class BinderTests
     private static BoundBlockStatement CreateBoundBlockStatement(StatementNode syntax, params BoundStatement[] statements) => new(syntax, statements.ToImmutableArray());
     private static BoundProgram CreateBoundProgram(StatementNode syntax, params BoundStatement[] statements) => new(CreateBoundBlockStatement(syntax, statements));
     private static ConstExpression ConstCreater(int val) => new(val, new TextLocation(1,1));
+    private static SyntaxToken MakeVariableToken(string name) => MakeToken(TIdentifier, new TextLocation(1,1, length:name.Length), name);
 
     [Fact]
     public void BindVariableDeclarationForConstantInteger()
     {
         var input = CreateBlockStatement(
-            new VarDeclaration(_syntaxInt,"x", ConstCreater(5))
+            new VarDeclaration(_syntaxInt,MakeVariableToken("x"), ConstCreater(5))
         );        
         var expected = new BoundProgram(new BoundBlockStatement(input, new BoundStatement[]
         {
-            new BoundVarDeclaration(new VarDeclaration(_syntaxInt,"x",ConstCreater(5)),"x",
+            new BoundVarDeclaration(
+                new VarDeclaration(_syntaxInt,MakeVariableToken("x"),ConstCreater(5)),
+                "x",
                 new BoundTypeConversionExpression(ConstCreater(5), TypeSymbol.Int,
                     new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
                 )
@@ -58,7 +61,7 @@ public class BinderTests
                         ConstCreater(5)
                     },
                     MakeToken(TBracketRight,1,1));
-        var varDecl = new VarDeclaration(_syntaxInt,"x",rhs);
+        var varDecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"),rhs);
         var input = CreateBlockStatement(varDecl);
         var expected = new BoundProgram(CreateBoundBlockStatement(
             input,
@@ -83,7 +86,7 @@ public class BinderTests
     {
         //int[] x = [];
         var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),new List<ExpressionNode>(),MakeToken(TBracketRight,1,1));
-        var varDecl = new VarDeclaration(_syntaxIntList,"x",rhs);
+        var varDecl = new VarDeclaration(_syntaxIntList,MakeVariableToken("x"),rhs);
         var input = CreateBlockStatement(varDecl);
         var expected = new BoundProgram(
             CreateBoundBlockStatement(input,
