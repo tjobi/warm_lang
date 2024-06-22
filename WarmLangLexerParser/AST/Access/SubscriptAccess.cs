@@ -6,6 +6,7 @@ public sealed class SubscriptAccess : Access
     public ExpressionNode Index { get; set; }
 
     public SubscriptAccess(Access target, ExpressionNode idx)
+    :base(target.Location)
     {
         Target = target;
         Index = idx;

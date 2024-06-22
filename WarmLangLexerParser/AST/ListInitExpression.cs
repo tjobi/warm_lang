@@ -5,11 +5,10 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class ListInitExpression : ExpressionNode
 {
-    public override TokenKind Kind => TokenKind.TArray;
-
     public ImmutableList<ExpressionNode> Elements { get; set; }
 
-    public ListInitExpression(IList<ExpressionNode> elements)
+    public ListInitExpression(SyntaxToken openBracket, IList<ExpressionNode> elements, SyntaxToken closeBracket)
+    :base(TextLocation.FromTo(openBracket, closeBracket))
     {
         Elements = elements.ToImmutableList();
     }

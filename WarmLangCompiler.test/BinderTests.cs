@@ -3,14 +3,14 @@ namespace WarmLangCompiler.test;
 using System.Collections.Immutable;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.TypeSyntax;
-
+using WarmLangLexerParser;
 
 public class BinderTests
 {
     private readonly ErrorWarrningBag _diag;
 
-    private static readonly ATypeSyntax _syntaxInt = new TypeSyntaxInt();
-    private static readonly ATypeSyntax _syntaxIntList = new TypeSyntaxList(_syntaxInt);
+    private static readonly ATypeSyntax _syntaxInt = new TypeSyntaxInt(new TextLocation(1,1, length:3));
+    private static readonly ATypeSyntax _syntaxIntList = new TypeSyntaxList(new TextLocation(1,1,length:3+2),_syntaxInt);
 
     private readonly Binder _binder;
     public BinderTests()
@@ -20,21 +20,22 @@ public class BinderTests
         
     }
 
-    private BlockStatement CreateBlockStatement(params StatementNode[] statements) => new(statements.ToList());
-    private BoundBlockStatement CreateBoundBlockStatement(StatementNode syntax, params BoundStatement[] statements) => new(syntax, statements.ToImmutableArray());
-    private BoundProgram CreateBoundProgram(StatementNode syntax, params BoundStatement[] statements) => new(CreateBoundBlockStatement(syntax, statements));
+    private static BlockStatement CreateBlockStatement(params StatementNode[] statements) => new(MakeToken(TCurLeft,1,1), statements.ToList(), MakeToken(TCurRight,1,1));
+    private static BoundBlockStatement CreateBoundBlockStatement(StatementNode syntax, params BoundStatement[] statements) => new(syntax, statements.ToImmutableArray());
+    private static BoundProgram CreateBoundProgram(StatementNode syntax, params BoundStatement[] statements) => new(CreateBoundBlockStatement(syntax, statements));
+    private static ConstExpression ConstCreater(int val) => new(val, new TextLocation(1,1));
 
     [Fact]
     public void BindVariableDeclarationForConstantInteger()
     {
         var input = CreateBlockStatement(
-            new VarDeclaration(_syntaxInt,"x",new ConstExpression(5))
+            new VarDeclaration(_syntaxInt,"x", ConstCreater(5))
         );        
         var expected = new BoundProgram(new BoundBlockStatement(input, new BoundStatement[]
         {
-            new BoundVarDeclaration(new VarDeclaration(_syntaxInt,"x",new ConstExpression(5)),"x",
-                new BoundTypeConversionExpression(new ConstExpression(5), TypeSymbol.Int,
-                    new BoundConstantExpression(new ConstExpression(5), TypeSymbol.Int)
+            new BoundVarDeclaration(new VarDeclaration(_syntaxInt,"x",ConstCreater(5)),"x",
+                new BoundTypeConversionExpression(ConstCreater(5), TypeSymbol.Int,
+                    new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
                 )
             ),
         }.ToImmutableArray())
@@ -49,10 +50,13 @@ public class BinderTests
     [Fact]
     public void BindVariableDeclarationOfTypeIntToList()
     {
-        var rhs = new ListInitExpression(new List<ExpressionNode>()
+        var rhs = new ListInitExpression(
+                    MakeToken(TBracketLeft,1,1),
+                    new List<ExpressionNode>()
                     {
-                        new ConstExpression(5)
-                    });
+                        ConstCreater(5)
+                    },
+                    MakeToken(TBracketRight,1,1));
         var varDecl = new VarDeclaration(_syntaxInt,"x",rhs);
         var input = CreateBlockStatement(varDecl);
         var expected = new BoundProgram(CreateBoundBlockStatement(
@@ -61,7 +65,7 @@ public class BinderTests
                 new BoundListExpression(
                     rhs,
                     TypeSymbol.IntList,
-                    new BoundExpression[]{new BoundConstantExpression(new ConstExpression(5), TypeSymbol.Int)}.ToImmutableArray())
+                    new BoundExpression[]{new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)}.ToImmutableArray())
             )
         ));
         var expectedErrorBag = new ErrorWarrningBag();
@@ -76,7 +80,7 @@ public class BinderTests
     [Fact]
     public void BindVariableDeclarationOfEmptyList()
     {
-        var rhs = new ListInitExpression(new List<ExpressionNode>());
+        var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),new List<ExpressionNode>(),MakeToken(TBracketRight,1,1));
         var varDecl = new VarDeclaration(_syntaxIntList,"x",rhs);
         var input = CreateBlockStatement(varDecl);
         var expected = new BoundProgram(

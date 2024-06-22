@@ -15,6 +15,7 @@ public static class TokenKindExtension
             TDoubleColon    => "::",
             TColonBang      => ":!",
             TLeftArrow      => "<-",
+            TEqual          => "=",
             _ => kind.ToString()
         };
     }

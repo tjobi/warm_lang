@@ -155,7 +155,7 @@ public sealed class Binder
             ConstExpression ce => BindConstantExpression(ce),
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
             ErrorExpressionNode => new BoundErrorExpression(expression),
-            _ => throw new NotImplementedException($"Bind expression failed on {expression.Kind}")
+            _ => throw new NotImplementedException($"Bind expression failed on ({expression.Location})-'{expression}'")
         };
     }
 
@@ -259,7 +259,7 @@ public sealed class Binder
         {
             return new BoundErrorExpression(ue);
         }
-        var boundOperator = BoundUnaryOperator.Bind(ue.Kind, bound);
+        var boundOperator = BoundUnaryOperator.Bind(ue.Operator.Kind, bound);
         if(boundOperator is null)
         {
             _diag.ReportUnaryOperatorCannotBeApplied(ue.Operator, bound.Type);
@@ -278,7 +278,7 @@ public sealed class Binder
             return new BoundErrorExpression(binaryExpr);
         }
 
-        var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Kind, boundLeft, boundRight);
+        var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Operator.Kind, boundLeft, boundRight);
         if(boundOperator is null)
         {
             _diag.ReportBinaryOperatorCannotBeApplied(binaryExpr.Operator, boundLeft.Type, boundRight.Type);

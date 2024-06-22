@@ -28,6 +28,14 @@ public class Lexer
 
     private void AdvanceLine() => _window.AdvanceLine(); 
 
+    //Extends the "old" token. Uses when we first see a "<" then a "=", to "combine" to the two into a "<=".
+    private SyntaxToken ExtendToken(SyntaxToken old, TokenKind kind)
+    {
+        var oldLocation = old.Location;
+        var newLocation = TextLocation.FromTo(old.Location, new TextLocation(Line,Column));
+        return SyntaxToken.MakeToken(kind, newLocation);
+    }
+
     public IList<SyntaxToken> Lex()
     {
         IList<SyntaxToken> tokens = new List<SyntaxToken>();
@@ -65,7 +73,7 @@ public class Lexer
                     switch(Current)
                     {
                         case '=': { //we've hit a ==
-                            token = SyntaxToken.MakeToken(TEqualEqual, Line, Column);
+                            token = ExtendToken(token, TEqualEqual);
                             AdvanceText();
                         } break;
                     }
@@ -76,11 +84,11 @@ public class Lexer
                     switch(Current)
                     {
                         case '=': {
-                            token = SyntaxToken.MakeToken(TLessThanEqual, Line, Column);
+                            token = ExtendToken(token, TLessThanEqual);
                             AdvanceText();
                         } break;
                         case '-': {
-                            token = SyntaxToken.MakeToken(TLeftArrow, Line, Column);
+                            token = ExtendToken(token, TLeftArrow);
                             AdvanceText();
                         } break;
                     }
@@ -91,11 +99,7 @@ public class Lexer
                     switch(Current)
                     {
                         case ':': {
-                            token = SyntaxToken.MakeToken(TDoubleColon, Line, Column);
-                            AdvanceText();
-                        } break;
-                        case '!': {
-                            token = SyntaxToken.MakeToken(TColonBang, Line, Column);
+                            token = ExtendToken(token,TDoubleColon);
                             AdvanceText();
                         } break;
                     }
@@ -177,7 +181,8 @@ public class Lexer
             sb.Append(Current);
         }
         var number = int.Parse(sb.ToString());
-        return SyntaxToken.MakeToken(TConst, startLine, startColumn, intValue: number);
+        var location = new TextLocation(startLine, startColumn, Line, Column);
+        return SyntaxToken.MakeToken(TConst, location, intValue: number);
     }
 
     private SyntaxToken LexKeywordOrIdentifier()
@@ -203,16 +208,18 @@ public class Lexer
             }
         }
         var name = sb.ToString();
-        return name switch 
+        TokenKind kind = name switch 
         {
-            "function" => SyntaxToken.MakeToken(TFunc, startLine, startColumn),
-            "if" => SyntaxToken.MakeToken(TIf, startLine, startColumn),
-            "then" => SyntaxToken.MakeToken(TThen, startLine, startColumn),
-            "else" => SyntaxToken.MakeToken(TElse, startLine, startColumn),
-            "int" => SyntaxToken.MakeToken(TInt, startLine, startColumn),
-            "while" => SyntaxToken.MakeToken(TWhile, startLine, startColumn),
-            //"var" => SyntaxToken.MakeToken(TVar, startLine, startColumn),
-            _ => SyntaxToken.MakeToken(TIdentifier, startLine, startColumn, name: name)
+            "function" => TFunc,
+            "if" => TIf,
+            "then" => TThen,
+            "else" => TElse,
+            "int" => TInt,
+            "while" => TWhile,
+            //"var" => TVar,
+            _ => TIdentifier,
         };
+        var location = new TextLocation(startLine, startColumn, Line, Column);
+        return SyntaxToken.MakeToken(kind, location, kind == TIdentifier ? name : null);
     }
 }

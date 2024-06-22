@@ -7,19 +7,18 @@ using ParameterList = IList<(ATypeSyntax type,string name)> ;
 
 public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {
-    public override TokenKind Kind => TokenKind.TFunc;
-
     public string Name { get; }
     public ParameterList Params { get; }
     public ATypeSyntax? ReturnType { get; }
     public BlockStatement Body { get; }
 
     //TODO: Remember to fix <parameters> when we add typing?
-    public FuncDeclaration(SyntaxToken nameToken, ParameterList parameters, BlockStatement body)
-    :this(nameToken, parameters, null, body) 
+    public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, BlockStatement body)
+    :this(funcKeyword, nameToken, parameters, null, body) 
     { }
 
-    public FuncDeclaration(SyntaxToken nameToken, ParameterList parameters, ATypeSyntax? returnType, BlockStatement body)
+    public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, ATypeSyntax? returnType, BlockStatement body)
+    : base(TextLocation.FromTo(funcKeyword.Location, body.Location))
     {
         Name = nameToken.Name!;
         Params = parameters;

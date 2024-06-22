@@ -5,6 +5,7 @@ public sealed class ExprAccess : Access
     public ExpressionNode Expression { get; }
 
     public ExprAccess(ExpressionNode expr)
+    :base(expr.Location)
     {
         Expression = expr;
     }

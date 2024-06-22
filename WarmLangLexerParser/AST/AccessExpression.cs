@@ -2,10 +2,10 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class AccessExpression : ExpressionNode
 {
-    public Access Access {get;}
-    public override TokenKind Kind => TokenKind.TIdentifier;
+    public Access Access { get; }
 
     public AccessExpression(Access acc)
+    :base(acc.Location)
     {
         Access = acc;
     }

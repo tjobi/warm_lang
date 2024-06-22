@@ -69,7 +69,7 @@ public class Parser
             var statement = ParseStatement(); 
             statements.Add(statement);
         }
-        return new BlockStatement(statements);
+        return new BlockStatement(tokens[0], statements, tokens[^1]);
     }
 
     private StatementNode ParseStatement()
@@ -113,7 +113,7 @@ public class Parser
         {
             _diag.ReportWhileExpectedBlockStatement(tokenBeforeBody);
         }
-        return new WhileStatement(condition, body, exprList);
+        return new WhileStatement(whileToken, condition, body, exprList);
     }
 
     private StatementNode ParseIfStatement()
@@ -124,34 +124,34 @@ public class Parser
         var thenStmnt = ParseStatement();
         if (Current.Kind != TElse) //Could be an EOF if the statement looks like "if <cond> then <stmnt>"
         {
-            return new IfStatement(condition, thenStmnt, null);
+            return new IfStatement(ifToken, condition, thenStmnt, null);
         }
         var elseToken = MatchKind(TElse);
         var elseStmnt = ParseStatement();
-        return new IfStatement(condition, thenStmnt, elseStmnt);
+        return new IfStatement(ifToken, condition, thenStmnt, elseStmnt);
     }
 
     private StatementNode ParseBlockStatement()
     {
         var statements = new List<StatementNode>();
-        var _ = MatchKind(TCurLeft);
+        var open = MatchKind(TCurLeft);
         while( NotEndOfFile && Current.Kind != TCurRight)
         {
             var statement = ParseStatement();
             statements.Add(statement);
         }
-        var __ = MatchKind(TCurRight);
-        return new BlockStatement(statements);
+        var close = MatchKind(TCurRight);
+        return new BlockStatement(open, statements, close);
     }
 
     private StatementNode ParseVariableDeclaration()
     {
         var type = ParseType();
         var name = MatchKind(TIdentifier);
-        var _ = NextToken(); // throw away the '='
+        var equal = NextToken(); // throw away the '='
         var rhs = ParseExpression(); //Parse the right hand side of a "int x = rhs"
         var semicolon = MatchKind(TSemiColon);
-        return new VarDeclaration(type, name.Name!, rhs);
+        return new VarDeclaration(type, name.Name!, equal, rhs);
     }
 
 
@@ -191,7 +191,7 @@ public class Parser
             returnType = ParseType();
         }
         var body = (BlockStatement) ParseBlockStatement();
-        return new FuncDeclaration(name, paramNames, returnType, body);
+        return new FuncDeclaration(funcKeyword, name, paramNames, returnType, body);
     }
 
     private StatementNode ParseExpressionStatement()
@@ -235,9 +235,9 @@ public class Parser
                 var rhs = ParseSubExpression();
                 if(left is AccessExpression ae)
                 {
-                    return new AssignmentExpression(ae.Access, rhs);
+                    return new AssignmentExpression(ae.Access, op, rhs);
                 }
-                return new AssignmentExpression(new ExprAccess(left), rhs);
+                return new AssignmentExpression(new ExprAccess(left), op, rhs);
             }
             default:
                 return ParseBinaryExpression(left,parentPrecedence);
@@ -278,8 +278,8 @@ public class Parser
                 var isReading = true;
                 if(Current.Kind == TBracketRight) //empty list
                 {
-                    var _ = MatchKind(TBracketRight);
-                    res = new ListInitExpression(staticElements);
+                    var close = MatchKind(TBracketRight);
+                    res = new ListInitExpression(bracketOpen, staticElements, close);
                     break;
                 }
                 while(isReading && NotEndOfFile)
@@ -295,7 +295,7 @@ public class Parser
                     }
                 }
                 var bracketClose = MatchKind(TBracketRight);
-                res = new ListInitExpression(staticElements);
+                res = new ListInitExpression(bracketOpen, staticElements, bracketClose);
             } break;
             case TIdentifier: {
                 var nameToken = NextToken();
@@ -362,7 +362,7 @@ public class Parser
     private ExpressionNode ParseConstExpression()
     {
         var token = NextToken();
-        return new ConstExpression(token.IntValue!.Value);
+        return new ConstExpression(token);
     }
 
     private ATypeSyntax ParseType()
@@ -370,15 +370,16 @@ public class Parser
         var type = MatchKinds(TInt, TIdentifier); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
         ATypeSyntax typ = type.Kind switch 
         {
-            TInt => new TypeSyntaxInt(),
+            TInt => new TypeSyntaxInt(type.Location),
             TIdentifier => new TypeSyntaxUserDefined(type), //user-defined types
-            _ => new BadTypeSyntax()
+            _ => new BadTypeSyntax(type.Location)
         };
         while(Current.Kind == TBracketLeft)
         {
             var bracketOpen = NextToken();
             var bracketClose = MatchKind(TBracketRight);
-            typ = new TypeSyntaxList(typ);
+            var location = TextLocation.FromTo(type.Location, bracketClose.Location);
+            typ = new TypeSyntaxList(location, typ);
         }
         return typ;
     }
@@ -408,6 +409,6 @@ public class Parser
         }
 
         var closePar = MatchKind(TParRight);
-        return new CallExpression(called, args);
+        return new CallExpression(called, openPar, args, closePar);
     }
 }

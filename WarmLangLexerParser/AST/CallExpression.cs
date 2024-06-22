@@ -4,13 +4,11 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class CallExpression : ExpressionNode
 {
-    public override TokenKind Kind => TokenKind.TCall;
-
     public SyntaxToken Called { get; set; }
     public IList<ExpressionNode> Arguments { get; }
 
-
-    public CallExpression(SyntaxToken called, IList<ExpressionNode> arguments)
+    public CallExpression(SyntaxToken called, SyntaxToken openPar, IList<ExpressionNode> arguments, SyntaxToken closePar)
+    :base(TextLocation.FromTo(called.Location, closePar.Location))
     {
         Called = called;
         Arguments = arguments;

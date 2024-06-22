@@ -69,6 +69,7 @@ try
     diagnostics.Clear();
     var parser = new Parser(tokens, diagnostics);
     ASTNode root = parser.Parse();
+    Console.WriteLine(root.Location);
     if(parserDebug)
     {
         Console.WriteLine($"Parsed:\n\t{root}");

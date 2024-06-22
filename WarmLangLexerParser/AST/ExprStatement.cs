@@ -4,9 +4,9 @@ public sealed class ExprStatement : StatementNode
 {
 
     public ExpressionNode Expression { get; }
-    public override TokenKind Kind => Expression.Kind;
 
     public ExprStatement(ExpressionNode expr)
+    :base(expr.Location)
     {
         Expression = expr;
     }

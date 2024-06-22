@@ -4,22 +4,21 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class WhileStatement : StatementNode
 {
-    public override TokenKind Kind => TokenKind.TWhile;
-
     public ExpressionNode Condition { get; }
 
     public IList<ExpressionNode> Continue { get; }
     public StatementNode Body { get; }
 
-    public WhileStatement(ExpressionNode cond, StatementNode body)
+    public WhileStatement(SyntaxToken whileKeyword, ExpressionNode cond, StatementNode body)
+    :base(TextLocation.FromTo(whileKeyword.Location, body.Location))
     {
         Condition = cond;
         Body = body;
         Continue = new List<ExpressionNode>();
     }
 
-    public WhileStatement(ExpressionNode cond, StatementNode body, IList<ExpressionNode> cont) 
-    : this(cond, body)
+    public WhileStatement(SyntaxToken whileKeyword, ExpressionNode cond, StatementNode body, IList<ExpressionNode> cont) 
+    : this(whileKeyword, cond, body)
     {
         Continue = cont;
     }

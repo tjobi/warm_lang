@@ -34,7 +34,7 @@ public record SyntaxToken
         return MakeToken(kind, new TextLocation(line, col), name, intValue);
     }
 
-    public static SyntaxToken MakeToken(TokenKind kind, int startLine, int endLine, int startCol, int endCol, string? name = null, int? intValue = null)
+    public static SyntaxToken MakeToken(TokenKind kind, int startLine, int startCol, int endLine, int endCol, string? name = null, int? intValue = null)
     {
         return MakeToken(kind, new TextLocation(startLine, startCol, endLine, endCol), name, intValue);
     }

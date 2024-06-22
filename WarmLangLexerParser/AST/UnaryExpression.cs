@@ -4,11 +4,11 @@ public sealed class UnaryExpression : ExpressionNode
 {
     public ExpressionNode Expression { get; }
     public SyntaxToken Operator { get; }
-    public override TokenKind Kind => Operator.Kind;
-    public string Operation => Kind.AsString();
+    public string Operation => Operator.Kind.AsString();
 
 
     public UnaryExpression(SyntaxToken op, ExpressionNode expr)
+    :base(TextLocation.FromTo(op.Location, expr.Location))
     {
         Expression = expr;
         Operator = op;

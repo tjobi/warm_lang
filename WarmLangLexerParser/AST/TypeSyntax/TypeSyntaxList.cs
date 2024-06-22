@@ -4,7 +4,7 @@ public sealed class TypeSyntaxList : ATypeSyntax
 {
     public ATypeSyntax InnerType { get; }
 
-    public TypeSyntaxList(ATypeSyntax typ)
+    public TypeSyntaxList(TextLocation location, ATypeSyntax typ): base(location)
     {
         InnerType = typ;
     }
