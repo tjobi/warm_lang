@@ -50,6 +50,7 @@ public class BinderTests
     [Fact]
     public void BindVariableDeclarationOfTypeIntToList()
     {
+        //int x = [5];
         var rhs = new ListInitExpression(
                     MakeToken(TBracketLeft,1,1),
                     new List<ExpressionNode>()
@@ -69,7 +70,7 @@ public class BinderTests
             )
         ));
         var expectedErrorBag = new ErrorWarrningBag();
-        expectedErrorBag.ReportCannotConvertToType(TypeSymbol.Int, TypeSymbol.IntList);
+        expectedErrorBag.ReportCannotConvertToType(rhs.Location, TypeSymbol.Int, TypeSymbol.IntList);
 
         var boundProgram = _binder.BindProgram(input);
 
@@ -80,6 +81,7 @@ public class BinderTests
     [Fact]
     public void BindVariableDeclarationOfEmptyList()
     {
+        //int[] x = [];
         var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),new List<ExpressionNode>(),MakeToken(TBracketRight,1,1));
         var varDecl = new VarDeclaration(_syntaxIntList,"x",rhs);
         var input = CreateBlockStatement(varDecl);
@@ -103,6 +105,7 @@ public class BinderTests
     [Fact]
     public void BindAccessToUndeclaredVariable()
     {
+        //x;
         var nameAccess = new NameAccess(MakeToken(TIdentifier,0,0,"x"));
         var accessExpr = new AccessExpression(nameAccess);
         var input = CreateBlockStatement(new ExprStatement(accessExpr));
@@ -110,7 +113,7 @@ public class BinderTests
             new BoundExprStatement(new ExprStatement(accessExpr),new BoundErrorExpression(accessExpr))
         );
         var expectedErrorBag = new ErrorWarrningBag();
-        expectedErrorBag.ReportNameDoesNotExist("x");
+        expectedErrorBag.ReportNameDoesNotExist(nameAccess.Location, nameAccess.Name);
 
         var boundProgram = _binder.BindProgram(input);
 

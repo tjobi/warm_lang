@@ -1,4 +1,5 @@
 using WarmLangCompiler.Symbols;
+using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Binding;
@@ -13,6 +14,8 @@ public abstract class BoundExpression
 
     public ExpressionNode Node { get; }
     public TypeSymbol Type { get; }
+
+    public TextLocation Location => Node.Location;
 
     public override string ToString() => Node.ToString();
 }

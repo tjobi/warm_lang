@@ -7,6 +7,8 @@ public sealed class ListTypeSymbol : TypeSymbol
         InnerType = innerType;
     }
 
+    public ListTypeSymbol(TypeSymbol innerType) : this(string.Intern($"list<{innerType}>"),innerType) { }
+
     public TypeSymbol InnerType { get; }
 
     public static bool operator == (ListTypeSymbol a, ListTypeSymbol b)

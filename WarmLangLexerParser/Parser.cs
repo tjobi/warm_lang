@@ -161,7 +161,7 @@ public class Parser
         var name = MatchKind(TIdentifier);
         var _ = MatchKind(TParLeft);
         //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        List<(ATypeSyntax,string)> paramNames = new(); 
+        List<(ATypeSyntax,SyntaxToken)> paramNames = new(); 
         if(Current.Kind == TParRight)
         {
             var parClose = NextToken();
@@ -174,7 +174,7 @@ public class Parser
             {
                 var paramType = ParseType(); 
                 var paramName = MatchKind(TIdentifier);
-                paramNames.Add( (paramType, paramName.Name!) );
+                paramNames.Add( (paramType, paramName) );
                 if(Current.Kind == TComma)
                 {
                     var comma = MatchKind(TComma);

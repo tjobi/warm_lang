@@ -338,7 +338,7 @@ x;
             new FuncDeclaration(
                 MakeToken(TFunc,new TextLocation(1,1,length:8)),
                 MakeToken(TIdentifier,1,10,"f"),
-                new List<(ATypeSyntax, string)>(),
+                new List<(ATypeSyntax, SyntaxToken)>(),
                 new BlockStatement(MakeToken(TCurLeft,1,13),
                 new List<StatementNode>()
                 {
@@ -367,11 +367,11 @@ x;
             new FuncDeclaration(
                 MakeToken(TFunc,1,1,1,9),
                 MakeToken(TIdentifier,1,11,"f"),
-                new List<(ATypeSyntax, string)>() 
+                new List<(ATypeSyntax, SyntaxToken)>() 
                 {
-                    (new TypeSyntaxInt(new TextLocation(1,12,length:3)), "y"), 
-                    (new TypeSyntaxInt(new TextLocation(1,19,length:3)), "z"), 
-                    (new TypeSyntaxInt(new TextLocation(1,26,length:3)), "l")
+                    (new TypeSyntaxInt(new TextLocation(1,12,length:3)), MakeToken(TIdentifier,1,16,"y")), 
+                    (new TypeSyntaxInt(new TextLocation(1,19,length:3)), MakeToken(TIdentifier,1,23,"z")), 
+                    (new TypeSyntaxInt(new TextLocation(1,26,length:3)), MakeToken(TIdentifier,1,30,"l"))
                 },
                 new BlockStatement(
                     MakeToken(TCurLeft,1,32),
@@ -1094,7 +1094,7 @@ x;
             new FuncDeclaration(
                 MakeToken(TFunc,new TextLocation(1,1,length:8)),
                 MakeToken(TIdentifier,1,10, "f"),
-                new List<(ATypeSyntax, string)>(),
+                new List<(ATypeSyntax, SyntaxToken)>(),
                 new TypeSyntaxInt(new TextLocation(1,14,1,17)),
                 new BlockStatement(MakeToken(TCurLeft,1,18),
                 new List<StatementNode>()

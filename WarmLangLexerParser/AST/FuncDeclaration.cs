@@ -3,7 +3,7 @@ using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangLexerParser.AST;
 
-using ParameterList = IList<(ATypeSyntax type,string name)> ;
+using ParameterList = IList<(ATypeSyntax type, SyntaxToken name)> ;
 
 public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {

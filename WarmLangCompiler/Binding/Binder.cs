@@ -58,11 +58,11 @@ public sealed class Binder
         var type = varDecl.Type.ToTypeSymbol();
         var name = varDecl.Name;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
-       
+
         var variable = new VariableSymbol(name, rightHandSide.Type);
         if(!_scope.TryDeclareVariable(variable))
         {
-            _diag.ReportVariableAlreadyDeclared(name);
+            _diag.ReportVariableAlreadyDeclared(varDecl.Location, name);
             return new BoundErrorStatement(varDecl);
         }
         return new BoundVarDeclaration(varDecl, name, rightHandSide);
@@ -75,10 +75,10 @@ public sealed class Binder
         foreach(var @param in funcDecl.Params)
         {
             var paramType = @param.type.ToTypeSymbol();
-            var paramName = @param.name;
+            var paramName = @param.name.Name ?? throw new Exception($"BINDER: NO NAME FOR PARAMETER {@param.name.Location}");
             if(uniqueParameterNames.Contains(paramName))
             {
-                _diag.ReportParameterDuplicateName(paramName);
+                _diag.ReportParameterDuplicateName(@param.name);
             } else
             {
                 parameters.Add(new ParameterSymbol(paramName, paramType));
@@ -96,7 +96,7 @@ public sealed class Binder
         var function = new FunctionSymbol(funcDecl.Name, parameters.ToImmutable(), returnType, body);
         if(!_scope.TryDeclareFunction(function))
         {
-            _diag.ReportFunctionAlreadyDeclared(function.Name);
+            _diag.ReportFunctionAlreadyDeclared(funcDecl.Location, function.Name);
             return new BoundErrorStatement(funcDecl);
         }
         return new BoundFunctionDeclaration(funcDecl, function);
@@ -107,7 +107,7 @@ public sealed class Binder
         var condition = BindExpression(ifStatement.Condition);
         if(condition.Type != TypeSymbol.Bool)
         {
-            _diag.ReportCannotImplicitlyConvertToType(TypeSymbol.Bool, condition.Type);
+            _diag.ReportCannotImplicitlyConvertToType(condition.Location, TypeSymbol.Bool, condition.Type);
             return new BoundErrorStatement(ifStatement);
         }
         _scope.PushScope();
@@ -122,7 +122,7 @@ public sealed class Binder
         var condition = BindExpression(wile.Condition);
         if(condition.Type != TypeSymbol.Bool)
         {
-            _diag.ReportCannotImplicitlyConvertToType(TypeSymbol.Bool, condition.Type);
+            _diag.ReportCannotImplicitlyConvertToType(condition.Location, TypeSymbol.Bool, condition.Type);
             return new BoundErrorStatement(wile);
         }
         var boundContinue = ImmutableArray.CreateBuilder<BoundExpression>(wile.Continue.Count);
@@ -162,12 +162,7 @@ public sealed class Binder
     private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
     {
         var boundAccess = BindAccess(assignment.Access);
-        var boundRightHandSide = BindExpression(assignment.RightHandSide);
-        if(boundAccess.Type != boundRightHandSide.Type)
-        {
-            _diag.ReportCannotImplicitlyConvertToType(boundAccess.Type, boundRightHandSide.Type);
-            return new BoundErrorExpression(assignment);
-        }
+        var boundRightHandSide = BindTypeConversion(assignment.RightHandSide, boundAccess.Type);
         return new BoundAssignmentExpression(assignment, boundAccess, boundRightHandSide);
     }
 
@@ -182,18 +177,18 @@ public sealed class Binder
         var functionName = ce.Called.Name!;
         if(!_scope.TryLookup(functionName, out var symbol))
         {
-            _diag.ReportNameDoesNotExist(functionName);
+            _diag.ReportNameDoesNotExist(ce.Called);
             return new BoundErrorExpression(ce);    
         }
 
         if (symbol is not FunctionSymbol function)
         {
-            _diag.ReportNameIsNotAFunction(functionName);
+            _diag.ReportNameIsNotAFunction(ce.Called);
             return new BoundErrorExpression(ce);
         }
         if(arguments.Count != function.Parameters.Length)
         {
-            _diag.ReportFunctionCalMissingArguments(functionName, function.Parameters.Length, arguments.Count);
+            _diag.ReportFunctionCalMissingArguments(ce.Called, function.Parameters.Length, arguments.Count);
             return new BoundErrorExpression(ce);
         }
 
@@ -226,7 +221,7 @@ public sealed class Binder
                 {
                     return new BoundNameAccess((VariableSymbol)symbol);
                 }
-                _diag.ReportNameDoesNotExist(na.Name);
+                _diag.ReportNameDoesNotExist(na.Location, na.Name);
                 return new BoundInvalidAccess();
             }
             case ExprAccess exprAccess: 
@@ -290,18 +285,18 @@ public sealed class Binder
     private BoundExpression BindListInitExpression(ListInitExpression le)
     {
         var elements = ImmutableArray.CreateBuilder<BoundExpression>(le.Elements.Count);
+        TypeSymbol? listType = null;
         foreach(var elm in le.Elements)
         {
             var bound = BindExpression(elm);
-            elements.Add(bound);
+            listType ??= bound.Type;
+            var conversion = BindTypeConversion(bound, listType);
+            elements.Add(conversion);
         }
-        if(elements.Count > 0)
-        {
-            var fstType = elements[0].Type;
-            var listType = new ListTypeSymbol($"list<{fstType}>", fstType);
-            return new BoundListExpression(le, listType, elements.MoveToImmutable());
-        }
-        return new BoundListExpression(le, TypeSymbol.EmptyList, elements.MoveToImmutable());
+        var initListType = listType is null 
+                           ? TypeSymbol.EmptyList
+                           : new ListTypeSymbol(listType);
+        return new BoundListExpression(le, initListType, elements.MoveToImmutable());
     }
 
     private BoundExpression BindConstantExpression(ConstExpression ce)
@@ -323,13 +318,13 @@ public sealed class Binder
         {
             if(to != TypeSymbol.Error && expr.Type != TypeSymbol.Error)
             {
-                _diag.ReportCannotConvertToType(to,expr.Type);
+                _diag.ReportCannotConvertToType(expr.Location, to,expr.Type);
             }
             return new BoundErrorExpression(expr.Node);
         }
         if(to != expr.Type && conversion.IsExplicit)
         {
-            _diag.ReportCannotImplicitlyConvertToType(to, expr.Type);
+            _diag.ReportCannotImplicitlyConvertToType(expr. Location, to, expr.Type);
             return new BoundErrorExpression(expr.Node);
         }
         return new BoundTypeConversionExpression(expr.Node, to, expr);
