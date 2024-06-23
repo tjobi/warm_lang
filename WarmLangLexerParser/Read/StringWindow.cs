@@ -24,21 +24,24 @@ public sealed class StringWindow : TextWindow
     
     public override void AdvanceLine()
     {
-        for(; _index < Length && CurChar != '\n'; _index++) { }
-        UpdateLineCounter();
-        
+        for(; _index < Length && CurChar != '\n'; _index++)
+        {
+            UpdateColumnCounter();
+        }
         _index++;
+
+        if(!IsEndOfFile)
+            UpdateLineCounter();
     }
 
     public override void AdvanceText()
     {
-        _index++;
         UpdateColumnCounter();
         if(!IsEndOfFile && CurChar == '\n') 
         { 
             UpdateLineCounter(); 
-            _index++;
         }
+        _index++;
     }
 
     public override char Peek()

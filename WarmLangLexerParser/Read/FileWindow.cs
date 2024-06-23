@@ -6,55 +6,65 @@ namespace WarmLangLexerParser.Read;
 public sealed class FileWindow : TextWindow
 {
     private readonly StreamReader _reader;
-    private string _curLine;
+    
+    private char _cur;
+
+    private void Read()
+    {
+        if(_reader.Peek() >= 0)
+        {
+            _cur = (char) _reader.Read();
+        }
+        else
+        {
+            _cur = '\0';
+        }
+    }
 
     private FileWindow(StreamReader reader) : base()
     {
         _reader = reader;
-        _curLine = _reader.ReadLine() ?? "";
+        Read();
     }
 
     public FileWindow(IFileReader reader) : this(reader.GetStreamReader()) { }
 
     public FileWindow(string filePath) : this(new StreamReader(filePath)) { }
 
-    public override bool IsEndOfFile => _reader.EndOfStream && _curLine == "";
+    public override bool IsEndOfFile => _reader.EndOfStream && _cur == '\0';
 
     public override void AdvanceLine()
     {
-        string? line = null;
-        while(!_reader.EndOfStream && string.IsNullOrWhiteSpace(line = _reader.ReadLine())) 
+        while(_cur != '\n' && !IsEndOfFile)
         {
-            Line++;
+            Read();
+            UpdateColumnCounter();
         }
-        _curLine = line ?? "";
-        UpdateLineCounter();
+        Read(); //Consume the '\n'
+        if(!IsEndOfFile)
+            UpdateLineCounter();
     }
 
     public override void AdvanceText()
     {
         UpdateColumnCounter();
-        if(Column >= _curLine.Length)
+        if(_cur == '\n')
         {
-            string? line = "";
-            while(!_reader.EndOfStream && string.IsNullOrWhiteSpace(line = _reader.ReadLine())) 
-            {
-                Line++;
-            }
-            _curLine = line ?? "";
             UpdateLineCounter();
         }
+        Read();
     }
 
     public override char Peek()
     {
-        try 
-        {
-            return _curLine[Column];
-        } catch (Exception)
-        {
-            Console.WriteLine($"LEXER Failed: on line: {Line+1}, column: {Column+1}");
-            throw;
-        }
+        if(!IsEndOfFile)
+            return _cur;
+        Console.WriteLine((string?)$"LEXER Failed: on line: {Line+1}, column: {Column+1}");
+        return '\0';
+    }
+
+    private void DebugPrint(string prefix = "")
+    {
+        Console.WriteLine($"{prefix} cur:'{_cur}'");
     }
 }

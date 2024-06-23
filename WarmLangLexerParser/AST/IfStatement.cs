@@ -2,14 +2,13 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class IfStatement : StatementNode
 {
-    public override TokenKind Kind => TokenKind.TIfStmnt;
-
     public ExpressionNode Condition { get; }
 
     public StatementNode Then { get; }
     public StatementNode? Else { get; }
 
-    public IfStatement(ExpressionNode condition, StatementNode thenPath, StatementNode? elsePath)
+    public IfStatement(SyntaxToken ifToken, ExpressionNode condition, StatementNode thenPath, StatementNode? elsePath)
+    :base(TextLocation.FromTo(ifToken.Location, elsePath?.Location ?? thenPath.Location))
     {
         Condition = condition;
         Then = thenPath;

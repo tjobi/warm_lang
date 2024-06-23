@@ -1,7 +1,7 @@
 int xs = [1,2,3];
 int xsLength = 3;
 
-function safeIndex(int i)
+function safeIndex(int i) int
 {
     if xsLength < i
     then

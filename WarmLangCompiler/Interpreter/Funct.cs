@@ -9,4 +9,7 @@ public sealed record Funct(ImmutableList<(ATypeSyntax, string)> ParamNames, Stat
 {
     //Separate constructor to make IList to an immutable list, derp
     public Funct(IList<(ATypeSyntax, string)> paramss, StatementNode body) : this(paramss.ToImmutableList(), body) { }
+
+    public Funct(IList<(ATypeSyntax, SyntaxToken)> paramss, StatementNode body) 
+    : this(paramss.Select(s => (s.Item1, s.Item2.Name!)).ToImmutableList(), body) { }
 };

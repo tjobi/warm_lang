@@ -1,9 +1,9 @@
-function incrementBySteps(int start, int incrementAmount, int amountOfTimes)
+function incrementBySteps(int start, int incrementAmount, int amountOfTimes) int
 {
     int result = start;
     
     //function delcared inside of the other function, we use it to loop (amountOfTimes) :D
-    function loop(int cnt)
+    function loop(int cnt) //implicit void
     {
         if cnt then 
         {

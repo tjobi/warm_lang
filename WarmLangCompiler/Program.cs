@@ -1,4 +1,5 @@
 ﻿using WarmLangCompiler;
+using WarmLangCompiler.Binding;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
@@ -74,7 +75,20 @@ try
     }
     if(diagnostics.Any())
     {
-        Console.WriteLine("--Parser problems --");
+        Console.WriteLine("--Parser problems--");
+        foreach(var err in diagnostics)
+        {
+            Console.WriteLine(err);
+        }
+    }
+
+    diagnostics.Clear();
+    var binder = new Binder(diagnostics);
+    var bound = binder.BindProgram(root);
+    Console.WriteLine($"Bound: {bound}");
+    if(diagnostics.Any())
+    {
+        Console.WriteLine("--Binder found--");
         foreach(var err in diagnostics)
         {
             Console.WriteLine(err);

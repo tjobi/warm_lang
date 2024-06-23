@@ -6,29 +6,45 @@ public record SyntaxToken
     public string? Name { get; init; }
     public int? IntValue { get; init; }
 
-    public int Line { get; set; }
-    public int Column { get; set; }
+    public TextLocation Location { get; }
 
-    public SyntaxToken(TokenKind kind, int line, int col)
+    public SyntaxToken(TokenKind kind, TextLocation location)
     {
         Kind = kind;
-        Line = line;
-        Column = col;
+        Location = location;
     }
 
-    public SyntaxToken(TokenKind kind, int line, int col, string? name, int intValue) 
-        : this(kind,line,col)
-    {
+    public SyntaxToken(TokenKind kind, TextLocation location, 
+                       string? name, int intValue) 
+    : this(kind, location)
+    { 
         Name = name;
         IntValue = intValue;
     }
 
+    public SyntaxToken(TokenKind kind, int startLine, 
+                       int endLine, int startCol, 
+                       int endCol, string? name, 
+                       int intValue) 
+    : this(kind, new TextLocation(startLine, endLine, startCol, endCol), name, intValue)
+    { }
+
     public static SyntaxToken MakeToken(TokenKind kind, int line, int col, string? name = null, int? intValue = null)
+    {
+        return MakeToken(kind, new TextLocation(line, col), name, intValue);
+    }
+
+    public static SyntaxToken MakeToken(TokenKind kind, int startLine, int startCol, int endLine, int endCol, string? name = null, int? intValue = null)
+    {
+        return MakeToken(kind, new TextLocation(startLine, startCol, endLine, endCol), name, intValue);
+    }
+
+    public static SyntaxToken MakeToken(TokenKind kind, TextLocation location, string? name = null, int? intValue = null)
     {
         return kind switch 
         {
-            TokenKind.TIdentifier or TokenKind.TConst => new SyntaxToken(kind, line, col, name, intValue ?? 0),
-            _ => new SyntaxToken(kind, line, col)
+            TokenKind.TIdentifier or TokenKind.TConst => new SyntaxToken(kind, location, name, intValue ?? 0),
+            _ => new SyntaxToken(kind, location, null, 0)
         };
     }
 }

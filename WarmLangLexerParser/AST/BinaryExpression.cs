@@ -8,9 +8,9 @@ public class BinaryExpression : ExpressionNode
     public SyntaxToken Operator { get; set; }
 
     public string Operation => Operator.Kind.AsString();
-    public override TokenKind Kind => Operator.Kind; 
 
     public BinaryExpression(ExpressionNode left, SyntaxToken op, ExpressionNode right)
+    :base(TextLocation.FromTo(left.Location, right.Location))
     {
         Left = left;
         Right = right;

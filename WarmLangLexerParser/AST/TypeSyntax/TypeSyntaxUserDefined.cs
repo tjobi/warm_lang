@@ -4,6 +4,7 @@ public sealed class TypeSyntaxUserDefined : ATypeSyntax
 {
     public string Name { get; }
     public TypeSyntaxUserDefined(SyntaxToken name)
+    :base(name.Location)
     {
         Name = name.Name!;
     }

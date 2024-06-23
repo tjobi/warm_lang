@@ -56,7 +56,7 @@ public static class WarmLangInterpreter
                     ("==", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value == i2.Value),
                     ("<", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value < i2.Value), 
                     ("<=", IntValue i1, IntValue i2) =>  GetBoolishValue(i1.Value <= i2.Value),
-                    ("::", ListValue arr, IntValue i) => arr.Add(i),
+                    ("::", ListValue arr,_) => arr.Add(right),
                     ("+", ListValue a1, ListValue a2) => new ListValue(a1.Elements.Concat(a2.Elements).ToList()),
                     _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
                 };
@@ -77,9 +77,9 @@ public static class WarmLangInterpreter
             }
             case VarDeclaration decl: 
             {
-                var name = decl.Name;
+                var name = decl.Identifier.Name!;
                 var (value, eEnv,_) = Evaluate(decl.RightHandSide, env, fenv);
-                var (_, nextEnv) = eEnv.Declare( name, value);
+                var (_, nextEnv) = eEnv.Declare(name, value);
                 return (value, (VarEnv)nextEnv, fenv);
             }
             case AssignmentExpression assignment: 
@@ -99,7 +99,7 @@ public static class WarmLangInterpreter
                         if(target is ListValue arr && index is IntValue iv)
                         {
                             var idx = iv.Value;
-                            if(idx < arr.Elements.Count && idx > 0)
+                            if(idx < arr.Elements.Count && idx >= 0)
                             {
                                 var (value, newVarEnv2, _) = Evaluate(assignment.RightHandSide, newVarEnv, fenv);
                                 arr[idx] = value;
@@ -135,11 +135,7 @@ public static class WarmLangInterpreter
                 var toCall = call.Called;
                 var callArgs = call.Arguments;
                 //var access = Access(toCall, env, fenv);
-                if(toCall is not AccessExpression || (toCall is AccessExpression expression && expression.Access is not NameAccess))
-                {
-                    throw new NotImplementedException($"Not implemented -> Interpreter doesn't allow arbitrary function calls - Cannot call {toCall.GetType().Name}");
-                }
-                var (functionParameters, funcBody) = fenv.Lookup(((NameAccess) ((AccessExpression)toCall).Access).Name);
+                var (functionParameters, funcBody) = fenv.Lookup(toCall.Name!);
                 
                 var callVarScope = env.Push();
                 var callFunScope = fenv.Push();
@@ -166,10 +162,10 @@ public static class WarmLangInterpreter
             }
             case FuncDeclaration funDecl: 
             {
-                var funcName = funDecl.Name;
+                var funcName = funDecl.NameToken;
                 var paramNames = funDecl.Params;
                 var body = funDecl.Body;
-                var (function, newFEnv) = fenv.Declare(funcName, new Funct(paramNames, body));
+                var (function, newFEnv) = fenv.Declare(funcName.Name!, new Funct(paramNames, body));
                 return (VoidValue.Instance, env, newFEnv);
             }
             case ExprStatement expr: 

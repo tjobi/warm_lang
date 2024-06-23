@@ -5,11 +5,10 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class BlockStatement : StatementNode
 {
-    public override TokenKind Kind => TokenKind.TBlock;
-
     public ImmutableList<StatementNode> Children { get; }
 
-    public BlockStatement(IList<StatementNode> children)
+    public BlockStatement(SyntaxToken leftCurlyBrace, IList<StatementNode> children, SyntaxToken rightCurlyBrace)
+    :base(TextLocation.FromTo(leftCurlyBrace, rightCurlyBrace))
     {
         Children = children.ToImmutableList();
     }
