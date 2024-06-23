@@ -1,14 +1,21 @@
 int x = 5;
 int z = 1;
 
-if z then {
+if z {
     int g  = 10;
-    if 0 + g then
+    if 0 + g {
         x = x + 25;
-    else
+    }
+    else {
         z = x + 5; 
+    }
 }
-else 
+else {
     x = 25;
-if z then x + z;
-else x;
+}
+if z { 
+    x + z;
+}
+else {
+    x;
+}

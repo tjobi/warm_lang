@@ -5,8 +5,7 @@ function incrementBySteps(int start, int incrementAmount, int amountOfTimes) int
     //function delcared inside of the other function, we use it to loop (amountOfTimes) :D
     function loop(int cnt) //implicit void
     {
-        if cnt then 
-        {
+        if cnt {
             result = result + incrementAmount;
             loop(cnt-1);
         }

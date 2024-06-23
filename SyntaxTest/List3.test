@@ -2,14 +2,13 @@ function makeArr(int size, int step, int start) int[]
 {
     function inner(int i, int cur, int[] res) int[]
     {
-        if i < size 
-        then 
-        {
+        if i < size {
             int next = cur + step;
             inner(i+1, next, res :: next);
         } 
-        else 
+        else {
             res;
+        }
     }
     inner(0,start, []);
 }

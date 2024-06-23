@@ -14,13 +14,14 @@ public enum TokenKind
 
     //Keyword
     TFunc, //function keyword 
-    TIf, TThen, TElse, //To allow if <cond> then <statement> else <statement>
-
+    TIf, TElse, //To allow if <cond> <block-statement> else <block-statement>
+    TWhile,
 
     //"Kind of construct?"
-    TConst, TArray,
+    TConst, 
+    TArray,
     TAssign, //Assignment x = 10;
-    TBlock, TWhile,
+    TBlock,
     TCall, //function call
     TIfStmnt,
 }

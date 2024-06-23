@@ -239,20 +239,23 @@ x;
     }
 
     [Fact]
-    public void TestLexerIfThenElseStatement()
+    public void TestLexerIfElseStatement()
     {
-        string input = "if 0 then 2; else 5;";
+        string input = "if 0 { 2; } else { 5; }";
         var expected = new List<SyntaxToken>()
         {
             MakeToken(TIf,new TextLocation(1,1, length:2)),
             MakeToken(TConst,1,4, intValue:0),
-            MakeToken(TThen, new TextLocation(1,6, length:4)),
-            MakeToken(TConst,1,11,intValue:2),
-            MakeToken(TSemiColon,1,12),
-            MakeToken(TElse,new TextLocation(1,14,length:4)),
-            MakeToken(TConst,1,19,intValue:5),
-            MakeToken(TSemiColon,1,20),
-            MakeToken(TEOF, 1,21)
+            MakeToken(TCurLeft,1,6),
+            MakeToken(TConst,1,8,intValue:2),
+            MakeToken(TSemiColon,1,9),
+            MakeToken(TCurRight,1,11),
+            MakeToken(TElse,new TextLocation(1,13,length:4)),
+            MakeToken(TCurLeft,1,18),
+            MakeToken(TConst,1,20,intValue:5),
+            MakeToken(TSemiColon,1,21),
+            MakeToken(TCurRight,1,23),
+            MakeToken(TEOF, 1,24)
         };
 
         var lexer = GetLexer(input);
@@ -264,13 +267,27 @@ x;
     [Fact]
     public void TestLexerParserIfThenElseStatement()
     {
-        string input = "if 0 then 2; else 5;";
+        string input = "if 0 {2;} else {5;}";
         var expected = MakeEntryBlock(input,
             new IfStatement(
                 MakeToken(TIf,1,1,1,3),
                 new ConstExpression(0, new TextLocation(1,4)),
-                new ExprStatement(new ConstExpression(2, new TextLocation(1,11))),
-                new ExprStatement(new ConstExpression(5, new TextLocation(1,19)))
+                new BlockStatement(
+                    MakeToken(TCurLeft,1,6),
+                    new List<StatementNode>()
+                    {
+                        new ExprStatement(new ConstExpression(2, new TextLocation(1,7)))
+                    },
+                    MakeToken(TCurLeft,1,9)
+                ),
+                new BlockStatement(
+                    MakeToken(TCurLeft,1,16),
+                    new List<StatementNode>()
+                    {
+                        new ExprStatement(new ConstExpression(5, new TextLocation(1,17)))
+                    },
+                    MakeToken(TCurLeft,1,19)
+                )
             )
         );
 
@@ -284,13 +301,19 @@ x;
     [Fact]
     public void TestLexerParserIfThenStatement()
     {
-        string input = "if 0 then 2;";
+        string input = "if 0 { 2; }";
         var expected = MakeEntryBlock(input,
             new IfStatement(
                 MakeToken(TIf,1,1),
                 new ConstExpression(MakeToken(TConst,1,4,intValue:0)),
-                new ExprStatement(
-                    new ConstExpression(MakeToken(TConst,1,11))),
+                new BlockStatement(
+                    MakeToken(TCurLeft,1,6),
+                    new List<StatementNode>()
+                    {
+                        new ExprStatement(new ConstExpression(MakeToken(TConst,1,8, intValue:2))),
+                    },
+                    MakeToken(TCurRight,1,11)
+                ),
                 null
             )
         );
@@ -299,7 +322,7 @@ x;
         var tokens = lexer.Lex();
         var res = GetParser(tokens).Parse();
 
-        res.Should().BeEquivalentTo(expected);
+        res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
     }
 
     [Fact]

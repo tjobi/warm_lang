@@ -212,7 +212,7 @@ public class Lexer
         {
             "function" => TFunc,
             "if" => TIf,
-            "then" => TThen,
+            //"then" => TThen,
             "else" => TElse,
             "int" => TInt,
             "while" => TWhile,
