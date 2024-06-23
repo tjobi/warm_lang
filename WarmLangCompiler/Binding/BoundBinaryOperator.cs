@@ -40,13 +40,24 @@ public sealed class BoundBinaryOperator
         //TODO: Should we cache these?
         return (op,left,right) switch
         {
-            (TPlus, _, ListTypeSymbol _) when left == TypeSymbol.EmptyList => new BoundBinaryOperator(op, left, right, right),
+            //List concat '+' operator
+            (TPlus, _, ListTypeSymbol _) when IsEmptyList(left)  => new BoundBinaryOperator(op, left, right, right),
+            (TPlus, ListTypeSymbol _, _) when IsEmptyList(right) => new BoundBinaryOperator(op, left, right, left),
             (TPlus, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType
                 => new BoundBinaryOperator(op, left, right, lts2.InnerType),
+
+            //List add '::' operator
+            (TDoubleColon, _, ListTypeSymbol _) when IsEmptyList(left)  => new BoundBinaryOperator(op, TypeSymbol.EmptyList, right, new ListTypeSymbol(right)),
+            (TDoubleColon, ListTypeSymbol lts, _) when IsEmptyList(right) && lts.InnerType is ListTypeSymbol
+                => new BoundBinaryOperator(op, left, TypeSymbol.EmptyList, left),
             (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, left, right, left),
+            
+            //No operator matches
             _ => null, 
         };
     }
+
+    private static bool IsEmptyList(TypeSymbol a) => a == TypeSymbol.EmptyList;
 
     private static BoundBinaryOperator[] _definedOperators = new BoundBinaryOperator[]{
         //Basic int operators
