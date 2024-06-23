@@ -1,20 +1,20 @@
 using System.Collections.Immutable;
-using WarmLangCompiler.Binding;
+using WarmLangLexerParser.AST;
 using WarmLangLexerParser;
 
 namespace WarmLangCompiler.Symbols;
 
-public sealed class FunctionSymbol : Symbol
+public class FunctionSymbol : Symbol
 {
     //Function symbol contains: name, parameters, returnType, body
-    public FunctionSymbol(SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type, BoundStatement body) : base(nameToken.Name!)
+    public FunctionSymbol(FuncDeclaration declaration, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type) : base(declaration.NameToken.Name!)
     {
+        Declaration = declaration;
         Parameters = parameters;
         Type = type;
-        Body = body;
     }
 
+    public FuncDeclaration Declaration { get; }
     public ImmutableArray<ParameterSymbol> Parameters { get; }
     public TypeSymbol Type { get; }
-    public BoundStatement Body { get; }
 }

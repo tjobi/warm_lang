@@ -49,6 +49,20 @@ public sealed class BoundSymbolScope
         return true;
     }
 
+    public IList<FunctionSymbol> GetFunctions() => GetSymbol<FunctionSymbol>();
+
+    public IList<TSymbol> GetSymbol<TSymbol>()
+        where TSymbol : Symbol
+    {
+        List<TSymbol> res = new();
+        foreach(var scope in _scopeStack)
+        {
+            res.AddRange(scope.Where(entry => entry.Value is TSymbol)
+                        .Select(entry => (entry.Value as TSymbol)!));
+        }
+        return res;
+    } 
+
     public void Print()
     {
         for (int i = _scopeStack.Count-1; i >= 0; i--)

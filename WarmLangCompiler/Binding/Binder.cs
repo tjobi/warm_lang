@@ -9,18 +9,39 @@ public sealed class Binder
 {
     private readonly ErrorWarrningBag _diag;
     private readonly BoundSymbolScope _scope;
+
+    /// <summary>
+    /// Used for binding functions - to allow local functions.
+    /// The first pass through of syntax tree only considers function "definitions", their headers.
+    /// This means, we don't know anything about local functions when binding function bodies.
+    /// </summary>
+    private bool _isGlobalScope;
     public Binder(ErrorWarrningBag bag)
     {
         _diag = bag;
         _scope = new BoundSymbolScope();
+        _isGlobalScope = true;
     }
 
     public BoundProgram BindProgram(ASTNode root)
     {
+        _isGlobalScope = true;
         if(root is BlockStatement statement)
         {
             var bound = BindBlockStatement(statement);
-            return new BoundProgram(bound);
+            _isGlobalScope = false; 
+            var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
+            foreach(var function in _scope.GetFunctions())
+            {
+                var unboundBody = function.Declaration.Body;
+                foreach(var @param in function.Parameters)
+                {
+                    _scope.TryDeclareVariable(@param);
+                }
+                var body = BindBlockStatement(unboundBody);
+                functions.Add(function, body);
+            }
+            return new BoundProgram(bound, functions.ToImmutable());
         }
         else 
             throw new NotImplementedException("Binder only allows root to be BlockStatements");
@@ -84,22 +105,32 @@ public sealed class Binder
                 parameters.Add(new ParameterSymbol(paramName, paramType));
             }
         }
-        
-        foreach(var @param in parameters)
-        {
-            var var = new VariableSymbol(@param.Name, @param.Type);
-            _scope.TryDeclareVariable(var);
-        }
-        var body = BindBlockStatement(funcDecl.Body);
-    
+
         var returnType = funcDecl.ReturnType.ToTypeSymbol();
-        var function = new FunctionSymbol(funcDecl.NameToken, parameters.ToImmutable(), returnType, body);
+        var function = _isGlobalScope 
+                       ? new FunctionSymbol(funcDecl, parameters.ToImmutable(), returnType)
+                       : new LocalFunctionSymbol(funcDecl, parameters.ToImmutable(), returnType);
         if(!_scope.TryDeclareFunction(function))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
             return new BoundErrorStatement(funcDecl);
         }
+        if(!_isGlobalScope && function is LocalFunctionSymbol f)
+        {
+            function = BindLocalFunctionDeclarationBody(f, funcDecl.Body);
+        }
         return new BoundFunctionDeclaration(funcDecl, function);
+    }
+
+    private FunctionSymbol BindLocalFunctionDeclarationBody(LocalFunctionSymbol function, BlockStatement body)
+    {
+        foreach(var @param in function.Parameters)
+        {
+            _scope.TryDeclareVariable(@param);
+        }
+        var boundBody = BindBlockStatement(body);
+        function.Body = boundBody;
+        return function;
     }
 
     private BoundStatement BindIfStatement(IfStatement ifStatement)
