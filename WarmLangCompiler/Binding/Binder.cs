@@ -16,11 +16,14 @@ public sealed class Binder
     /// This means, we don't know anything about local functions when binding function bodies.
     /// </summary>
     private bool _isGlobalScope;
+
+    private readonly Stack<FunctionSymbol> _functionStack;
     public Binder(ErrorWarrningBag bag)
     {
         _diag = bag;
         _scope = new BoundSymbolScope();
         _isGlobalScope = true;
+        _functionStack = new();
     }
 
     public BoundProgram BindProgram(ASTNode root)
@@ -33,6 +36,7 @@ public sealed class Binder
             var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
             foreach(var function in _scope.GetFunctions())
             {
+                _functionStack.Push(function);
                 var unboundBody = function.Declaration.Body;
                 foreach(var @param in function.Parameters)
                 {
@@ -40,6 +44,7 @@ public sealed class Binder
                 }
                 var body = BindBlockStatement(unboundBody);
                 functions.Add(function, body);
+                _functionStack.Pop();
             }
             return new BoundProgram(bound, functions.ToImmutable());
         }
@@ -56,11 +61,12 @@ public sealed class Binder
             FuncDeclaration funcDecl => BindFunctionDeclaration(funcDecl),
             IfStatement ifStatement => BindIfStatement(ifStatement),
             WhileStatement wile => BindWhileStatement(wile),
+            ReturnStatement ret => BindReturnStatement(ret),
             ExprStatement expr => BindExprStatement(expr),
             _ => throw new NotImplementedException($"Bind statement for {statement}"),
         };
     }
-    
+
     private BoundBlockStatement BindBlockStatement(BlockStatement st)
     {
         var boundStatements = ImmutableArray.CreateBuilder<BoundStatement>();
@@ -117,7 +123,9 @@ public sealed class Binder
         }
         if(!_isGlobalScope && function is LocalFunctionSymbol f)
         {
+            _functionStack.Push(function);
             function = BindLocalFunctionDeclarationBody(f, funcDecl.Body);
+            _functionStack.Pop();
         }
         return new BoundFunctionDeclaration(funcDecl, function);
     }
@@ -166,6 +174,28 @@ public sealed class Binder
         var boundBody = BindStatement(wile.Body);
         _scope.PopScope();
         return new BoundWhileStatement(wile, condition, boundBody, boundContinue.MoveToImmutable());
+    }
+
+    private BoundStatement BindReturnStatement(ReturnStatement ret)
+    {
+        if(_functionStack.Count == 0)
+        {
+            _diag.ReportCannotReturnOutsideFunction(ret.ReturnToken);
+            return new BoundErrorStatement(ret);
+        }
+        var function = _functionStack.Peek();
+        BoundExpression? expr = null;
+        if(ret.Expression is not null && function.Type != TypeSymbol.Void)
+        {
+            expr = BindTypeConversion(ret.Expression, function.Type);
+        }
+        else if(ret.Expression is null && function.Type != TypeSymbol.Void)
+        {
+            //return 2; inside a function that returns void -> We cannot have that !
+            _diag.ReportReturnIsMissingExpression(ret.ReturnToken, function.Type);
+            return new BoundErrorStatement(ret);
+        }
+        return new BoundReturnStatement(ret, expr);
     }
 
     private BoundStatement BindExprStatement(ExprStatement expr)

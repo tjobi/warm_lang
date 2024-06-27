@@ -72,5 +72,16 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, called.Location);
     }    
 
+    internal static void ReportCannotReturnOutsideFunction(this ErrorWarrningBag bag, SyntaxToken retToken)
+    {
+        var message = $"Invalid 'return' outside of function body";
+        bag.Report(message, true, retToken.Location);
+    }
+
+    internal static void ReportReturnIsMissingExpression(this ErrorWarrningBag bag, SyntaxToken retToken, TypeSymbol expectedType)
+    {
+        var message = $"The return requires an expression of type '{expectedType}'";
+        bag.Report(message, true, retToken.Location);
+    }
     
 }

@@ -16,6 +16,7 @@ public enum TokenKind
     TFunc, //function keyword 
     TIf, TElse, //To allow if <cond> <block-statement> else <block-statement>
     TWhile,
+    TReturn,
 
     //"Kind of construct?"
     TConst, 

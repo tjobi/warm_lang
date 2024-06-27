@@ -217,6 +217,7 @@ public class Lexer
             "int" => TInt,
             "while" => TWhile,
             //"var" => TVar,
+            "return" => TReturn,
             _ => TIdentifier,
         };
         var location = new TextLocation(startLine, startColumn, Line, Column);

@@ -181,17 +181,20 @@ public static class WarmLangInterpreter
                 }
                 var nenv = env.Push();
                 var nFuncEnv = fenv.Push();
-                for (int i = 0; i < expressions.Count-1; i++)
+                Value retValue = VoidValue.Instance;
+                for (int i = 0; i < expressions.Count; i++)
                 {
                     var expr = expressions[i];
-                    var (_, nenv2, fenv2) = Evaluate(expr, (VarEnv)nenv, fenv);
+                    var (val, nenv2, fenv2) = Evaluate(expr, (VarEnv)nenv, fenv);
                     nenv = nenv2;
                     nFuncEnv = fenv2;
+                    retValue = val;
+                    if(expr is ReturnStatement)
+                    {
+                        break;
+                    }
                 }
-                var last = expressions[^1];
-                
-                var (lastValue, lastEnv, lastFuncEnv) = Evaluate(last, (VarEnv)nenv, nFuncEnv);
-                return (lastValue, (VarEnv)lastEnv.Pop(), lastFuncEnv.Pop()); //Return an unaltered environment - to throw away any variables declared in block.
+                return (retValue, (VarEnv)nenv.Pop(), nFuncEnv.Pop()); //Return an unaltered environment - to throw away any variables declared in block.
             }
             case IfStatement ifstmnt: 
             {
@@ -231,6 +234,14 @@ public static class WarmLangInterpreter
                         (IAssignableEnv<Value>)whileVarScope.Pop(), 
                         whileFuncScope.Pop());
             }
+            case ReturnStatement ret:
+            {
+                if(ret.Expression is null)
+                {
+                    return (VoidValue.Instance, env, fenv);
+                }
+                return Evaluate(ret.Expression,env, fenv);
+            } 
             default: 
             {
                 throw new NotImplementedException($"Unsupported Expression: {node.GetType()}");

@@ -79,11 +79,24 @@ public class Parser
             TCurLeft => ParseBlockStatement(),
             TIf => ParseIfStatement(),
             TWhile => ParseWhileStatement(),
+            TReturn => ParseReturnStatement(),
             //TODO: May be a problem when we introduce more types? -- what to do?
             TInt => ParseVariableDeclaration(), 
             TFunc =>  ParseFunctionDeclaration(),
             _ => ParseExpressionStatement()
         };
+    }
+
+    private StatementNode ParseReturnStatement()
+    {
+        var returnToken = MatchKind(TReturn);
+        ExpressionNode? expr = null;
+        if(Current.Kind != TSemiColon)
+        {
+            expr = ParseExpression();
+        }
+        var semicolon = MatchKind(TSemiColon);
+        return new ReturnStatement(returnToken, expr);
     }
 
     private StatementNode ParseWhileStatement()

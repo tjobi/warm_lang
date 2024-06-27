@@ -1136,4 +1136,42 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+
+    [Fact]
+    public void TestReturnStatementNoExpression()
+    {
+        var input = "return;";
+        var expected = MakeEntryBlock(input,
+            new ReturnStatement(MakeToken(TReturn, new TextLocation(1,1,length:6)), null)
+        );
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TestReturnStatementWithExpression()
+    {
+        var input = "return 2+2;";
+        var expected = MakeEntryBlock(input,
+            new ReturnStatement(
+                MakeToken(TReturn, new TextLocation(1,1,length:6)),
+                new BinaryExpression(
+                    new ConstExpression(2,new TextLocation(1,8)),
+                    MakeToken(TPlus, new TextLocation(1,9)),
+                    new ConstExpression(2,new TextLocation(1,10))
+                )
+            )
+        );
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }

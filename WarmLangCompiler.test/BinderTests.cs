@@ -22,7 +22,7 @@ public class BinderTests
 
     private static BlockStatement CreateBlockStatement(params StatementNode[] statements) => new(MakeToken(TCurLeft,1,1), statements.ToList(), MakeToken(TCurRight,1,1));
     private static BoundBlockStatement CreateBoundBlockStatement(StatementNode syntax, params BoundStatement[] statements) => new(syntax, statements.ToImmutableArray());
-    private static BoundProgram CreateBoundProgram(StatementNode syntax, params BoundStatement[] statements) => new(CreateBoundBlockStatement(syntax, statements));
+    private static BoundProgram CreateBoundProgram(StatementNode syntax, params BoundStatement[] statements) => new(CreateBoundBlockStatement(syntax, statements), ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty);
     private static ConstExpression ConstCreater(int val) => new(val, new TextLocation(1,1));
     private static SyntaxToken MakeVariableToken(string name) => MakeToken(TIdentifier, new TextLocation(1,1, length:name.Length), name);
 
@@ -32,16 +32,18 @@ public class BinderTests
         var input = CreateBlockStatement(
             new VarDeclaration(_syntaxInt,MakeVariableToken("x"), ConstCreater(5))
         );        
-        var expected = new BoundProgram(new BoundBlockStatement(input, new BoundStatement[]
-        {
-            new BoundVarDeclaration(
-                new VarDeclaration(_syntaxInt,MakeVariableToken("x"),ConstCreater(5)),
-                "x",
-                new BoundTypeConversionExpression(ConstCreater(5), TypeSymbol.Int,
-                    new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
-                )
-            ),
-        }.ToImmutableArray())
+        var expected = new BoundProgram(
+            new BoundBlockStatement(input, new BoundStatement[]
+            {
+                new BoundVarDeclaration(
+                    new VarDeclaration(_syntaxInt,MakeVariableToken("x"),ConstCreater(5)),
+                    "x",
+                    new BoundTypeConversionExpression(ConstCreater(5), TypeSymbol.Int,
+                        new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
+                    )
+                ),
+            }.ToImmutableArray()),
+            ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty
         );
 
         var boundProgram = _binder.BindProgram(input);
@@ -71,7 +73,7 @@ public class BinderTests
                     TypeSymbol.IntList,
                     new BoundExpression[]{new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)}.ToImmutableArray())
             )
-        ));
+        ),ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty);
         var expectedErrorBag = new ErrorWarrningBag();
         expectedErrorBag.ReportCannotConvertToType(rhs.Location, TypeSymbol.Int, TypeSymbol.IntList);
 
@@ -97,7 +99,7 @@ public class BinderTests
                             TypeSymbol.EmptyList, new ImmutableArray<BoundExpression>())
                     )
                 )
-            ));
+            ), ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty);
 
         var boundProgram = _binder.BindProgram(input);
 
