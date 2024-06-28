@@ -1,9 +1,9 @@
 namespace WarmLangCompiler.Interpreter.Values;
 
-public sealed class VoidValue : Value
+public sealed record class VoidValue : Value
 {
     private static readonly VoidValue _voidValue = new();
-    static public VoidValue Instance => _voidValue; 
+    static public VoidValue Void => _voidValue; 
 
     private VoidValue(){ }
 

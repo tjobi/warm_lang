@@ -1,6 +1,6 @@
 namespace WarmLangCompiler.Interpreter.Values;
 
-public sealed class ErrValue : Value
+public sealed record class ErrValue : Value
 {
     public string Message { get; }
 

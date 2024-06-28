@@ -1,6 +1,6 @@
 namespace WarmLangCompiler.Interpreter.Values;
 
-public sealed class StrValue : Value
+public sealed record class StrValue : Value
 {
     public string Value { get; }
 

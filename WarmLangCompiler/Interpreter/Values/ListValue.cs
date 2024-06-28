@@ -1,6 +1,6 @@
 namespace WarmLangCompiler.Interpreter.Values;
 using System.Text;
-public sealed class ListValue : Value
+public sealed record class ListValue : Value
 {
     public List<Value> Elements { get; }
 
@@ -39,6 +39,20 @@ public sealed class ListValue : Value
         var last = Elements[^1];
         Elements.RemoveAt(Length-1);
         return last;
+    }
+
+    public bool IsEqualTo(ListValue b) => DeepEquality(this, b); 
+
+    public static bool DeepEquality(ListValue a, ListValue b)
+    {
+        if(a.Length != b.Length)
+            return false;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if(a[i] != b[i])
+                return false;
+        }
+        return true;
     }
 
     public override string ToString()

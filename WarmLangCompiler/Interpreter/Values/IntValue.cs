@@ -1,7 +1,7 @@
 namespace WarmLangCompiler.Interpreter.Values;
 
 
-public sealed class IntValue : Value
+public sealed record class IntValue : Value
 {
     public int Value { get; }
 

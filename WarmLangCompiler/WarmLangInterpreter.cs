@@ -53,7 +53,8 @@ public static class WarmLangInterpreter
                     ("+", IntValue i1, IntValue i2) => new IntValue(i1.Value + i2.Value),
                     ("*", IntValue i1, IntValue i2) => new IntValue(i1.Value * i2.Value),
                     ("-", IntValue i1, IntValue i2) => new IntValue(i1.Value - i2.Value),
-                    ("==", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value == i2.Value),
+                    ("==", ListValue a, ListValue b) => GetBoolishValue(a.IsEqualTo(b)),
+                    ("==", _,_) => GetBoolishValue(left == right),
                     ("<", IntValue i1, IntValue i2) => GetBoolishValue(i1.Value < i2.Value), 
                     ("<=", IntValue i1, IntValue i2) =>  GetBoolishValue(i1.Value <= i2.Value),
                     ("::", ListValue arr,_) => arr.Add(right),
@@ -166,7 +167,7 @@ public static class WarmLangInterpreter
                 var paramNames = funDecl.Params;
                 var body = funDecl.Body;
                 var (function, newFEnv) = fenv.Declare(funcName.Name!, new Funct(paramNames, body));
-                return (VoidValue.Instance, env, newFEnv);
+                return (VoidValue.Void, env, newFEnv);
             }
             case ExprStatement expr: 
             {
@@ -177,11 +178,11 @@ public static class WarmLangInterpreter
                 var expressions = block.Children;
                 if(expressions.IsEmpty)
                 {
-                    return (VoidValue.Instance, env, fenv);
+                    return (VoidValue.Void, env, fenv);
                 }
                 var nenv = env.Push();
                 var nFuncEnv = fenv.Push();
-                Value retValue = VoidValue.Instance;
+                Value retValue = VoidValue.Void;
                 for (int i = 0; i < expressions.Count; i++)
                 {
                     var expr = expressions[i];
@@ -230,7 +231,7 @@ public static class WarmLangInterpreter
                         (_, whileVarScope, whileFuncScope) = Evaluate(cont,whileVarScope,whileFuncScope);
                     }
                 }
-                return (VoidValue.Instance, 
+                return (VoidValue.Void, 
                         (IAssignableEnv<Value>)whileVarScope.Pop(), 
                         whileFuncScope.Pop());
             }
@@ -238,7 +239,7 @@ public static class WarmLangInterpreter
             {
                 if(ret.Expression is null)
                 {
-                    return (VoidValue.Instance, env, fenv);
+                    return (VoidValue.Void, env, fenv);
                 }
                 return Evaluate(ret.Expression,env, fenv);
             } 
