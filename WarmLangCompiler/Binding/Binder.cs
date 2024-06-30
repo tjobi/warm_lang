@@ -36,15 +36,8 @@ public sealed class Binder
             var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
             foreach(var function in _scope.GetFunctions())
             {
-                _functionStack.Push(function);
-                var unboundBody = function.Declaration.Body;
-                foreach(var @param in function.Parameters)
-                {
-                    _scope.TryDeclareVariable(@param);
-                }
-                var body = BindBlockStatement(unboundBody);
-                functions.Add(function, body);
-                _functionStack.Pop();
+                var boundBody = BindFunctionBody(function);
+                functions.Add(function, boundBody);
             }
             return new BoundProgram(bound, functions.ToImmutable());
         }
@@ -99,13 +92,13 @@ public sealed class Binder
     {
         var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
         var uniqueParameterNames = new HashSet<string>();
-        foreach(var @param in funcDecl.Params)
+        foreach(var (type, name) in funcDecl.Params)
         {
-            var paramType = @param.type.ToTypeSymbol();
-            var paramName = @param.name.Name ?? throw new Exception($"BINDER: NO NAME FOR PARAMETER {@param.name.Location}");
+            var paramType = type.ToTypeSymbol();
+            var paramName = name.Name ?? throw new Exception($"BINDER: NO NAME FOR PARAMETER {name.Location}");
             if(uniqueParameterNames.Contains(paramName))
             {
-                _diag.ReportParameterDuplicateName(@param.name);
+                _diag.ReportParameterDuplicateName(name);
             } else
             {
                 parameters.Add(new ParameterSymbol(paramName, paramType));
@@ -123,32 +116,27 @@ public sealed class Binder
         }
         if(!_isGlobalScope && function is LocalFunctionSymbol f)
         {
-            _functionStack.Push(function);
-            function = BindLocalFunctionDeclarationBody(f, funcDecl.Body);
-            _functionStack.Pop();
+            var boundBody = BindFunctionBody(function);
+            f.Body = boundBody;
         }
         return new BoundFunctionDeclaration(funcDecl, function);
     }
 
-    private FunctionSymbol BindLocalFunctionDeclarationBody(LocalFunctionSymbol function, BlockStatement body)
+    private BoundBlockStatement BindFunctionBody(FunctionSymbol function)
     {
+        _functionStack.Push(function);
         foreach(var @param in function.Parameters)
         {
             _scope.TryDeclareVariable(@param);
         }
-        var boundBody = BindBlockStatement(body);
-        function.Body = boundBody;
-        return function;
+        var boundBody = BindBlockStatement(function.Declaration.Body);
+        _functionStack.Pop();
+        return boundBody;
     }
 
     private BoundStatement BindIfStatement(IfStatement ifStatement)
     {
-        var condition = BindExpression(ifStatement.Condition);
-        if(condition.Type != TypeSymbol.Bool)
-        {
-            _diag.ReportCannotImplicitlyConvertToType(condition.Location, TypeSymbol.Bool, condition.Type);
-            return new BoundErrorStatement(ifStatement);
-        }
+        var condition = BindExpression(ifStatement.Condition, TypeSymbol.Bool);
         _scope.PushScope();
         var trueBranch = BindStatement(ifStatement.Then);
         var falseBranch = ifStatement.Else is null ? null : BindStatement(ifStatement.Else);
@@ -158,12 +146,7 @@ public sealed class Binder
 
     private BoundStatement BindWhileStatement(WhileStatement wile)
     {
-        var condition = BindExpression(wile.Condition);
-        if(condition.Type != TypeSymbol.Bool)
-        {
-            _diag.ReportCannotImplicitlyConvertToType(condition.Location, TypeSymbol.Bool, condition.Type);
-            return new BoundErrorStatement(wile);
-        }
+        var condition = BindExpression(wile.Condition, TypeSymbol.Bool);
         var boundContinue = ImmutableArray.CreateBuilder<BoundExpression>(wile.Continue.Count);
         foreach(var cont in wile.Continue)
         {
@@ -185,15 +168,23 @@ public sealed class Binder
         }
         var function = _functionStack.Peek();
         BoundExpression? expr = null;
-        if(ret.Expression is not null && function.Type != TypeSymbol.Void)
+        
+        if(function.Type == TypeSymbol.Void)
         {
+            if(ret.Expression is not null)
+            {
+                _diag.ReportReturnWithValueInVoidFunction(ret.ReturnToken, function);
+                return new BoundErrorStatement(ret);
+            }
+        } else
+        {
+            //we're in a function that returns some value
+            if(ret.Expression is null) //if the return does not contain such a value uh oh
+            {
+                _diag.ReportReturnIsMissingExpression(ret.ReturnToken, function.Type);
+                return new BoundErrorStatement(ret);
+            }
             expr = BindTypeConversion(ret.Expression, function.Type);
-        }
-        else if(ret.Expression is null && function.Type != TypeSymbol.Void)
-        {
-            //return 2; inside a function that returns void -> We cannot have that !
-            _diag.ReportReturnIsMissingExpression(ret.ReturnToken, function.Type);
-            return new BoundErrorStatement(ret);
         }
         return new BoundReturnStatement(ret, expr);
     }
@@ -203,6 +194,8 @@ public sealed class Binder
         var bound = BindExpression(expr.Expression);
         return new BoundExprStatement(expr, bound);
     }
+
+    private BoundExpression BindExpression(ExpressionNode expression, TypeSymbol targetType) => BindTypeConversion(expression, targetType);
 
     private BoundExpression BindExpression(ExpressionNode expression)
     {

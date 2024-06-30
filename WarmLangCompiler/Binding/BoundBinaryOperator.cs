@@ -53,8 +53,9 @@ public sealed class BoundBinaryOperator
             (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, left, right, left),
             
             //List equality '==' operator
-            (TEqualEqual, ListTypeSymbol lts, _) => new(op, lts, TypeSymbol.EmptyList, TypeSymbol.Bool),
-            (TEqualEqual, _, ListTypeSymbol lts) => new(op, TypeSymbol.EmptyList, lts, TypeSymbol.Bool),
+            (TEqualEqual, ListTypeSymbol lts, _) when IsEmptyList(left)  => new(op, lts, TypeSymbol.EmptyList, TypeSymbol.Bool),
+            (TEqualEqual, _, ListTypeSymbol lts) when IsEmptyList(right) => new(op, TypeSymbol.EmptyList, lts, TypeSymbol.Bool),
+            (TEqualEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType => new(op, left, right, TypeSymbol.Bool),
             //No operator matches
             _ => null, 
         };

@@ -83,5 +83,11 @@ internal static class BinderErrorWarnings
         var message = $"The return requires an expression of type '{expectedType}'";
         bag.Report(message, true, retToken.Location);
     }
+
+    internal static void ReportReturnWithValueInVoidFunction(this ErrorWarrningBag bag, SyntaxToken retToken, FunctionSymbol function)
+    {
+        var message = $"The function '{function}' returns void, so the return keyword must not be followed by an expression";
+        bag.Report(message, true, retToken.Location);
+    }
     
 }
