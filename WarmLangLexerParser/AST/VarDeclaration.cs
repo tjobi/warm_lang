@@ -24,7 +24,7 @@ public sealed class VarDeclaration : StatementNode
     public override string ToString()
     {
         var rhs = RightHandSide.ToString();
-        return $"({Identifier}:{Type} = {rhs})";
+        return $"({Identifier.Name!}:{Type} = {rhs})";
     }
 
 }

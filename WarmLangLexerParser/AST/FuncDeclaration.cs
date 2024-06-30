@@ -28,14 +28,14 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
 
     public override string ToString()
     {
-        var sb = new StringBuilder($"{NameToken} (");
+        var sb = new StringBuilder($"{NameToken.Name!} (");
         for (int i = 0; i < Params.Count; i++)
         {
             var (typ, name) = Params[i];
             if(i > 0)
                 sb.Append(',');
             sb.Append(typ.ToString()).Append(' ');
-            sb.Append(name);
+            sb.Append(name.Name!);
         }
         if(ReturnType is not null)
         {
