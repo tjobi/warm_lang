@@ -219,6 +219,11 @@ public sealed class Binder
     private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
     {
         var boundAccess = BindAccess(assignment.Access);
+        if(boundAccess is BoundExprAccess)
+        {
+            _diag.ReportInvalidLeftSideOfAssignment(assignment.Location);
+            return new BoundErrorExpression(assignment);
+        }
         var boundRightHandSide = BindTypeConversion(assignment.RightHandSide, boundAccess.Type);
         return new BoundAssignmentExpression(assignment, boundAccess, boundRightHandSide);
     }

@@ -89,5 +89,11 @@ internal static class BinderErrorWarnings
         var message = $"The function '{function}' returns void, so the return keyword must not be followed by an expression";
         bag.Report(message, true, retToken.Location);
     }
+
+    internal static void ReportInvalidLeftSideOfAssignment(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = $"The left-hand side of an assignment must be a variable or a subscript";
+        bag.Report(message, true, location);
+    }
     
 }
