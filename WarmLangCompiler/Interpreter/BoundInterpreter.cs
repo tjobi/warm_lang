@@ -116,7 +116,7 @@ public sealed class BoundInterpreter
             BoundAccessExpression acc => EvaluateAccessExpression(acc),
             BoundConstantExpression konst => EvaluateConstantExpression(konst),
             BoundListExpression lst => EvaluateListExpression(lst),
-            _ => throw new NotImplementedException($"Interpreter doesn't know '{expr.GetType()} yet!'"),
+            _ => throw new NotImplementedException($"Interpreter doesn't know '{expr.GetType().Name} yet!'"),
         };
     }
 
@@ -156,7 +156,7 @@ public sealed class BoundInterpreter
             ("<=", IntValue i1, IntValue i2) =>  BoolValue(i1 <= i2),
             ("::", ListValue arr,_) => arr.Add(right),
             ("+", ListValue a1, ListValue a2) => a1 + a2,
-            _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
+            _ => throw new NotImplementedException($"Operator: '{op.Kind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")
         };
 
         return res;
@@ -209,7 +209,7 @@ public sealed class BoundInterpreter
                     } else 
                         throw new Exception("Index was out of range. Must be non-negative and less than size of collection");
                 } 
-                throw new NotImplementedException($"Subscripting not implemented for {target.GetType().Name}");
+                throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
             } 
             default:
                 throw new NotImplementedException($"Assignment into access of type '{assign.Access.GetType().Name}' is not known");
@@ -280,7 +280,7 @@ public sealed class BoundInterpreter
     {
         if (v is IntValue i)
             return i != 0;
-        throw new NotImplementedException($"value of {v.GetType()} cannot be used as boolean");
+        throw new NotImplementedException($"value of {v.GetType().Name} cannot be used as boolean");
     }
 
     private static Value BoolValue(bool cond) => new IntValue(cond ? 1 : 0);
