@@ -35,6 +35,14 @@ public sealed record class ListValue : Value
         return this;
     }
 
+    public static ListValue operator +(ListValue a, ListValue b)
+    {
+        var res = new List<Value>(a.Length + b.Length);
+        res.AddRange(a.Elements);
+        res.AddRange(b.Elements);
+        return new ListValue(res);
+    }
+
     public Value RemoveLast()
     {
         if(Elements.Count == 0)
@@ -54,7 +62,14 @@ public sealed record class ListValue : Value
             return false;
         for (int i = 0; i < a.Length; i++)
         {
-            if(a[i] != b[i])
+            Value aElm = a[i], bElm = b[i]; 
+            if(aElm is ListValue aLst && bElm is ListValue bLst)
+            {
+                if(!aLst.IsEqualTo(bLst))
+                    return false;
+                continue;
+            }
+            if(aElm != bElm)
                 return false;
         }
         return true;

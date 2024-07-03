@@ -39,7 +39,7 @@ public sealed class BoundInterpreter
             BoundBlockStatement block => EvaluateBlock(block),
             BoundVarDeclaration varDecl => EvaluateVarDeclaration(varDecl),
             BoundFunctionDeclaration decl when decl.Symbol is LocalFunctionSymbol func => EvaluateFunctionDeclaration(func),
-            BoundFunctionDeclaration => VoidValue.Void, //Global function, is already declared from binder
+            BoundFunctionDeclaration => Value.Void, //Global function, is already declared from binder
             _ => throw new NotImplementedException($"Interpreter doesn't know {statement.GetType().Name} yet!"),
         };
     }
@@ -57,7 +57,7 @@ public sealed class BoundInterpreter
         }
 
         PushEnvironments();
-        Value res = VoidValue.Void;
+        Value res = Value.Void;
         for (int i = 0; i < block.Statements.Length; i++)
         {
             var stmnt = block.Statements[i];
@@ -77,7 +77,7 @@ public sealed class BoundInterpreter
                 case BoundReturnStatement ret:
                 {
                     if(ret.Expression is null)
-                        return VoidValue.Void;
+                        return Value.Void;
                     return EvaluateExpression(ret.Expression);
                 }
                 default:
@@ -100,7 +100,7 @@ public sealed class BoundInterpreter
     private Value EvaluateFunctionDeclaration(LocalFunctionSymbol local)
     {
         _functionEnvironment.Declare(local, local.Body!);
-        return VoidValue.Void;
+        return Value.Void;
     }
 
 
@@ -147,15 +147,15 @@ public sealed class BoundInterpreter
         var op = binOp.Operator;
         Value res = (op.Kind.AsString(),left,right) switch 
         {
-            ("+", IntValue i1, IntValue i2) => new IntValue(i1.Value + i2.Value),
-            ("*", IntValue i1, IntValue i2) => new IntValue(i1.Value * i2.Value),
-            ("-", IntValue i1, IntValue i2) => new IntValue(i1.Value - i2.Value),
+            ("+", IntValue i1, IntValue i2) => new IntValue(i1 + i2),
+            ("*", IntValue i1, IntValue i2) => new IntValue(i1 * i2),
+            ("-", IntValue i1, IntValue i2) => new IntValue(i1 - i2),
             ("==", ListValue a, ListValue b) => BoolValue(a.IsEqualTo(b)),
             ("==", _,_) => BoolValue(left == right),
-            ("<", IntValue i1, IntValue i2) => BoolValue(i1.Value < i2.Value), 
-            ("<=", IntValue i1, IntValue i2) =>  BoolValue(i1.Value <= i2.Value),
+            ("<", IntValue i1, IntValue i2) => BoolValue(i1 < i2), 
+            ("<=", IntValue i1, IntValue i2) =>  BoolValue(i1 <= i2),
             ("::", ListValue arr,_) => arr.Add(right),
-            ("+", ListValue a1, ListValue a2) => new ListValue(a1.Elements.Concat(a2.Elements).ToList()),
+            ("+", ListValue a1, ListValue a2) => a1 + a2,
             _ => throw new NotImplementedException($"Operator: \"{op}\" on {left.GetType().Name} and {right.GetType().Name} is not defined")
         };
 
@@ -200,9 +200,8 @@ public sealed class BoundInterpreter
                 var index = EvaluateExpression(sa.Index);
                 res = EvaluateExpression(assign.RightHandSide);
 
-                if(target is ListValue lst && index is IntValue iv)
+                if(target is ListValue lst && index is IntValue idx)
                 {
-                    var idx = iv.Value;
                     if(idx < lst.Elements.Count && idx >= 0)
                     {
                         lst[idx] = res;
@@ -238,11 +237,11 @@ public sealed class BoundInterpreter
                     Value index = EvaluateExpression(sa.Index);
                     if (index is IntValue idx && target is ListValue lst)
                     {
-                        if (idx.Value >= lst.Length || idx.Value < 0)
+                        if (idx >= lst.Length || idx < 0)
                             throw new Exception($"Index was out of range. Must be non-negative and less than size of collection");
 
-                        if (idx.Value < lst.Length && idx.Value >= 0)
-                            return lst[idx.Value];
+                        if (idx < lst.Length && idx >= 0)
+                            return lst[idx];
                     }
                     //nothing good came out of this!
                     throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
@@ -280,7 +279,7 @@ public sealed class BoundInterpreter
      private static bool IsValueTrue(Value v)
     {
         if (v is IntValue i)
-            return i.Value != 0;
+            return i != 0;
         throw new NotImplementedException($"value of {v.GetType()} cannot be used as boolean");
     }
 

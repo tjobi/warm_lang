@@ -10,4 +10,6 @@ public sealed record class StrValue : Value
     }
 
     public override string ToString() => $"Str \"{Value}\"";
+
+    public static implicit operator string(StrValue str) => str.Value;
 }

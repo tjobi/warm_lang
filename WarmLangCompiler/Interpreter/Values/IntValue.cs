@@ -11,4 +11,6 @@ public sealed record class IntValue : Value
     }
 
     public override string ToString() => $"Int {Value}";
+
+    public static implicit operator int(IntValue i) => i.Value;
 }
