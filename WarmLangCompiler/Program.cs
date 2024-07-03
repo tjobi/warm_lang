@@ -1,5 +1,6 @@
 ﻿using WarmLangCompiler;
 using WarmLangCompiler.Binding;
+using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
@@ -10,39 +11,15 @@ var DEFAULT_PROGRAM = "SyntaxTest/test.test";
 var parsedArgs = ArgsParser.ParseArgs(args, DEFAULT_PROGRAM);
 if(parsedArgs is null)
 {
-    return -1;
+    return 16;
 }
-// To change the "default" value of the values below goto ArgsParser.ParseArgs :)
-var (program, parserDebug, lexerDebug, longExceptions, interactive) = (ParsedArgs) parsedArgs; //cast is okay-ish, we just did a null check
+var (program, parserDebug, 
+     lexerDebug, longExceptions, 
+     interactive) = (ParsedArgs) parsedArgs!;
 
-if(interactive)
+if(interactive) 
 {
-    for(string? input = Console.ReadLine(); input is not null; input = Console.ReadLine())
-    {
-        if(input == "q;;")
-        {
-            break;
-        }
-        var diagnostics = new ErrorWarrningBag();
-        var lexer = Lexer.FromString(input, diagnostics);
-        var tokens = lexer.Lex();
-        if(diagnostics.Any())
-        {
-            diagnostics.ToList().ForEach(Console.WriteLine);
-            diagnostics.Clear();
-        }
-        var parser = new Parser(tokens, diagnostics);
-        var parsed = parser.Parse();
-        if(diagnostics.Any())
-        {
-            diagnostics.ToList().ForEach(Console.WriteLine);
-        }
-
-        Console.WriteLine(parsed);
-        var run = WarmLangInterpreter.Run(parsed);
-        Console.WriteLine($"Evaluated to: {run}");
-    }
-    return 0;
+    return Interactive.Loop();
 }
 
 try 
@@ -56,56 +33,57 @@ try
         {
             Console.WriteLine(token);
         }
-    }
-    if(diagnostics.Any())
-    {
-        Console.WriteLine("--Lexer problems--");
-        foreach(var err in diagnostics)
+        if(diagnostics.Any())
         {
-            Console.WriteLine(err);
+            Console.WriteLine("--Lexer problems--");
+            foreach(var err in diagnostics)
+            {
+                Console.WriteLine(err);
+            }
         }
     }
 
-    diagnostics.Clear();
     var parser = new Parser(tokens, diagnostics);
     ASTNode root = parser.Parse();
     if(parserDebug)
     {
         Console.WriteLine($"Parsed:\n\t{root}");
-    }
-    if(diagnostics.Any())
-    {
-        Console.WriteLine("--Parser problems--");
-        foreach(var err in diagnostics)
+        if(diagnostics.Any())
         {
-            Console.WriteLine(err);
+            Console.WriteLine("--Parser problems--");
+            foreach(var err in diagnostics)
+            {
+                Console.WriteLine(err);
+            }
+
         }
     }
 
-    diagnostics.Clear();
     var binder = new Binder(diagnostics);
-    var bound = binder.BindProgram(root);
-    Console.WriteLine($"Bound: {bound}");
+    var boundProgram = binder.BindProgram(root);
     if(diagnostics.Any())
     {
-        Console.WriteLine("--Binder found--");
+        Console.WriteLine("--Compilation failed on: --");
         foreach(var err in diagnostics)
         {
             Console.WriteLine(err);
         }
+        Console.WriteLine("Exitting... no evaluation");
+        return 1;
     }
-
-    var res = WarmLangInterpreter.Run(root);
+    Console.WriteLine($"Bound: {boundProgram}");
+    var res = BoundInterpreter.Run(boundProgram);
     Console.WriteLine($"Evaluated '{program}' -> {res}");
+
 } catch(ParserException e)
 {
     Console.WriteLine(longExceptions ? e : e.Message);
-    return -1;
+    return 20;
 }
 catch (NotImplementedException e )
 {
     Console.WriteLine(longExceptions ? e : e.Message);
-    return 2;
+    return 30;
 }
 
 

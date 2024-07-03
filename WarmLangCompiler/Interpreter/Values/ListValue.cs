@@ -9,6 +9,11 @@ public sealed record class ListValue : Value
         Elements = elements.ToList();
     }
 
+    public ListValue(int initCapacity)
+    {
+        Elements = new List<Value>(initCapacity);
+    }
+
     public int Length => Elements.Count;
 
     public Value this[int idx]
