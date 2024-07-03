@@ -59,7 +59,7 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportFunctionCalMissingArguments(this ErrorWarrningBag bag, SyntaxToken called, int expectedNumArgs, int realNumArgs)
+    internal static void ReportFunctionCallMismatchArguments(this ErrorWarrningBag bag, SyntaxToken called, int expectedNumArgs, int realNumArgs)
     {
         //TODO: Go through the arguments, and find the ones that are missing.
         var message = $"Function '{called.Name}' expected {expectedNumArgs} arguments but got {realNumArgs}";

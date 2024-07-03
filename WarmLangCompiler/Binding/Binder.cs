@@ -250,7 +250,7 @@ public sealed class Binder
         }
         if(arguments.Count != function.Parameters.Length)
         {
-            _diag.ReportFunctionCalMissingArguments(ce.Called, function.Parameters.Length, arguments.Count);
+            _diag.ReportFunctionCallMismatchArguments(ce.Called, function.Parameters.Length, arguments.Count);
             return new BoundErrorExpression(ce);
         }
 
