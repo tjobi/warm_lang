@@ -37,7 +37,7 @@ public class BinderTests
             {
                 new BoundVarDeclaration(
                     new VarDeclaration(_syntaxInt,MakeVariableToken("x"),ConstCreater(5)),
-                    "x",
+                    new VariableSymbol("x",TypeSymbol.Int),
                     new BoundTypeConversionExpression(ConstCreater(5), TypeSymbol.Int,
                         new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
                     )
@@ -67,7 +67,7 @@ public class BinderTests
         var input = CreateBlockStatement(varDecl);
         var expected = new BoundProgram(CreateBoundBlockStatement(
             input,
-            new BoundVarDeclaration(varDecl,"x",
+            new BoundVarDeclaration(varDecl,new VariableSymbol("x", TypeSymbol.Int),
                 new BoundListExpression(
                     rhs,
                     TypeSymbol.IntList,
@@ -92,7 +92,7 @@ public class BinderTests
         var input = CreateBlockStatement(varDecl);
         var expected = new BoundProgram(
             CreateBoundBlockStatement(input,
-                new BoundVarDeclaration(varDecl,"x",
+                new BoundVarDeclaration(varDecl,new VariableSymbol("x", TypeSymbol.IntList),
                     new BoundTypeConversionExpression(rhs, TypeSymbol.IntList,
                         new BoundListExpression(
                             rhs,

@@ -1,4 +1,3 @@
-using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Binding;

@@ -29,6 +29,6 @@ public class FunctionSymbol : Symbol
             if(i < Parameters.Length-1)
                 sb.Append(", ");   
         }
-        return sb.Append(") ").ToString();
+        return sb.Append(')').ToString();
     }
 }

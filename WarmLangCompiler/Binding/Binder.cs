@@ -1,6 +1,7 @@
 namespace WarmLangCompiler.Binding;
 
 using System.Collections.Immutable;
+using WarmLangCompiler.Binding.Lower;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
@@ -31,7 +32,7 @@ public sealed class Binder
         _isGlobalScope = true;
         if(root is BlockStatement statement)
         {
-            var bound = BindBlockStatement(statement);
+            var bound = Lowerer.LowerBody(BindBlockStatement(statement));
             _isGlobalScope = false; 
             var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
             foreach(var function in _scope.GetFunctions())
@@ -85,7 +86,7 @@ public sealed class Binder
             _diag.ReportNameAlreadyDeclared(varDecl.Identifier);
             return new BoundErrorStatement(varDecl);
         }
-        return new BoundVarDeclaration(varDecl, name, rightHandSide);
+        return new BoundVarDeclaration(varDecl, variable, rightHandSide);
     }
 
     private BoundStatement BindFunctionDeclaration(FuncDeclaration funcDecl)
@@ -116,13 +117,13 @@ public sealed class Binder
         }
         if(!_isGlobalScope && function is LocalFunctionSymbol f)
         {
-            var boundBody = BindFunctionBody(function);
+            var boundBody = BindFunctionBody(function, isGlobalFunc: false);
             f.Body = boundBody;
         }
         return new BoundFunctionDeclaration(funcDecl, function);
     }
 
-    private BoundBlockStatement BindFunctionBody(FunctionSymbol function)
+    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, bool isGlobalFunc = true)
     {
         _functionStack.Push(function);
         foreach(var @param in function.Parameters)
@@ -130,6 +131,8 @@ public sealed class Binder
             _scope.TryDeclareVariable(@param);
         }
         var boundBody = BindBlockStatement(function.Declaration.Body);
+        if(isGlobalFunc)
+            boundBody = Lowerer.LowerBody(boundBody);
         _functionStack.Pop();
         return boundBody;
     }
