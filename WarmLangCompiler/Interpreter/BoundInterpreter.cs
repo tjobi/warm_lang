@@ -147,9 +147,9 @@ public sealed class BoundInterpreter
         var op = binOp.Operator;
         Value res = (op.Kind.AsString(),left,right) switch 
         {
-            ("+", IntValue i1, IntValue i2) => new IntValue(i1 + i2),
-            ("*", IntValue i1, IntValue i2) => new IntValue(i1 * i2),
-            ("-", IntValue i1, IntValue i2) => new IntValue(i1 - i2),
+            ("+", IntValue i1, IntValue i2) => i1 + i2,
+            ("*", IntValue i1, IntValue i2) => i1 * i2,
+            ("-", IntValue i1, IntValue i2) => i1 - i2,
             ("==", ListValue a, ListValue b) => BoolValue(a.IsEqualTo(b)),
             ("==", _,_) => BoolValue(left == right),
             ("<", IntValue i1, IntValue i2) => BoolValue(i1 < i2), 
