@@ -13,12 +13,14 @@ public static class Lowerer
     private static BoundBlockStatement Block(BoundStatement syntax, params BoundStatement[] statements)
     => new(syntax.Node, statements.ToImmutableArray());
 
-    public static BoundBlockStatement LowerBody(BoundBlockStatement blockStatement)
+    public static BoundBlockStatement LowerProgram(BoundBlockStatement blockStatement) => Flatten(null, RewriteBlockStatement(blockStatement));
+
+    public static BoundBlockStatement LowerBody(FunctionSymbol function, BoundBlockStatement blockStatement)
     {
-        return Flatten(RewriteBlockStatement(blockStatement));
+        return Flatten(function, RewriteBlockStatement(blockStatement));
     }
 
-    public static BoundBlockStatement Flatten(BoundBlockStatement statement)
+    private static BoundBlockStatement Flatten(FunctionSymbol? function, BoundBlockStatement statement)
     {
         var flatStatements = ImmutableArray.CreateBuilder<BoundStatement>();
         var stack = new Stack<BoundStatement>();
@@ -39,6 +41,15 @@ public static class Lowerer
                 {
                     flatStatements.Add(current);
                 }
+            }
+        }
+        if(function is not null)
+        {
+            var last = flatStatements.LastOrDefault();
+            if(function.Type == TypeSymbol.Void && 
+               last is null or not BoundReturnStatement)
+            {
+                flatStatements.Add(new BoundReturnStatement(statement.Node));
             }
         }
 
@@ -62,7 +73,7 @@ public static class Lowerer
     {
         if(symbol.Body is null)
             return func;
-        symbol.Body = LowerBody(symbol.Body);
+        symbol.Body = LowerBody(symbol, symbol.Body);
         return func;
     }
 

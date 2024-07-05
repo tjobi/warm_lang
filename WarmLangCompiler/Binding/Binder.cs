@@ -34,7 +34,7 @@ public sealed class Binder
         _isGlobalScope = true;
         if(root is BlockStatement statement)
         {
-            var bound = Lowerer.LowerBody(BindBlockStatement(statement));
+            var bound = Lowerer.LowerProgram(BindBlockStatement(statement));
             _isGlobalScope = false; 
             var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
             foreach(var function in _scope.GetFunctions())
@@ -134,7 +134,7 @@ public sealed class Binder
         }
         var boundBody = BindBlockStatement(function.Declaration.Body);
         if(isGlobalFunc)
-            boundBody = Lowerer.LowerBody(boundBody);
+            boundBody = Lowerer.LowerBody(function, boundBody);
         if(!ControlFlowGraph.AllPathsReturn(boundBody))
             _diag.ReportNotAllCodePathsReturn(function);
         _functionStack.Pop();
