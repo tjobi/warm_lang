@@ -1,6 +1,8 @@
 namespace WarmLangCompiler.Binding;
 
 using System.Collections.Immutable;
+using System.Diagnostics;
+using WarmLangCompiler.Binding.ControlFlow;
 using WarmLangCompiler.Binding.Lower;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
@@ -133,6 +135,8 @@ public sealed class Binder
         var boundBody = BindBlockStatement(function.Declaration.Body);
         if(isGlobalFunc)
             boundBody = Lowerer.LowerBody(boundBody);
+        if(!ControlFlowGraph.AllPathsReturn(boundBody))
+            _diag.ReportNotAllCodePathsReturn(function);
         _functionStack.Pop();
         return boundBody;
     }

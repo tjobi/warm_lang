@@ -136,7 +136,7 @@ public static class Lowerer
         var labelEnd = GenerateLabel();
         var result = Block(iff,
             new BoundConditionalGotoStatement(iff.Node, iff.Condition, labelThen, labelElse),
-            new BoundGotoStatement(iff.Node, labelThen),
+            new BoundLabelStatement(iff.Node, labelThen),
             iff.Then,
             new BoundGotoStatement(iff.Node, labelEnd),
             new BoundLabelStatement(iff.Node, labelElse),

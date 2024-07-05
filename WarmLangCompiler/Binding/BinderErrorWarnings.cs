@@ -84,6 +84,12 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, retToken.Location);
     }
 
+    internal static void ReportNotAllCodePathsReturn(this ErrorWarrningBag bag, FunctionSymbol function)
+    {
+        var message = $"All code paths of '{function}' must return value of type '{function.Type}'";
+        bag.Report(message, true, function.Declaration.NameToken.Location);
+    }
+
     internal static void ReportReturnWithValueInVoidFunction(this ErrorWarrningBag bag, SyntaxToken retToken, FunctionSymbol function)
     {
         var message = $"The function '{function}' returns void, so the return keyword must not be followed by an expression";

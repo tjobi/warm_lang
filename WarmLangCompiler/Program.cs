@@ -75,6 +75,7 @@ try
     var res = BoundInterpreter.Run(boundProgram);
     Console.WriteLine($"Evaluated '{program}' -> {res}");
 
+
 } catch(ParserException e)
 {
     Console.WriteLine(longExceptions ? e : e.Message);

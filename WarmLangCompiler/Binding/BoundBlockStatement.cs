@@ -21,7 +21,7 @@ public class BoundBlockStatement : BoundStatement
         {
             sb.Append(stmnt);
             if(stmnt != Statements[^1])
-                sb.Append("; ");
+                sb.Append(", ");
         }
         return sb.Append('}').ToString();
     }
