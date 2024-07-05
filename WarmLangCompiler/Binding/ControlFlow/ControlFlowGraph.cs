@@ -100,9 +100,9 @@ public sealed class ControlFlowGraph
             bool removedAny = false;
             foreach(var block in _blocks)
             {
-                if(!block.Inbound.Any())
+                if(block.Inbound.Count == 0)
                 {
-                    RemoveBlock(block);
+                    RemoveBlockNoInbound(block);
                     removedAny = true;
                     break;
                 }
@@ -119,7 +119,7 @@ public sealed class ControlFlowGraph
         to.Inbound.Add(edge);
     }
 
-    private void RemoveBlock(BasicBlock block)
+    private void RemoveBlockNoInbound(BasicBlock block)
     {
         foreach(var outEdge in block.Outgoing)
         {
