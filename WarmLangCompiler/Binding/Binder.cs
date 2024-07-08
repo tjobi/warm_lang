@@ -133,8 +133,8 @@ public sealed class Binder
             _scope.TryDeclareVariable(@param);
         }
         var boundBody = BindBlockStatement(function.Declaration.Body);
-        if(isGlobalFunc)
-            boundBody = Lowerer.LowerBody(function, boundBody);
+        // if(isGlobalFunc) //Little bit of a waste ... but the LowerBody call also inserts a return if it is missing
+        boundBody = Lowerer.LowerBody(function, boundBody);
         if(!ControlFlowGraph.AllPathsReturn(boundBody))
             _diag.ReportNotAllCodePathsReturn(function);
         _functionStack.Pop();

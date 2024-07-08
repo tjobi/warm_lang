@@ -11,7 +11,7 @@ function incrementBySteps(int start, int incrementAmount, int amountOfTimes) int
         }
     }
     loop(amountOfTimes);
-    result;
+    return result;
 }
 
 //Starting at 0 increment by 5, and do it 10 times
