@@ -1,17 +1,17 @@
 namespace WarmLangCompiler.Interpreter;
 using System.Collections.Immutable;
 using WarmLangCompiler.Interpreter.Values;
-public sealed class VarEnv : IAssignableEnv<Value>
+public sealed class VariableEnv : IAssignableEnv<string,Value>
 {
     private readonly List<ImmutableDictionary<string,Value>> env;
-    public VarEnv()
+    public VariableEnv()
     {
         env = new List<ImmutableDictionary<string, Value>>()
         {
             ImmutableDictionary<string, Value>.Empty
         };
     }
-    public (Value, IEnv<Value>) Declare(string name, Value value)
+    public (Value, IEnv<string, Value>) Declare(string name, Value value)
     {
         var mostRecentScope = env.Last();
         try
@@ -25,7 +25,7 @@ public sealed class VarEnv : IAssignableEnv<Value>
         }
     }
 
-    public (Value, IAssignableEnv<Value>) Assign(string name, Value value)
+    public (Value, IAssignableEnv<string, Value>) Assign(string name, Value value)
     {
         for (int i = env.Count - 1; i >= 0 ; i--)
         {
@@ -52,13 +52,13 @@ public sealed class VarEnv : IAssignableEnv<Value>
         throw new Exception($"Variable {name} has not been declared.");
     }
 
-    public IEnv<Value> Pop()
+    public IEnv<string, Value> Pop()
     {
         env.RemoveAt(env.Count-1);
         return this;
     }
 
-    public IEnv<Value> Push()
+    public IEnv<string, Value> Push()
     {
         env.Add(ImmutableDictionary<string, Value>.Empty);
         return this;

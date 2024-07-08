@@ -1,16 +1,17 @@
+using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Binding;
 
 public sealed class BoundVarDeclaration : BoundStatement
 {
-    public BoundVarDeclaration(StatementNode node, string name, BoundExpression rightHandSide)
+    public BoundVarDeclaration(StatementNode node, VariableSymbol name, BoundExpression rightHandSide)
     : base(node)
     {
-        Name = name;
+        Symbol = name;
         RightHandSide = rightHandSide;
     }
 
-    public string Name { get; }
+    public VariableSymbol Symbol { get; }
     public BoundExpression RightHandSide { get; }
 }

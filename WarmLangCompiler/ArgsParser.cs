@@ -20,6 +20,8 @@ public static class ArgsParser
         Console.WriteLine("\t-is,--interactive  - enables interactive mode");
     }
 
+    public static ParsedArgs DefaultArgs(string program) => new(program);
+
     public static ParsedArgs? ParseArgs(string[] args, string defaultProgram)
     {
         var parsedArgs = new ParsedArgs(defaultProgram);

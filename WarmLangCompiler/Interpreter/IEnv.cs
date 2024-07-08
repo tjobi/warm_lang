@@ -1,17 +1,17 @@
 namespace WarmLangCompiler.Interpreter;
 
-public interface IEnv<T>
+public interface IEnv<K,T>
 {
-    public T Lookup(string name);
+    public T Lookup(K name);
 
-    public (T, IEnv<T>) Declare(string name, T value);
+    public (T, IEnv<K,T>) Declare(K name, T value);
 
-    public IEnv<T> Push();
+    public IEnv<K,T> Push();
 
-    public IEnv<T> Pop();
+    public IEnv<K,T> Pop();
 }
 
-public interface IAssignableEnv<T> : IEnv<T>
+public interface IAssignableEnv<K,T> : IEnv<K,T>
 {
-    public (T, IAssignableEnv<T>) Assign(string name, T value);
+    public (T, IAssignableEnv<K,T>) Assign(K name, T value);
 }

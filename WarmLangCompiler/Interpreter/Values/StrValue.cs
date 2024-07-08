@@ -1,6 +1,6 @@
 namespace WarmLangCompiler.Interpreter.Values;
 
-public sealed class StrValue : Value
+public sealed record class StrValue : Value
 {
     public string Value { get; }
 
@@ -10,4 +10,6 @@ public sealed class StrValue : Value
     }
 
     public override string ToString() => $"Str \"{Value}\"";
+
+    public static implicit operator string(StrValue str) => str.Value;
 }

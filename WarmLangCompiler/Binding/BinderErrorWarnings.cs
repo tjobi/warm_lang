@@ -59,7 +59,7 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportFunctionCalMissingArguments(this ErrorWarrningBag bag, SyntaxToken called, int expectedNumArgs, int realNumArgs)
+    internal static void ReportFunctionCallMismatchArguments(this ErrorWarrningBag bag, SyntaxToken called, int expectedNumArgs, int realNumArgs)
     {
         //TODO: Go through the arguments, and find the ones that are missing.
         var message = $"Function '{called.Name}' expected {expectedNumArgs} arguments but got {realNumArgs}";
@@ -72,5 +72,34 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, called.Location);
     }    
 
+    internal static void ReportCannotReturnOutsideFunction(this ErrorWarrningBag bag, SyntaxToken retToken)
+    {
+        var message = $"Invalid 'return' outside of function body";
+        bag.Report(message, true, retToken.Location);
+    }
+
+    internal static void ReportReturnIsMissingExpression(this ErrorWarrningBag bag, SyntaxToken retToken, TypeSymbol expectedType)
+    {
+        var message = $"The return requires an expression of type '{expectedType}'";
+        bag.Report(message, true, retToken.Location);
+    }
+
+    internal static void ReportNotAllCodePathsReturn(this ErrorWarrningBag bag, FunctionSymbol function)
+    {
+        var message = $"All code paths of '{function}' must return value of type '{function.Type}'";
+        bag.Report(message, true, function.Declaration.NameToken.Location);
+    }
+
+    internal static void ReportReturnWithValueInVoidFunction(this ErrorWarrningBag bag, SyntaxToken retToken, FunctionSymbol function)
+    {
+        var message = $"The function '{function}' returns void, so the return keyword must not be followed by an expression";
+        bag.Report(message, true, retToken.Location);
+    }
+
+    internal static void ReportInvalidLeftSideOfAssignment(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = $"The left-hand side of an assignment must be a variable or a subscript";
+        bag.Report(message, true, location);
+    }
     
 }

@@ -1,1 +1,10 @@
-if 0 { 2; } else { 5; }
+function f(int iters, int step, int start) int[] {
+    int i = 0;
+    while i < iters : i = i + 1 {
+        start = start + step;
+    }
+    return [start];
+}
+
+int start = 2500;
+f(10, -5, start);

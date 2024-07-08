@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using WarmLangCompiler.Binding;
-using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Symbols;
@@ -11,5 +10,13 @@ public sealed class LocalFunctionSymbol : FunctionSymbol
     : base(declaration, parameters, type)
     { }
 
-    public BoundStatement? Body { get; set; }
+    public BoundBlockStatement? Body { get; set; }
+
+    public override string ToString()
+    {
+        var baseStr = base.ToString();
+        if(Body is null)
+            return baseStr;
+        return baseStr + $"{{ {Body} }}";
+    }
 }

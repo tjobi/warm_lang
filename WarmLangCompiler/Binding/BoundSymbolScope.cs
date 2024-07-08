@@ -57,8 +57,11 @@ public sealed class BoundSymbolScope
         List<TSymbol> res = new();
         foreach(var scope in _scopeStack)
         {
-            res.AddRange(scope.Where(entry => entry.Value is TSymbol)
-                        .Select(entry => (entry.Value as TSymbol)!));
+            foreach(var entry in scope)
+            {
+                if(entry.Value is TSymbol x)
+                    res.Add(x);
+            }
         }
         return res;
     } 
