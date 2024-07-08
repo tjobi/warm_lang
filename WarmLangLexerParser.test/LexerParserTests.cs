@@ -1174,4 +1174,29 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void TestLexerParserIfElse()
+    {
+        var input = "if 0 { } else if 1 { }";
+        var expected = MakeEntryBlock(input,
+            new IfStatement(
+                MakeToken(TIf, new TextLocation(1,1,length:2)),
+                new ConstExpression(0, new TextLocation(1,4)),
+                new BlockStatement(MakeToken(TCurLeft, 1,6), new List<StatementNode>(), MakeToken(TCurRight,1,8)),
+                new IfStatement(
+                    MakeToken(TIf,new TextLocation(1,15,length:2)), 
+                    new ConstExpression(1, new TextLocation(1,18)),
+                    new BlockStatement(MakeToken(TCurLeft, 1,20), new List<StatementNode>(), MakeToken(TCurRight,1,22)),
+                    null
+                )
+            ) 
+        );
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }

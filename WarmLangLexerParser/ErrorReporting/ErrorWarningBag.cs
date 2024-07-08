@@ -82,4 +82,10 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         var message = "The body of a while statement must be a block {}";
         Report(message, true, read.Location);
     }
+
+    internal void ReportExpectedIfStatement(SyntaxToken falseToken)
+    {
+        var message = "Expected an if-block to form an else-if (or a regular block)";
+        Report(message, true, falseToken.Location);
+    }
 }

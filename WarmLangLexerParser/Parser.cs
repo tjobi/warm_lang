@@ -139,7 +139,16 @@ public class Parser
             return new IfStatement(ifToken, condition, thenStmnt, null);
         }
         var elseToken = MatchKind(TElse);
-        var elseStmnt = ParseBlockStatement();
+        StatementNode elseStmnt;
+        if(Current.Kind != TCurLeft)
+        {
+            if(Current.Kind != TIf)
+                _diag.ReportExpectedIfStatement(Current);
+            elseStmnt = ParseIfStatement();
+        } else 
+        {
+            elseStmnt = ParseBlockStatement();
+        }
         return new IfStatement(ifToken, condition, thenStmnt, elseStmnt);
     }
 
