@@ -38,9 +38,7 @@ public class BinderTests
                 new BoundVarDeclaration(
                     new VarDeclaration(_syntaxInt,MakeVariableToken("x"),ConstCreater(5)),
                     new VariableSymbol("x",TypeSymbol.Int),
-                    new BoundTypeConversionExpression(ConstCreater(5), TypeSymbol.Int,
-                        new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
-                    )
+                    new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
                 ),
             }.ToImmutableArray()),
             ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty
@@ -152,9 +150,7 @@ public class BinderTests
                         right, TypeSymbol.IntList, 
                         new List<BoundExpression>
                         {
-                            new BoundTypeConversionExpression(
-                                two, TypeSymbol.Int, 
-                                new BoundConstantExpression(two, TypeSymbol.Int)),
+                            new BoundConstantExpression(two, TypeSymbol.Int),
                         }.ToImmutableArray())
                     )));
         

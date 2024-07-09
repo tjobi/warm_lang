@@ -1,7 +1,6 @@
 namespace WarmLangCompiler.Binding;
 
 using System.Collections.Immutable;
-using System.Diagnostics;
 using WarmLangCompiler.Binding.ControlFlow;
 using WarmLangCompiler.Binding.Lower;
 using WarmLangCompiler.Symbols;
@@ -234,7 +233,11 @@ public sealed class Binder
     }
 
     private BoundExpression BindCallExpression(CallExpression ce)
-    {
+    {   
+        //We have reached a cast 'bool(25)' or 'int(true)'
+        if(ce.Arguments.Count == 1 && ce.Called.Kind.ToTypeSymbol() is TypeSymbol to)
+            return BindTypeConversion(ce.Arguments[0], to, allowExplicit: true);
+
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(ce.Arguments.Count);
         foreach(var arg in ce.Arguments)
         {
@@ -388,13 +391,13 @@ public sealed class Binder
         return new BoundConstantExpression(ce, type);
     }
 
-    private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowimplicitListType = false)
+    private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowExplicit = false, bool allowimplicitListType = false)
     {
         var boundExpression = BindExpression(expr, allowimplicitListType);
-        return BindTypeConversion(boundExpression, to);
+        return BindTypeConversion(boundExpression, to, allowExplicit);
     }
 
-    private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to)
+    private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to, bool allowExplicit = false)
     {
         var conversion = Conversion.GetConversion(expr.Type, to);
         if(!conversion.Exists)
@@ -405,11 +408,13 @@ public sealed class Binder
             }
             return new BoundErrorExpression(expr.Node);
         }
-        if(to != expr.Type && conversion.IsExplicit)
+        if(conversion.IsExplicit && !allowExplicit)
         {
             _diag.ReportCannotImplicitlyConvertToType(expr. Location, to, expr.Type);
             return new BoundErrorExpression(expr.Node);
         }
+        if(conversion.IsIdentity)
+            return expr;
         return new BoundTypeConversionExpression(expr.Node, to, expr);
     }
 }

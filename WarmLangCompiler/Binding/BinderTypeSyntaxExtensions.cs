@@ -1,5 +1,5 @@
-using System.Collections;
 using WarmLangCompiler.Symbols;
+using WarmLangLexerParser;
 using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangCompiler.Binding;
@@ -36,5 +36,18 @@ public static class BinderTypeSyntaxExtensions
             default:
                 throw new NotImplementedException($"BinderTypeExntensions doesn't know {type}");
         }
+    }
+}
+
+public static class BinderTokenKindExtensions 
+{
+    public static TypeSymbol? ToTypeSymbol(this TokenKind kind)
+    {
+        return kind switch
+        {
+            TokenKind.TInt => TypeSymbol.Int,
+            TokenKind.TBool => TypeSymbol.Bool,
+            _ => null,
+        };
     }
 }

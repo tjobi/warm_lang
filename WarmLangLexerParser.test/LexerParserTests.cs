@@ -156,9 +156,9 @@ x;
     }
 
     [Theory]
-    [InlineData("5*(4+4);", "{(CstI 5 * (CstI 4 + CstI 4));}")]
-    [InlineData("5*4+4;", "{((CstI 5 * CstI 4) + CstI 4);}")]
-    [InlineData("(5*(4+4))*5;", "{((CstI 5 * (CstI 4 + CstI 4)) * CstI 5);}")]
+    [InlineData("5*(4+4);", "{(Cst 5 * (Cst 4 + Cst 4));}")]
+    [InlineData("5*4+4;", "{((Cst 5 * Cst 4) + Cst 4);}")]
+    [InlineData("(5*(4+4))*5;", "{((Cst 5 * (Cst 4 + Cst 4)) * Cst 5);}")]
     public void TestLexerParserPrecedenceShouldSucceed(string input, string expected)
     {
         //AAA

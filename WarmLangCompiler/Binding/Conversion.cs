@@ -1,5 +1,6 @@
 using System.Text;
 using WarmLangCompiler.Symbols;
+using static WarmLangCompiler.Symbols.TypeSymbol;
 
 namespace WarmLangCompiler.Binding;
 
@@ -30,10 +31,15 @@ public sealed class Conversion
         if(from == to)
             return Identity;
         
-        if(from.ResolveNestedType() == TypeSymbol.EmptyList && to is ListTypeSymbol)
+        if(from.ResolveNestedType() == EmptyList && to is ListTypeSymbol)
         {
             return Implicit;
         }
+
+        if(from == Int && to == Bool)
+            return Explicit;
+        if(from == Bool && to == Int)
+            return Explicit;
 
         //There is no conversion
         return None;

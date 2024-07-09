@@ -299,6 +299,11 @@ public class Parser
                 res = ParseListInitializtionExpression();
             }
             break;
+            case TBool or TInt: {
+                var nameToken = NextToken();
+                nameToken = new SyntaxToken(nameToken.Kind,nameToken.Location, name: nameToken.Kind.AsString(), 0);
+                res = ParseCallExpression(nameToken); 
+            } break;
             case TIdentifier: {
                 var nameToken = NextToken();
                 if(Current.Kind == TParLeft)

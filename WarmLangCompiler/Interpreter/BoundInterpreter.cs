@@ -17,7 +17,6 @@ public sealed class BoundInterpreter
         this.program = program;
         _variableEnvironment = new();
         _functionEnvironment = new(program.Functions);
-        
     }
 
     public static Value Run(BoundProgram program)
@@ -26,10 +25,7 @@ public sealed class BoundInterpreter
         return runner.Run();
     }
 
-    public Value Run()
-    {
-        return EvaluateStatement(program.Statement);
-    }
+    public Value Run() => EvaluateStatement(program.Statement);
 
     private Value EvaluateStatement(BoundStatement statement)
     {
@@ -122,8 +118,16 @@ public sealed class BoundInterpreter
 
     private Value EvaluateTypeConversionExpression(BoundTypeConversionExpression conv)
     {
-        //TODO: Right now we only support [] to list<xxx> so, we do nothing here
-        return EvaluateExpression(conv.Expression);
+        var value = EvaluateExpression(conv.Expression);
+        if(conv.Type is ListTypeSymbol)
+            return value;
+        if(conv.Type == TypeSymbol.Bool)
+            if(value is IntValue i)
+                return BoolValue.FromBool(i != 0);
+        if(conv.Type == TypeSymbol.Int)
+            if(value is BoolValue bv)
+                return new IntValue(bv ? 1 : 0);
+        throw new Exception($"{nameof(BoundInterpreter)} doesn't know conversion from '{value}' to '{conv.Type}'");
     }
 
     private Value EvaluateUnaryExpression(BoundUnaryExpression unary)

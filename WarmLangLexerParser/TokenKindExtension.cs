@@ -22,6 +22,8 @@ public static class TokenKindExtension
             TEqual              => "=",
             TBang               => "!",
             TBangEqual          => "!=",
+            TInt                => "int",
+            TBool               => "bool",
             _ => kind.ToString()
         };
     }
