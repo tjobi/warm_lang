@@ -80,7 +80,7 @@ public sealed class Binder
     {
         var type = varDecl.Type.ToTypeSymbol();
         var name = varDecl.Identifier.Name!;
-        var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
+        var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type, allowimplicitListType: true);
 
         var variable = new VariableSymbol(name, rightHandSide.Type);
         if(!_scope.TryDeclareVariable(variable))
@@ -202,9 +202,10 @@ public sealed class Binder
         return new BoundExprStatement(expr, bound);
     }
 
-    private BoundExpression BindExpression(ExpressionNode expression, TypeSymbol targetType) => BindTypeConversion(expression, targetType);
+    private BoundExpression BindExpression(ExpressionNode expression, TypeSymbol targetType, bool allowimplicitListType = false) 
+    => BindTypeConversion(expression, targetType, allowimplicitListType);
 
-    private BoundExpression BindExpression(ExpressionNode expression)
+    private BoundExpression BindExpression(ExpressionNode expression, bool allowimplicitListType = false)
     {
         return expression switch
         {
@@ -212,7 +213,7 @@ public sealed class Binder
             AccessExpression ae => BindAccessExpression(ae),
             UnaryExpression ue => BindUnaryExpression(ue),
             BinaryExpression be => BindBinaryExpression(be),
-            ListInitExpression le => BindListInitExpression(le),
+            ListInitExpression le => BindListInitExpression(le, allowimplicitListType),
             ConstExpression ce => BindConstantExpression(ce),
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
             ErrorExpressionNode => new BoundErrorExpression(expression),
@@ -348,8 +349,21 @@ public sealed class Binder
         return new BoundBinaryExpression(binaryExpr,boundLeft, boundOperator, boundRight);
     }
 
-    private BoundExpression BindListInitExpression(ListInitExpression le)
+    private BoundExpression BindListInitExpression(ListInitExpression le, bool allowimplicitListType)
     {
+        if(le.IsEmptyList)
+        {
+            var type = TypeSymbol.EmptyList;
+            if(le.ElementType is null)
+            {
+                if(!allowimplicitListType)
+                    _diag.ReportTypeOfEmptyListMustBeExplicit(le.Location);
+            }
+            else
+                type = new ListTypeSymbol(le.ElementType.ToTypeSymbol());
+            return new BoundListExpression(le, type, ImmutableArray<BoundExpression>.Empty);
+        }
+
         var elements = ImmutableArray.CreateBuilder<BoundExpression>(le.Elements.Count);
         TypeSymbol? listType = null;
         foreach(var elm in le.Elements)
@@ -359,9 +373,7 @@ public sealed class Binder
             var conversion = BindTypeConversion(bound, listType);
             elements.Add(conversion);
         }
-        var initListType = listType is null 
-                           ? TypeSymbol.EmptyList
-                           : new ListTypeSymbol(listType);
+        var initListType = new ListTypeSymbol(listType!);
         return new BoundListExpression(le, initListType, elements.MoveToImmutable());
     }
 
@@ -371,9 +383,9 @@ public sealed class Binder
         return new BoundConstantExpression(ce, type);
     }
 
-    private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to)
+    private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowimplicitListType = false)
     {
-        var boundExpression = BindExpression(expr);
+        var boundExpression = BindExpression(expr, allowimplicitListType);
         return BindTypeConversion(boundExpression, to);
     }
 

@@ -9,8 +9,8 @@ public class BinderTests
 {
     private readonly ErrorWarrningBag _diag;
 
-    private static readonly ATypeSyntax _syntaxInt = new TypeSyntaxInt(new TextLocation(1,1, length:3));
-    private static readonly ATypeSyntax _syntaxIntList = new TypeSyntaxList(new TextLocation(1,1,length:3+2),_syntaxInt);
+    private static readonly TypeSyntaxNode _syntaxInt = new TypeSyntaxInt(new TextLocation(1,1, length:3));
+    private static readonly TypeSyntaxNode _syntaxIntList = new TypeSyntaxList(new TextLocation(1,1,length:3+2),_syntaxInt);
 
     private readonly Binder _binder;
     public BinderTests()
@@ -87,7 +87,7 @@ public class BinderTests
     public void BindVariableDeclarationOfEmptyList()
     {
         //int[] x = [];
-        var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),new List<ExpressionNode>(),MakeToken(TBracketRight,1,1));
+        var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),MakeToken(TBracketRight,1,1), null);
         var varDecl = new VarDeclaration(_syntaxIntList,MakeVariableToken("x"),rhs);
         var input = CreateBlockStatement(varDecl);
         var expected = new BoundProgram(
@@ -124,5 +124,76 @@ public class BinderTests
 
         boundProgram.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEquivalentTo(expectedErrorBag);
+    }
+
+    [Fact]
+    public void BindListConcatenationWithEmptyListWithExplicitType()
+    {
+        // [] int + [2];
+        var left = new ListInitExpression(MakeToken(TCurLeft,1,1), MakeToken(TCurRight,1,1), _syntaxInt);
+        var plus = MakeToken(TPlus,1,1);
+        var two = new ConstExpression(2, new TextLocation(1,1));
+        var right = new ListInitExpression(
+                MakeToken(TCurLeft,1,1), 
+                new List<ExpressionNode>() { two },
+                MakeToken(TCurRight,1,1));
+        var binaryExpression = new BinaryExpression(left,plus,right);
+        var exprStatement = new ExprStatement(binaryExpression);
+        var input = CreateBlockStatement(exprStatement);
+
+        var expected = CreateBoundProgram(input,
+            new BoundExprStatement(
+                exprStatement, 
+                new BoundBinaryExpression(
+                    binaryExpression,
+                    new BoundListExpression(left, TypeSymbol.IntList, ImmutableArray<BoundExpression>.Empty),
+                    new BoundBinaryOperator(plus.Kind, TypeSymbol.IntList, TypeSymbol.IntList, TypeSymbol.IntList),
+                    new BoundListExpression(
+                        right, TypeSymbol.IntList, 
+                        new List<BoundExpression>
+                        {
+                            new BoundTypeConversionExpression(
+                                two, TypeSymbol.Int, 
+                                new BoundConstantExpression(two, TypeSymbol.Int)),
+                        }.ToImmutableArray())
+                    )));
+        
+        var boundProgram = _binder.BindProgram(input);
+
+        boundProgram.Should().BeEquivalentTo(expected,  opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void BindListConcatenationWithEmptyListWithNoExplicitTypeFails()
+    {
+        // [] + [2];
+        var left = new ListInitExpression(MakeToken(TCurLeft,1,1), MakeToken(TCurRight,1,1), null);
+        var plus = MakeToken(TPlus,1,1);
+        var two = new ConstExpression(2, new TextLocation(1,1));
+        var right = new ListInitExpression(
+                MakeToken(TCurLeft,1,1), 
+                new List<ExpressionNode>() { two },
+                MakeToken(TCurRight,1,1));
+        var binaryExpression = new BinaryExpression(left,plus,right);
+        var exprStatement = new ExprStatement(binaryExpression);
+        var input = CreateBlockStatement(exprStatement);
+
+        var expected = CreateBoundProgram(input,
+            new BoundExprStatement(
+                exprStatement, 
+                new BoundErrorExpression(binaryExpression)));
+        
+        var boundProgram = _binder.BindProgram(input);
+        var expectedBag = new ErrorWarrningBag();
+        expectedBag.ReportBinaryOperatorCannotBeApplied(new TextLocation(1,1), plus, TypeSymbol.EmptyList, TypeSymbol.IntList);
+        expectedBag.ReportTypeOfEmptyListMustBeExplicit(new TextLocation(1,1));
+
+        boundProgram.Should().BeEquivalentTo(expected,  opt => opt.RespectingRuntimeTypes());
+        _diag.Count().Should().Be(2);
+        _diag.Should().BeEquivalentTo(
+            expectedBag, 
+            opt => opt.Including(we => we.Message)
+                      .Including(we => we.IsError));
     }
 }

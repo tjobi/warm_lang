@@ -1,9 +1,9 @@
 namespace WarmLangLexerParser.AST.TypeSyntax;
 
-public abstract class ATypeSyntax : ASTNode
+public abstract class TypeSyntaxNode : ASTNode
 {
     public abstract override string ToString();
 
-    public ATypeSyntax(TextLocation location)
+    public TypeSyntaxNode(TextLocation location)
     :base(location) { }
 }

@@ -1,6 +1,6 @@
 namespace WarmLangLexerParser.AST.TypeSyntax;
 
-public sealed class TypeSyntaxUserDefined : ATypeSyntax
+public sealed class TypeSyntaxUserDefined : TypeSyntaxNode
 {
     public string Name { get; }
     public TypeSyntaxUserDefined(SyntaxToken name)

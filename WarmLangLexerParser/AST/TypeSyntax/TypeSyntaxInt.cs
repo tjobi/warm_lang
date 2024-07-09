@@ -1,6 +1,6 @@
 namespace WarmLangLexerParser.AST.TypeSyntax;
 
-public sealed class TypeSyntaxInt : ATypeSyntax
+public sealed class TypeSyntaxInt : TypeSyntaxNode
 {
     public TypeSyntaxInt(TextLocation location) : base(location) { }
 

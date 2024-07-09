@@ -2,7 +2,7 @@ namespace WarmLangLexerParser.AST.TypeSyntax;
 
 public static class TypeSyntaxExtensions
 {
-    public static TokenKind ToTokenKind(this ATypeSyntax typ) => typ switch 
+    public static TokenKind ToTokenKind(this TypeSyntaxNode typ) => typ switch 
     {
         TypeSyntaxInt => TokenKind.TInt,
         TypeSyntaxList => TokenKind.TArray,

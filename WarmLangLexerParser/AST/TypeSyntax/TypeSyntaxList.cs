@@ -1,10 +1,10 @@
 namespace WarmLangLexerParser.AST.TypeSyntax;
 
-public sealed class TypeSyntaxList : ATypeSyntax
+public sealed class TypeSyntaxList : TypeSyntaxNode
 {
-    public ATypeSyntax InnerType { get; }
+    public TypeSyntaxNode InnerType { get; }
 
-    public TypeSyntaxList(TextLocation location, ATypeSyntax typ): base(location)
+    public TypeSyntaxList(TextLocation location, TypeSyntaxNode typ): base(location)
     {
         InnerType = typ;
     }

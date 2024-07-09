@@ -3,13 +3,13 @@ using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangLexerParser.AST;
 
-using ParameterList = IList<(ATypeSyntax type, SyntaxToken name)> ;
+using ParameterList = IList<(TypeSyntaxNode type, SyntaxToken name)> ;
 
 public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {
     public SyntaxToken NameToken { get; }
     public ParameterList Params { get; }
-    public ATypeSyntax? ReturnType { get; }
+    public TypeSyntaxNode? ReturnType { get; }
     public BlockStatement Body { get; }
 
     //TODO: Remember to fix <parameters> when we add typing?
@@ -17,7 +17,7 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
     :this(funcKeyword, nameToken, parameters, null, body) 
     { }
 
-    public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, ATypeSyntax? returnType, BlockStatement body)
+    public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, TypeSyntaxNode? returnType, BlockStatement body)
     : base(TextLocation.FromTo(funcKeyword.Location, body.Location))
     {
         NameToken = nameToken;

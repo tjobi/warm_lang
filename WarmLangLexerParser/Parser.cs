@@ -182,7 +182,7 @@ public class Parser
         var name = MatchKind(TIdentifier);
         var _ = MatchKind(TParLeft);
         //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        List<(ATypeSyntax,SyntaxToken)> paramNames = new(); 
+        List<(TypeSyntaxNode,SyntaxToken)> paramNames = new(); 
         if(Current.Kind == TParRight)
         {
             var parClose = NextToken();
@@ -206,7 +206,7 @@ public class Parser
             }
             var paramClose = MatchKind(TParRight);
         }
-        ATypeSyntax? returnType = null;
+        TypeSyntaxNode? returnType = null;
         if(Current.Kind != TCurLeft)
         {
             returnType = ParseType();
@@ -292,32 +292,11 @@ public class Parser
             case TParLeft: {
                 res = ParseParenthesesExpression();
             } break;
-            case TBracketLeft: {
-                //Allow list initialization like [] or [1,2,3,4]?
-                var bracketOpen = MatchKind(TBracketLeft);
-                var staticElements = new List<ExpressionNode>();
-                var isReading = true;
-                if(Current.Kind == TBracketRight) //empty list
-                {
-                    var close = MatchKind(TBracketRight);
-                    res = new ListInitExpression(bracketOpen, staticElements, close);
-                    break;
-                }
-                while(isReading && NotEndOfFile)
-                {
-                    var next = ParseExpression();
-                    staticElements.Add(next);
-                    if(Current.Kind != TComma)
-                    {
-                        isReading = false;
-                    } else
-                    {
-                        var comma = NextToken();
-                    }
-                }
-                var bracketClose = MatchKind(TBracketRight);
-                res = new ListInitExpression(bracketOpen, staticElements, bracketClose);
-            } break;
+            case TBracketLeft:
+            {
+                res = ParseListInitializtionExpression();
+            }
+            break;
             case TIdentifier: {
                 var nameToken = NextToken();
                 if(Current.Kind == TParLeft)
@@ -386,23 +365,38 @@ public class Parser
         return new ConstExpression(token);
     }
 
-    private ATypeSyntax ParseType()
+    private ExpressionNode ParseListInitializtionExpression()
     {
-        var type = MatchKinds(TInt, TIdentifier); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
-        ATypeSyntax typ = type.Kind switch 
+        //Allow list initialization like [] or [1,2,3,4]?
+        if(Current.Kind == TBracketLeft && Peek(1).Kind == TBracketRight)
+            return ParseEmptyListInitializationExpression();
+        
+        var bracketOpen = MatchKind(TBracketLeft);
+        var staticElements = new List<ExpressionNode>();
+        var isReading = true;
+        while (isReading && NotEndOfFile)
         {
-            TInt => new TypeSyntaxInt(type.Location),
-            TIdentifier => new TypeSyntaxUserDefined(type), //user-defined types
-            _ => new BadTypeSyntax(type.Location)
-        };
-        while(Current.Kind == TBracketLeft)
-        {
-            var bracketOpen = NextToken();
-            var bracketClose = MatchKind(TBracketRight);
-            var location = TextLocation.FromTo(type.Location, bracketClose.Location);
-            typ = new TypeSyntaxList(location, typ);
+            var next = ParseExpression();
+            staticElements.Add(next);
+            if (Current.Kind != TComma)
+            {
+                isReading = false;
+            }
+            else
+            {
+                var comma = NextToken();
+            }
         }
-        return typ;
+        var bracketClose = MatchKind(TBracketRight);
+        return new ListInitExpression(bracketOpen, staticElements, bracketClose);
+    }
+
+    private ExpressionNode ParseEmptyListInitializationExpression()
+    {
+        var open = MatchKind(TBracketLeft);
+        var close = MatchKind(TBracketRight);
+        TryParseType(out TypeSyntaxNode? type);
+        return new ListInitExpression(open, close, type);
     }
 
     private ExpressionNode ParseCallExpression(SyntaxToken called)
@@ -432,4 +426,54 @@ public class Parser
         var closePar = MatchKind(TParRight);
         return new CallExpression(called, openPar, args, closePar);
     }
+
+    private TypeSyntaxNode ParseType()
+    {
+        var type = MatchKinds(TInt, TIdentifier); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
+        TypeSyntaxNode typ = type.Kind switch 
+        {
+            TInt => new TypeSyntaxInt(type.Location),
+            TIdentifier => new TypeSyntaxUserDefined(type), //user-defined types
+            _ => new BadTypeSyntax(type.Location)
+        };
+        while(Current.Kind == TBracketLeft)
+        {
+            var bracketOpen = NextToken();
+            var bracketClose = MatchKind(TBracketRight);
+            var location = TextLocation.FromTo(type.Location, bracketClose.Location);
+            typ = new TypeSyntaxList(location, typ);
+        }
+        return typ;
+    }
+
+    private bool TryParseType(out TypeSyntaxNode? type)
+    {
+        var checkpoint = currentToken;
+        type = null;
+        if(Current.Kind is not TInt or TIdentifier)
+            return false;
+        var typeToken = NextToken();
+        TypeSyntaxNode typ = typeToken.Kind switch 
+        {
+            TInt => new TypeSyntaxInt(typeToken.Location),
+            TIdentifier => new TypeSyntaxUserDefined(typeToken), //user-defined types
+            _ => new BadTypeSyntax(typeToken.Location)
+        };
+        while(Current.Kind == TBracketLeft)
+        {
+            var bracketOpen = NextToken();
+            if(Current.Kind != TBracketRight)
+            {
+                currentToken = checkpoint;
+                return false;
+            }
+            var bracketClose = NextToken();
+            var location = TextLocation.FromTo(typeToken.Location, bracketClose.Location);
+            typ = new TypeSyntaxList(location, typ);
+        }
+        type = typ;
+        return true;
+    }
+
+    
 }

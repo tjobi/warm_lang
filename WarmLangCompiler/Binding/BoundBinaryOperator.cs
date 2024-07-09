@@ -41,20 +41,13 @@ public sealed class BoundBinaryOperator
         return (op,left,right) switch
         {
             //List concat '+' operator
-            (TPlus, _, ListTypeSymbol _) when IsEmptyList(left)  => new BoundBinaryOperator(op, left, right, right),
-            (TPlus, ListTypeSymbol _, _) when IsEmptyList(right) => new BoundBinaryOperator(op, left, right, left),
             (TPlus, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType
                 => new BoundBinaryOperator(op, left, right, lts2.InnerType),
 
             //List add '::' operator
-            (TDoubleColon, _, ListTypeSymbol _) when IsEmptyList(left)  => new BoundBinaryOperator(op, TypeSymbol.EmptyList, right, new ListTypeSymbol(right)),
-            (TDoubleColon, ListTypeSymbol lts, _) when IsEmptyList(right) && lts.InnerType is ListTypeSymbol
-                => new BoundBinaryOperator(op, left, TypeSymbol.EmptyList, left),
             (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, left, right, left),
             
             //List equality '==' operator
-            (TEqualEqual, ListTypeSymbol lts, _) when IsEmptyList(left)  => new(op, lts, TypeSymbol.EmptyList, TypeSymbol.Bool),
-            (TEqualEqual, _, ListTypeSymbol lts) when IsEmptyList(right) => new(op, TypeSymbol.EmptyList, lts, TypeSymbol.Bool),
             (TEqualEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType => new(op, left, right, TypeSymbol.Bool),
             //No operator matches
             _ => null, 

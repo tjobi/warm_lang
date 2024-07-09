@@ -101,5 +101,11 @@ internal static class BinderErrorWarnings
         var message = $"The left-hand side of an assignment must be a variable or a subscript";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportTypeOfEmptyListMustBeExplicit(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = $"The type of empty list must be explicit unless used for variable declaration";
+        bag.Report(message, true, location);
+    }
     
 }

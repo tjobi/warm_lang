@@ -6,7 +6,7 @@ namespace WarmLangCompiler.Binding;
 
 public static class BinderTypeSyntaxExtensions
 {
-    private static TypeSymbol ResolveNestedTypeSyntax(ATypeSyntax aType)
+    private static TypeSymbol ResolveNestedTypeSyntax(TypeSyntaxNode aType)
     {
         if(aType is TypeSyntaxList tsl)
         {
@@ -19,7 +19,7 @@ public static class BinderTypeSyntaxExtensions
             _ => throw new NotImplementedException($"BinderTypeExtensions-ResolveNestedTypeSyntax doesn't know {aType}"),
         };
     }
-    public static TypeSymbol ToTypeSymbol(this ATypeSyntax? type)
+    public static TypeSymbol ToTypeSymbol(this TypeSyntaxNode? type)
     {
         if(type is null)
         {

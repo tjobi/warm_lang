@@ -1,6 +1,6 @@
 namespace WarmLangLexerParser.AST.TypeSyntax;
 
-public sealed class BadTypeSyntax : ATypeSyntax
+public sealed class BadTypeSyntax : TypeSyntaxNode
 {
     public BadTypeSyntax(TextLocation location) : base(location) { }
 
