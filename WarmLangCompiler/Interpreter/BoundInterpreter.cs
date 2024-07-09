@@ -133,8 +133,9 @@ public sealed class BoundInterpreter
         return (operatorAsString, exprValue) switch 
         {
             ("+", IntValue i) => i,  //do nothing for the (+1) cases
-            ("-", IntValue i) => new IntValue(-i.Value), //flip it for the (-1) cases
+            ("-", IntValue i) => new IntValue(-i), //flip it for the (-1) cases
             ("<-", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
+            ("!", IntValue) => BoolValue(!IsValueTrue(exprValue)),
             _ => throw new NotImplementedException($"Unary {operatorAsString} is not defined on {exprValue.GetType()}")
         };
     }
@@ -148,12 +149,18 @@ public sealed class BoundInterpreter
         Value res = (op.Kind.AsString(),left,right) switch 
         {
             ("+", IntValue i1, IntValue i2) => i1 + i2,
-            ("*", IntValue i1, IntValue i2) => i1 * i2,
             ("-", IntValue i1, IntValue i2) => i1 - i2,
+            ("*", IntValue i1, IntValue i2) => i1 * i2,
+            ("/", IntValue i1, IntValue i2) => i1 / i2,
+            ("**", IntValue i1, IntValue i2) => new IntValue((int)Math.Pow(i1,i2)),
             ("==", ListValue a, ListValue b) => BoolValue(a.IsEqualTo(b)),
+            ("!=", ListValue a, ListValue b) => BoolValue(!a.IsEqualTo(b)),
             ("==", _,_) => BoolValue(left == right),
+            ("!=", _,_) => BoolValue(left != right),
             ("<", IntValue i1, IntValue i2) => BoolValue(i1 < i2), 
             ("<=", IntValue i1, IntValue i2) =>  BoolValue(i1 <= i2),
+            (">", IntValue i1, IntValue i2) => BoolValue(i1 > i2), 
+            (">=", IntValue i1, IntValue i2) =>  BoolValue(i1 >= i2),
             ("::", ListValue arr,_) => arr.Add(right),
             ("+", ListValue a1, ListValue a2) => a1 + a2,
             _ => throw new NotImplementedException($"Operator: '{op.Kind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")

@@ -43,6 +43,7 @@ public sealed class BoundUnaryOperator
     {
         new(TPlus, TypeSymbol.Int, TypeSymbol.Int),
         new(TMinus, TypeSymbol.Int, TypeSymbol.Int),
-        new(TLeftArrow, TypeSymbol.IntList, TypeSymbol.Int) //TODO: Generic lists?
+        new(TLeftArrow, TypeSymbol.IntList, TypeSymbol.Int),
+        new(TBang, TypeSymbol.Bool, TypeSymbol.Bool),
     };
 }

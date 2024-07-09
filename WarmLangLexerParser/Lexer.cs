@@ -28,11 +28,10 @@ public class Lexer
 
     private void AdvanceLine() => _window.AdvanceLine(); 
 
-    //Extends the "old" token. Uses when we first see a "<" then a "=", to "combine" to the two into a "<=".
+    //Extends the "old" token. Used when we first see a "<" then a "=", to "combine" to the two into a "<=".
     private SyntaxToken ExtendToken(SyntaxToken old, TokenKind kind)
     {
-        var oldLocation = old.Location;
-        var newLocation = TextLocation.FromTo(old.Location, new TextLocation(Line,Column));
+        var newLocation = TextLocation.FromTo(old.Location, new TextLocation(Line, Column));
         return SyntaxToken.MakeToken(kind, newLocation);
     }
 
@@ -93,6 +92,15 @@ public class Lexer
                         } break;
                     }
                 } break;
+                case '>': {
+                    token = SyntaxToken.MakeToken(TGreaterThan, Line, Column);
+                    AdvanceText();
+                    if(Current == '=')
+                    {
+                        token = ExtendToken(token, TGreaterThanEqual);
+                        AdvanceText();
+                    }
+                } break;
                 case ':': {
                     token = SyntaxToken.MakeToken(TColon, Line, Column);
                     AdvanceText();
@@ -107,6 +115,13 @@ public class Lexer
                 case '!': {
                     token = SyntaxToken.MakeToken(TBang, Line, Column);
                     AdvanceText();
+                    switch(Current)
+                    {
+                        case '=': {
+                            token = ExtendToken(token, TBangEqual);
+                            AdvanceText();
+                        } break;
+                    }
                 } break;
                 case '+': {
                     token = SyntaxToken.MakeToken(TPlus, Line, Column);
@@ -119,6 +134,11 @@ public class Lexer
                 case '*': {
                     token = SyntaxToken.MakeToken(TStar, Line, Column);
                     AdvanceText();
+                    if(Current == '*') 
+                    {
+                        token = ExtendToken(token, TDoubleStar);
+                        AdvanceText();
+                    }
                 } break;
                 case '{': {
                     token = SyntaxToken.MakeToken(TCurLeft, Line, Column);

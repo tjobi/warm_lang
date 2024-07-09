@@ -47,23 +47,29 @@ public sealed class BoundBinaryOperator
             //List add '::' operator
             (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, left, right, left),
             
-            //List equality '==' operator
-            (TEqualEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType => new(op, left, right, TypeSymbol.Bool),
+            //List equality '==' & '!=' operator
+            (TEqualEqual or TBangEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) 
+                when lts1.InnerType == lts2.InnerType => new(op, left, right, TypeSymbol.Bool),
+            
             //No operator matches
             _ => null, 
         };
     }
 
-    private static bool IsEmptyList(TypeSymbol a) => a == TypeSymbol.EmptyList;
-
-    private static BoundBinaryOperator[] _definedOperators = new BoundBinaryOperator[]{
+    private static readonly BoundBinaryOperator[] _definedOperators = new BoundBinaryOperator[]{
         //Basic int operators
         new(TPlus, TypeSymbol.Int),
         new(TStar, TypeSymbol.Int),
         new(TMinus, TypeSymbol.Int),
-        new(TLessThan, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Int),
-        new(TLessThanEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Int),
+        new(TSlash, TypeSymbol.Int),
+        new(TDoubleStar, TypeSymbol.Int),
+        //Equaility and relation on ints
+        new(TLessThan, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
+        new(TLessThanEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
+        new(TGreaterThan, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
+        new(TGreaterThanEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
         new(TEqualEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
+        new(TBangEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
         
         //builtin list operators
         new(TDoubleColon, TypeSymbol.IntList, TypeSymbol.Int, TypeSymbol.IntList),

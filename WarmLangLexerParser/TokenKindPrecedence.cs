@@ -1,22 +1,28 @@
 namespace WarmLangLexerParser;
 using static TokenKind;
 public static class TokenKindPrecedence
-{
+{   
+    //precedence levels goes from high to low
+    private readonly static int CLASS3 = 1000, CLASS4 = 950,
+                                CLASS5 = 900,  CLASS6 = 800,
+                                CLASS9 = 700,  CLASS10 = 600,
+                                CLASS12 = 500, CLASS13 = 400, 
+                                REST = -1;
+
     public static int GetBinaryPrecedence(this TokenKind kind)
     {
         return kind switch
         {
-            // * 
-            TStar => 1000,
-            // + 
-            TPlus => 100,
-            TMinus => 100,
+            TDoubleStar               => CLASS4,    //Exponents 2 ** 2
+            TStar or TSlash           => CLASS5,    //Multiplication and division, modulo
+            TPlus or TMinus           => CLASS6,    //Addition and subtraction
             TLessThan 
-                or TLessThanEqual => 75,
-            TEqualEqual => 50,
-            TDoubleColon => 40,
-            //The rest shouldn't have any precedence - I think
-            _ => -1
+            or TLessThanEqual
+            or TGreaterThan
+            or TGreaterThanEqual      => CLASS9,    //Relational operators
+            TEqualEqual or TBangEqual => CLASS10,   //Equality operators
+            TDoubleColon              => CLASS12,   //Homemade list_add '::'
+            _ => REST                               //The rest shouldn't have any precedence - I think
         };
     }
 
@@ -24,10 +30,10 @@ public static class TokenKindPrecedence
     {
         return kind switch
         {
-            TMinus 
-            or TPlus   => 10_000,
-            TLeftArrow => 35,
-            _ => -1
+            TBang                     => CLASS3,    //logical not, should really be right-associative
+            TMinus or TPlus           => CLASS3,    //Unary plus and minus
+            TLeftArrow                => CLASS13,   //Homemade list_remove '<- [3,5,6]'
+            _ => REST
         };
     }
 
@@ -38,11 +44,10 @@ public static class TokenKindPrecedence
 
     public static bool IsPrefixUnaryExpression(this TokenKind kind)
     {
-        return kind switch 
+        return kind switch
         {
-            TPlus or TMinus => true,
-            TLeftArrow => true,
-            _ => false
+            TBang or TPlus or TMinus or TLeftArrow => true,
+            _ => false,
         };
     }
 

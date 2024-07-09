@@ -6,16 +6,22 @@ public static class TokenKindExtension
     {
         return kind switch 
         {
-            TPlus           => "+",
-            TStar           => "*",
-            TMinus          => "-",
-            TEqualEqual     => "==",
-            TLessThan       => "<",
-            TLessThanEqual  => "<=",
-            TDoubleColon    => "::",
-            TColonBang      => ":!",
-            TLeftArrow      => "<-",
-            TEqual          => "=",
+            TPlus               => "+",
+            TStar               => "*",
+            TDoubleStar         => "**",
+            TSlash              => "/",
+            TMinus              => "-",
+            TEqualEqual         => "==",
+            TLessThan           => "<",
+            TLessThanEqual      => "<=",
+            TGreaterThan        => ">",
+            TGreaterThanEqual   => ">=",
+            TDoubleColon        => "::",
+            TColonBang          => ":!",
+            TLeftArrow          => "<-",
+            TEqual              => "=",
+            TBang               => "!",
+            TBangEqual          => "!=",
             _ => kind.ToString()
         };
     }

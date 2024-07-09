@@ -4,11 +4,11 @@ public enum TokenKind
 {
     //Token
     TBadToken, TEOF,
-    TIdentifier, //Variable names, function names...
-    TVar, TInt, //var x = 5, the keyword 'var'
-    TSemiColon, TComma, TDot, TColon, TDoubleColon, TBang, TColonBang, TLeftArrow,
-    TEqual,
-    TEqualEqual, TLessThan, TLessThanEqual, TPlus, TStar, TSlash, TMinus,
+    TSemiColon, TComma, TDot, TColon, TDoubleColon, TColonBang, TLeftArrow,
+    TEqual, TEqualEqual,
+    TLessThan, TLessThanEqual, TGreaterThan, TGreaterThanEqual,
+    TBang, TBangEqual,
+    TPlus, TStar, TSlash, TMinus, TDoubleStar,
     TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
 
 
@@ -19,10 +19,7 @@ public enum TokenKind
     TReturn,
 
     //"Kind of construct?"
-    TConst, 
+    TConst, TVar, TInt, //var x = 5, the keyword 'var'
+    TIdentifier, //Variable names, function names...
     TArray,
-    TAssign, //Assignment x = 10;
-    TBlock,
-    TCall, //function call
-    TIfStmnt,
 }
