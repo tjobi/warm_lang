@@ -29,7 +29,7 @@ public sealed class ListInitExpression : ExpressionNode
     {
         if(IsEmptyList)
         {
-            return $"({ElementType})[]";
+            return ElementType is null ? "[]" : $"({ElementType})[]";
         }
         var sb = new StringBuilder().Append('[');
         
