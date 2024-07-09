@@ -377,9 +377,14 @@ public sealed class Binder
         return new BoundListExpression(le, initListType, elements.MoveToImmutable());
     }
 
-    private BoundExpression BindConstantExpression(ConstExpression ce)
+    private static BoundExpression BindConstantExpression(ConstExpression ce)
     {
-        var type = TypeSymbol.Int; //TODO: more constants?
+        var type = ce.Value switch 
+        {
+            int => TypeSymbol.Int,
+            bool => TypeSymbol.Bool,
+            _ => throw new NotImplementedException($"'{nameof(BindConstantExpression)}' doesn't know about '{ce.Value}'"),
+        };
         return new BoundConstantExpression(ce, type);
     }
 

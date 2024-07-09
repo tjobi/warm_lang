@@ -71,8 +71,8 @@ public sealed class BoundInterpreter
                 } break;
                 case BoundConditionalGotoStatement jmp:
                 {
-                    var condtion = EvaluateExpression(jmp.Condition);
-                    i = labelIndex[IsValueTrue(condtion) ? jmp.LabelTrue : jmp.LabelFalse];
+                    var condition = EvaluateExpression(jmp.Condition) as BoolValue;
+                    i = labelIndex[condition! ? jmp.LabelTrue : jmp.LabelFalse];
                 } break;
                 case BoundReturnStatement ret:
                 {
@@ -135,7 +135,7 @@ public sealed class BoundInterpreter
             ("+", IntValue i) => i,  //do nothing for the (+1) cases
             ("-", IntValue i) => new IntValue(-i), //flip it for the (-1) cases
             ("<-", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
-            ("!", IntValue) => BoolValue(!IsValueTrue(exprValue)),
+            ("!", BoolValue b) => b.Negate(),
             _ => throw new NotImplementedException($"Unary {operatorAsString} is not defined on {exprValue.GetType()}")
         };
     }
@@ -144,7 +144,7 @@ public sealed class BoundInterpreter
     {
         var left = EvaluateExpression(binOp.Left);
         var right = EvaluateExpression(binOp.Right);
-
+        
         var op = binOp.Operator;
         Value res = (op.Kind.AsString(),left,right) switch 
         {
@@ -153,14 +153,14 @@ public sealed class BoundInterpreter
             ("*", IntValue i1, IntValue i2) => i1 * i2,
             ("/", IntValue i1, IntValue i2) => i1 / i2,
             ("**", IntValue i1, IntValue i2) => new IntValue((int)Math.Pow(i1,i2)),
-            ("==", ListValue a, ListValue b) => BoolValue(a.IsEqualTo(b)),
-            ("!=", ListValue a, ListValue b) => BoolValue(!a.IsEqualTo(b)),
-            ("==", _,_) => BoolValue(left == right),
-            ("!=", _,_) => BoolValue(left != right),
-            ("<", IntValue i1, IntValue i2) => BoolValue(i1 < i2), 
-            ("<=", IntValue i1, IntValue i2) =>  BoolValue(i1 <= i2),
-            (">", IntValue i1, IntValue i2) => BoolValue(i1 > i2), 
-            (">=", IntValue i1, IntValue i2) =>  BoolValue(i1 >= i2),
+            ("==", ListValue a, ListValue b) => BoolValue.FromBool(a.IsEqualTo(b)),
+            ("!=", ListValue a, ListValue b) => BoolValue.FromBool(!a.IsEqualTo(b)),
+            ("==", _,_) => BoolValue.FromBool(left == right),
+            ("!=", _,_) => BoolValue.FromBool(left != right),
+            ("<", IntValue i1, IntValue i2) => BoolValue.FromBool(i1 < i2), 
+            ("<=", IntValue i1, IntValue i2) =>  BoolValue.FromBool(i1 <= i2),
+            (">", IntValue i1, IntValue i2) => BoolValue.FromBool(i1 > i2), 
+            (">=", IntValue i1, IntValue i2) =>  BoolValue.FromBool(i1 >= i2),
             ("::", ListValue arr,_) => arr.Add(right),
             ("+", ListValue a1, ListValue a2) => a1 + a2,
             _ => throw new NotImplementedException($"Operator: '{op.Kind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")
@@ -263,13 +263,17 @@ public sealed class BoundInterpreter
         {
             BoundNameAccess na => _variableEnvironment.Lookup(na.Symbol.Name),
             BoundExprAccess ea => EvaluateExpression(ea.Expression),
-            _ => throw new Exception($"BoundInterpreter access expression - your code didn't work bro"),
+            _ => throw new Exception($"{nameof(BoundInterpreter)} access expression - your code didn't work bro"),
         };
     }
 
     private Value EvaluateConstantExpression(BoundConstantExpression konst)
     {
-        return new IntValue(konst.Constant.Value);
+        return konst.Constant.Value switch {
+            int i    => new IntValue(i),
+            bool boo => BoolValue.FromBool(boo),
+            _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know value {konst.Constant.Value.GetType().Name} yet"),
+        };
     }
 
     private Value EvaluateListExpression(BoundListExpression initializer)
@@ -282,15 +286,6 @@ public sealed class BoundInterpreter
         }
         return values;
     }
-
-     private static bool IsValueTrue(Value v)
-    {
-        if (v is IntValue i)
-            return i != 0;
-        throw new NotImplementedException($"value of {v.GetType().Name} cannot be used as boolean");
-    }
-
-    private static Value BoolValue(bool cond) => new IntValue(cond ? 1 : 0);
 
     private void PushEnvironments()
     {

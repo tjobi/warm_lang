@@ -1,21 +1,22 @@
-int x = 5;
-int z = 1;
+bool x = true;
+bool z = true;
+int xi = 0;
 
 if z {
     int g  = 10;
-    if 0 + g {
-        x = x + 25;
+    if 0 + g > 0 {
+        xi = xi + 25;
     }
     else {
-        z = x + 5; 
+        xi = xi + 5; 
     }
 }
 else {
-    x = 25;
+    xi = 25;
 }
 if z { 
-    x + z;
+    xi + xi;
 }
 else {
-    x;
+    xi;
 }

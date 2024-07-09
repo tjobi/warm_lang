@@ -17,9 +17,11 @@ public enum TokenKind
     TIf, TElse, //To allow if <cond> <block-statement> else <block-statement>
     TWhile,
     TReturn,
+    TTrue, TFalse,
+    TVar,//var x = 5, the keyword 'var'
 
     //"Kind of construct?"
-    TConst, TVar, TInt, //var x = 5, the keyword 'var'
+    TConst, TInt, TBool,
     TIdentifier, //Variable names, function names...
     TArray,
 }

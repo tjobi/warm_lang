@@ -7,8 +7,7 @@ public class TypeSymbol : Symbol
     public static readonly TypeSymbol EmptyList = new("unspecified empty list");
     public static readonly TypeSymbol Void = new("void");
     public static readonly TypeSymbol Error = new("err");
-
-    public static readonly TypeSymbol Bool = Int; //TODO: Add bools.
+    public static readonly TypeSymbol Bool = new("bool");
 
     public TypeSymbol(string name) : base(name) { }
 

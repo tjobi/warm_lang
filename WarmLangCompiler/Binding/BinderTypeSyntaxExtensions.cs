@@ -13,11 +13,7 @@ public static class BinderTypeSyntaxExtensions
             TypeSymbol res = ResolveNestedTypeSyntax(tsl.InnerType);
             return new ListTypeSymbol($"list<{res}>", res);
         }
-        return aType switch 
-        {
-            TypeSyntaxInt => TypeSymbol.Int,
-            _ => throw new NotImplementedException($"BinderTypeExtensions-ResolveNestedTypeSyntax doesn't know {aType}"),
-        };
+        return aType.ToTypeSymbol();
     }
     public static TypeSymbol ToTypeSymbol(this TypeSyntaxNode? type)
     {
@@ -28,9 +24,9 @@ public static class BinderTypeSyntaxExtensions
         switch(type)
         {
             case TypeSyntaxInt: 
-            {
                 return TypeSymbol.Int;
-            }
+            case TypeSyntaxBool: 
+                return TypeSymbol.Bool;
             case TypeSyntaxList list: 
             {
                 if(list.InnerType is TypeSyntaxInt)

@@ -2,12 +2,17 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class ConstExpression : ExpressionNode
 {
-    public int Value { get; private init; }
+    public object Value { get; private init; }
 
     public ConstExpression(SyntaxToken constant)
     :base(constant.Location)
     {
-        Value = constant.IntValue ?? 0;
+        Value = constant.Kind switch {
+            TokenKind.TConst => constant.IntValue!,
+            TokenKind.TTrue => true,
+            TokenKind.TFalse => false,
+            _ => throw new NotImplementedException($"ConstExpression doesn't know {constant.Kind.AsString()} yet!"),
+        };
     }
 
     public ConstExpression(int value, TextLocation location)
@@ -16,6 +21,6 @@ public sealed class ConstExpression : ExpressionNode
         Value = value;
     }
 
-    public override string ToString() => $"CstI {Value}";
+    public override string ToString() => $"Cst {Value}";
     
 }

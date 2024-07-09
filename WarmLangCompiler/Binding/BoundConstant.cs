@@ -1,11 +1,21 @@
 namespace WarmLangCompiler.Binding;
 
+
 public class BoundConstant
 {
-    public int Value { get; }
+    public object Value { get; }
 
-    public BoundConstant(int value)
+    public T GetCastValue<T>() 
     {
-        Value = value;
+        if(Value is T v) 
+        {
+            return v;
+        }
+        throw new Exception($"BoundConstant someone had a wrong assumption of value '{Value}'");
+    } 
+
+    public BoundConstant(object val) 
+    {
+        Value = val;
     }
 }
