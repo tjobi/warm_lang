@@ -11,6 +11,7 @@ public sealed class ConstExpression : ExpressionNode
             TokenKind.TConst => constant.IntValue!,
             TokenKind.TTrue => true,
             TokenKind.TFalse => false,
+            TokenKind.TStringLiteral => constant.Name!,
             _ => throw new NotImplementedException($"ConstExpression doesn't know {constant.Kind.AsString()} yet!"),
         };
     }
@@ -21,6 +22,13 @@ public sealed class ConstExpression : ExpressionNode
         Value = value;
     }
 
-    public override string ToString() => $"Cst {Value}";
+    public override string ToString() 
+    {
+        if(Value is string s)
+        {
+            return $"Cst \"{s}\"";
+        }
+        return $"Cst {Value}";
+    }
     
 }

@@ -112,21 +112,29 @@ public sealed class BoundInterpreter
             BoundAccessExpression acc => EvaluateAccessExpression(acc),
             BoundConstantExpression konst => EvaluateConstantExpression(konst),
             BoundListExpression lst => EvaluateListExpression(lst),
-            _ => throw new NotImplementedException($"Interpreter doesn't know '{expr.GetType().Name} yet!'"),
+            _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{expr.GetType().Name}' yet"),
         };
     }
 
     private Value EvaluateTypeConversionExpression(BoundTypeConversionExpression conv)
     {
         var value = EvaluateExpression(conv.Expression);
-        if(conv.Type is ListTypeSymbol)
-            return value;
         if(conv.Type == TypeSymbol.Bool)
             if(value is IntValue i)
                 return BoolValue.FromBool(i != 0);
         if(conv.Type == TypeSymbol.Int)
             if(value is BoolValue bv)
                 return new IntValue(bv ? 1 : 0);
+        if(conv.Type == TypeSymbol.String)
+        {
+            if(value is BoolValue bv)
+                return new StrValue(bv.Value.ToString());
+            if(value is IntValue i)
+                return new StrValue(i.Value.ToString());
+        }
+        //Convert [] when used in variable declaration
+        if(conv.Type is ListTypeSymbol)
+            return value;
         throw new Exception($"{nameof(BoundInterpreter)} doesn't know conversion from '{value}' to '{conv.Type}'");
     }
 
@@ -148,7 +156,7 @@ public sealed class BoundInterpreter
     {
         var left = EvaluateExpression(binOp.Left);
         var right = EvaluateExpression(binOp.Right);
-        
+
         var op = binOp.Operator;
         Value res = (op.Kind.AsString(),left,right) switch 
         {
@@ -167,7 +175,8 @@ public sealed class BoundInterpreter
             (">=", IntValue i1, IntValue i2) =>  BoolValue.FromBool(i1 >= i2),
             ("::", ListValue arr,_) => arr.Add(right),
             ("+", ListValue a1, ListValue a2) => a1 + a2,
-            _ => throw new NotImplementedException($"Operator: '{op.Kind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")
+            ("+", StrValue str1, StrValue str2) => str1 + str2,
+            _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} - Operator: '{op.Kind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")
         };
 
         return res;
@@ -219,7 +228,7 @@ public sealed class BoundInterpreter
                         break;
                     } else 
                         throw new Exception("Index was out of range. Must be non-negative and less than size of collection");
-                } 
+                }
                 throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
             } 
             default:
@@ -245,14 +254,22 @@ public sealed class BoundInterpreter
                     BoundAccess accessTarget = sa.Target;
                     for (; accessTarget is BoundSubscriptAccess saa; accessTarget = saa.Target) ;
                     Value target = GetValueFromAccess(accessTarget);
-                    Value index = EvaluateExpression(sa.Index);
-                    if (index is IntValue idx && target is ListValue lst)
+                    IntValue idx = EvaluateExpression(sa.Index) as IntValue ?? throw new Exception($"{nameof(BoundInterpreter)} cannot use '{sa.Index.Type}' as subscript");
+                    if (target is ListValue lst)
                     {
                         if (idx >= lst.Length || idx < 0)
                             throw new Exception($"Index was out of range. Must be non-negative and less than size of collection");
 
                         if (idx < lst.Length && idx >= 0)
                             return lst[idx];
+                    }
+                    else if (target is StrValue str)
+                    {
+                        if (idx >= str.Value.Length || idx < 0)
+                            throw new Exception($"Index was out of range. Must be non-negative and less than size of collection");
+
+                        if (idx < str.Value.Length && idx >= 0)
+                            return new IntValue(str.Value[idx]);
                     }
                     //nothing good came out of this!
                     throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
@@ -276,7 +293,8 @@ public sealed class BoundInterpreter
         return konst.Constant.Value switch {
             int i    => new IntValue(i),
             bool boo => BoolValue.FromBool(boo),
-            _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know value {konst.Constant.Value.GetType().Name} yet"),
+            string s => new StrValue(s),
+            _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know value of type '{konst.Constant.Value.GetType().Name}' yet"),
         };
     }
 

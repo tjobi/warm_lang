@@ -81,7 +81,7 @@ public class Parser
             TWhile => ParseWhileStatement(),
             TReturn => ParseReturnStatement(),
             //TODO: May be a problem when we introduce more types? -- what to do?
-            TInt or TBool => ParseVariableDeclaration(), 
+            TInt or TBool or TString => ParseVariableDeclaration(), 
             TFunc =>  ParseFunctionDeclaration(),
             _ => ParseExpressionStatement()
         };
@@ -286,6 +286,7 @@ public class Parser
         ExpressionNode res;
         switch(Current.Kind)
         {
+            case TStringLiteral:
             case TTrue:
             case TFalse:
             case TConst: {
@@ -299,7 +300,7 @@ public class Parser
                 res = ParseListInitializtionExpression();
             }
             break;
-            case TBool or TInt: {
+            case TBool or TInt or TString: {
                 var nameToken = NextToken();
                 nameToken = new SyntaxToken(nameToken.Kind,nameToken.Location, name: nameToken.Kind.AsString(), 0);
                 res = ParseCallExpression(nameToken); 
@@ -436,11 +437,12 @@ public class Parser
 
     private TypeSyntaxNode ParseType()
     {
-        var type = MatchKinds(TInt, TIdentifier, TBool); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
+        var type = MatchKinds(TInt, TIdentifier, TBool, TString); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
         TypeSyntaxNode typ = type.Kind switch 
         {
             TInt => new TypeSyntaxInt(type.Location),
             TBool => new TypeSyntaxBool(type.Location),
+            TString => new TypeSyntaxString(type.Location),
             TIdentifier => new TypeSyntaxUserDefined(type), //user-defined types
             _ => new BadTypeSyntax(type.Location)
         };

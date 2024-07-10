@@ -107,5 +107,11 @@ internal static class BinderErrorWarnings
         var message = $"The type of empty list must be explicit unless used for variable declaration";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportSubscriptTargetIsReadOnly(this ErrorWarrningBag bag, TypeSymbol type, TextLocation location)
+    {
+        var message = $"Cannot assign to subscript of '{type}' -- it is readonly";
+        bag.Report(message, true, location);
+    }
     
 }

@@ -2,6 +2,7 @@
 using WarmLangLexerParser.Read;
 using WarmLangLexerParser.ErrorReporting;
 using static WarmLangLexerParser.TokenKind;
+using System.ComponentModel;
 
 namespace WarmLangLexerParser;
 public class Lexer
@@ -164,6 +165,9 @@ public class Lexer
                     token = SyntaxToken.MakeToken(TBracketRight, Line, Column);
                     AdvanceText();
                 } break;
+                case '"': {
+                    token = LexStringLiteral();
+                } break;
                 default: {
                     if(char.IsDigit(Current))
                     {
@@ -187,6 +191,54 @@ public class Lexer
         //End token stream with an EndOfFile
         tokens.Add(SyntaxToken.MakeToken(TEOF, Line, Column));
         return tokens;
+    }
+
+    private SyntaxToken LexStringLiteral()
+    {
+        //Eat first "
+        int startLine = Line, startColumn = Column;
+        AdvanceText();
+        var sb = new StringBuilder();
+        var isDone = false;
+        while(!IsEndOfFile && !isDone)
+        {
+            switch(Current)
+            {
+                case '"':
+                    isDone = true;
+                    break;
+                case '\r':
+                case '\n':
+                    _diag.ReportNewLineStringLiteral(new TextLocation(startLine, startColumn, Line,Column));
+                    isDone = true;
+                    break;
+                case '\\':
+                    AdvanceText();
+                    switch(Current)
+                    {
+                        case 'n':
+                            sb.Append('\n');
+                            AdvanceText();
+                            break;
+                        case '"':
+                            sb.Append('"');
+                            AdvanceText();
+                            break;
+                        default:
+                            sb.Append('\\');
+                            break;
+                    }
+                    break;
+                default:
+                    sb.Append(Current);
+                    AdvanceText();
+                    break;
+            }
+        }
+        //Eat last "
+        AdvanceText();
+        var location = new TextLocation(startLine, startColumn, Line, Column);
+        return new SyntaxToken(TStringLiteral, location, sb.ToString(),0);
     }
 
     private SyntaxToken LexNumericLiteral()
@@ -241,6 +293,7 @@ public class Lexer
             "false" => TFalse,
             "true" => TTrue,
             "bool" => TBool,
+            "string" => TString,
             _ => TIdentifier,
         };
         var location = new TextLocation(startLine, startColumn, Line, Column);

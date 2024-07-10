@@ -71,13 +71,15 @@ public sealed class BoundBinaryOperator
         new(TEqualEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
         new(TBangEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
         
-        //builint for bools
+        //builin for bools
         new(TEqualEqual, TypeSymbol.Bool),
         new(TBangEqual , TypeSymbol.Bool),
 
+        //builtin for string 
+        new(TPlus, TypeSymbol.String),
+
         //builtin list operators
         new(TDoubleColon, TypeSymbol.IntList, TypeSymbol.Int, TypeSymbol.IntList),
-        new(TDoubleColon, TypeSymbol.EmptyList, TypeSymbol.Int, TypeSymbol.IntList),
         new(TPlus,TypeSymbol.IntList),
     };
 }

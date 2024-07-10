@@ -10,6 +10,7 @@ public enum TokenKind
     TBang, TBangEqual,
     TPlus, TStar, TSlash, TMinus, TDoubleStar,
     TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
+    TQuote, TTick, // " and '
 
 
     //Keyword
@@ -21,7 +22,7 @@ public enum TokenKind
     TVar,//var x = 5, the keyword 'var'
 
     //"Kind of construct?"
-    TConst, TInt, TBool,
+    TConst, TInt, TBool, TString, TStringLiteral,
     TIdentifier, //Variable names, function names...
     TArray,
 }

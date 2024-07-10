@@ -27,6 +27,8 @@ public static class BinderTypeSyntaxExtensions
                 return TypeSymbol.Int;
             case TypeSyntaxBool: 
                 return TypeSymbol.Bool;
+            case TypeSyntaxString:
+                return TypeSymbol.String;
             case TypeSyntaxList list: 
             {
                 if(list.InnerType is TypeSyntaxInt)
@@ -47,6 +49,7 @@ public static class BinderTokenKindExtensions
         {
             TokenKind.TInt => TypeSymbol.Int,
             TokenKind.TBool => TypeSymbol.Bool,
+            TokenKind.TString => TypeSymbol.String,
             _ => null,
         };
     }
