@@ -199,10 +199,41 @@ public class Lexer
         int startLine = Line, startColumn = Column;
         AdvanceText();
         var sb = new StringBuilder();
-        while(Current != '"' && !IsEndOfFile)
+        var isDone = false;
+        while(!IsEndOfFile && !isDone)
         {
-            sb.Append(Current);
-            AdvanceText();
+            switch(Current)
+            {
+                case '"':
+                    isDone = true;
+                    break;
+                case '\r':
+                case '\n':
+                    _diag.ReportNewLineStringLiteral(new TextLocation(startLine, startColumn, Line,Column));
+                    isDone = true;
+                    break;
+                case '\\':
+                    AdvanceText();
+                    switch(Current)
+                    {
+                        case 'n':
+                            sb.Append('\n');
+                            AdvanceText();
+                            break;
+                        case '"':
+                            sb.Append('"');
+                            AdvanceText();
+                            break;
+                        default:
+                            sb.Append('\\');
+                            break;
+                    }
+                    break;
+                default:
+                    sb.Append(Current);
+                    AdvanceText();
+                    break;
+            }
         }
         //Eat last "
         AdvanceText();

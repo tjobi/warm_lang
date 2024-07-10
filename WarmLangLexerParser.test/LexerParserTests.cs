@@ -1245,4 +1245,51 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void LexerStringLiteralNewLine()
+    {
+        var input = @"string s = ""h
+h"";";
+        var expected = new List<SyntaxToken>()
+        {
+            MakeToken(TString, new TextLocation(1,1,length:6)),
+            MakeToken(TIdentifier,1,8,"s"),
+            MakeToken(TEqual,1,10),
+            new(TStringLiteral, new TextLocation(1,12,2,1), "h",0),
+            MakeToken(TIdentifier,2,1, "h"),
+            new(TStringLiteral,new TextLocation(2,2, length:3), ";",0), //length 3, because it counts the ""
+            MakeToken(TEOF,2,5)
+        };
+
+        var lexer = GetLexer(input);
+        var result = lexer.Lex();
+        var expectedBag = new ErrorWarrningBag();
+        expectedBag.ReportNewLineStringLiteral(new TextLocation(1,12,2,1));
+
+        result.Should().BeEquivalentTo(expected);
+        _diag.Should().BeEquivalentTo(expectedBag);
+    }
+
+    [Fact]
+    public void LexerStringEscaping()
+    {
+        var input = """string s = "y\ny";""";
+        var expected = new List<SyntaxToken>()
+        {
+            MakeToken(TString, new TextLocation(1,1,length:6)),
+            MakeToken(TIdentifier,1,8,"s"),
+            MakeToken(TEqual,1,10),
+            new(TStringLiteral, new TextLocation(1,12,length:6), "y\ny",0),
+            MakeToken(TSemiColon,1,18),
+            MakeToken(TEOF,1,19)
+        };
+
+        var lexer = GetLexer(input);
+        var result = lexer.Lex();
+
+        result[3].Name!.Should().Be("y\ny");
+        result.Should().BeEquivalentTo(expected);
+        _diag.Should().BeEmpty();
+    }
 }

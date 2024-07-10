@@ -88,4 +88,10 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         var message = "Expected an if-block to form an else-if (or a regular block)";
         Report(message, true, falseToken.Location);
     }
+
+    public void ReportNewLineStringLiteral(TextLocation textLocation)
+    {
+        var message = "Newline in constant";
+        Report(message, true, textLocation);
+    }
 }
