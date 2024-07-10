@@ -21,7 +21,7 @@ public sealed class VariableEnv : IAssignableEnv<string,Value>
             return (value, this);
         } catch
         {
-            throw new Exception("Variable is already defined");
+            throw new Exception($"Variable '{name}' is already defined");
         }
     }
 
