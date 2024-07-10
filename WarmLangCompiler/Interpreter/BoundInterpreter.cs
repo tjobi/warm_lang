@@ -22,7 +22,6 @@ public sealed class BoundInterpreter
     public static Value Run(BoundProgram program)
     {
         var runner = new BoundInterpreter(program);
-        Console.WriteLine(runner._variableEnvironment);
         return runner.Run();
     }
 
