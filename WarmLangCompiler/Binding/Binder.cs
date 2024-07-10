@@ -228,16 +228,22 @@ public sealed class Binder
             _diag.ReportInvalidLeftSideOfAssignment(assignment.Location);
             return new BoundErrorExpression(assignment);
         }
+        if(boundAccess is BoundSubscriptAccess sa)
+        {
+            var targetType = sa.Target.Type;
+            if(targetType == TypeSymbol.String)
+                _diag.ReportSubscriptTargetIsReadOnly(targetType, assignment.Access.Location);
+        }
         var boundRightHandSide = BindTypeConversion(assignment.RightHandSide, boundAccess.Type);
         return new BoundAssignmentExpression(assignment, boundAccess, boundRightHandSide);
     }
 
     private BoundExpression BindCallExpression(CallExpression ce)
     {   
-        //We have reached a cast 'bool(25)' or 'int(true)'
+        //We have reached a cast 'bool(25)' or 'int(true)' or 'string(2555)'
         if(ce.Arguments.Count == 1 && ce.Called.Kind.ToTypeSymbol() is TypeSymbol to)
             return BindTypeConversion(ce.Arguments[0], to, allowExplicit: true);
-
+        
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(ce.Arguments.Count);
         foreach(var arg in ce.Arguments)
         {
@@ -344,6 +350,7 @@ public sealed class Binder
         }
 
         var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Operator.Kind, boundLeft, boundRight);
+        
         if(boundOperator is null)
         {
             _diag.ReportBinaryOperatorCannotBeApplied(binaryExpr.Location, binaryExpr.Operator, boundLeft.Type, boundRight.Type);
@@ -386,6 +393,7 @@ public sealed class Binder
         {
             int => TypeSymbol.Int,
             bool => TypeSymbol.Bool,
+            string => TypeSymbol.String,
             _ => throw new NotImplementedException($"'{nameof(BindConstantExpression)}' doesn't know about '{ce.Value}'"),
         };
         return new BoundConstantExpression(ce, type);

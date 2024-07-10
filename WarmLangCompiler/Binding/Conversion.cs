@@ -36,10 +36,12 @@ public sealed class Conversion
             return Implicit;
         }
 
-        if(from == Int && to == Bool)
-            return Explicit;
-        if(from == Bool && to == Int)
-            return Explicit;
+        if(from == Int)
+            if(to == TypeSymbol.String || to == Bool)
+                return Explicit;
+        if(from == Bool)
+            if(to == TypeSymbol.String || to == Int)
+                return Explicit;
 
         //There is no conversion
         return None;

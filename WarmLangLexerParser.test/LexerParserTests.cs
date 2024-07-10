@@ -1199,4 +1199,50 @@ x;
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
+
+    [Fact]
+    public void LexerParserTestStringLiteral()
+    {
+        var input = """string s = "hi there";""";
+        var expected = MakeEntryBlock(input,
+            new VarDeclaration(
+                new TypeSyntaxString(new TextLocation(1,1,length:6)),
+                MakeToken(TIdentifier,1,8,"s"),
+                new ConstExpression(
+                    new SyntaxToken(TStringLiteral, new TextLocation(1,12,length:10), "hi there",0)
+                )
+            )
+        );
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserTestStringLiteralPlus()
+    {
+        var input = """string s = "hi there" + "y";""";
+        var expected = MakeEntryBlock(input,
+            new VarDeclaration(
+                new TypeSyntaxString(new TextLocation(1,1,length:6)),
+                MakeToken(TIdentifier,1,8,"s"),
+                new BinaryExpression(
+                    new ConstExpression(
+                        new SyntaxToken(TStringLiteral, new TextLocation(1,12,length:10), "hi there",0)),
+                    MakeToken(TPlus,1,23),
+                    new ConstExpression(
+                        new SyntaxToken(TStringLiteral, new TextLocation(1,25,length:3), "y",0))
+                )   
+            )
+        );
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }

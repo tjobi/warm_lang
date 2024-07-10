@@ -2,6 +2,7 @@
 using WarmLangLexerParser.Read;
 using WarmLangLexerParser.ErrorReporting;
 using static WarmLangLexerParser.TokenKind;
+using System.ComponentModel;
 
 namespace WarmLangLexerParser;
 public class Lexer
@@ -164,6 +165,9 @@ public class Lexer
                     token = SyntaxToken.MakeToken(TBracketRight, Line, Column);
                     AdvanceText();
                 } break;
+                case '"': {
+                    token = LexStringLiteral();
+                } break;
                 default: {
                     if(char.IsDigit(Current))
                     {
@@ -187,6 +191,23 @@ public class Lexer
         //End token stream with an EndOfFile
         tokens.Add(SyntaxToken.MakeToken(TEOF, Line, Column));
         return tokens;
+    }
+
+    private SyntaxToken LexStringLiteral()
+    {
+        //Eat first "
+        int startLine = Line, startColumn = Column;
+        AdvanceText();
+        var sb = new StringBuilder();
+        while(Current != '"' && !IsEndOfFile)
+        {
+            sb.Append(Current);
+            AdvanceText();
+        }
+        //Eat last "
+        AdvanceText();
+        var location = new TextLocation(startLine, startColumn, Line, Column);
+        return new SyntaxToken(TStringLiteral, location, sb.ToString(),0);
     }
 
     private SyntaxToken LexNumericLiteral()
@@ -241,6 +262,7 @@ public class Lexer
             "false" => TFalse,
             "true" => TTrue,
             "bool" => TBool,
+            "string" => TString,
             _ => TIdentifier,
         };
         var location = new TextLocation(startLine, startColumn, Line, Column);
