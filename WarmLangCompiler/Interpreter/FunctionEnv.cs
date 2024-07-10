@@ -19,6 +19,8 @@ public sealed class FunctionEnv : IEnv<FunctionSymbol, BoundBlockStatement>
     public FunctionEnv(IImmutableDictionary<FunctionSymbol, BoundBlockStatement> initial)
     :this()
     {
+        if(environment.Count == 0)
+            environment.Add(new Dictionary<FunctionSymbol, BoundBlockStatement>());
         var globalScope = environment[0];
         foreach(var funcAndBody in initial)
         {
@@ -51,7 +53,8 @@ public sealed class FunctionEnv : IEnv<FunctionSymbol, BoundBlockStatement>
 
     public IEnv<FunctionSymbol, BoundBlockStatement> Pop()
     {
-        environment.RemoveAt(environment.Count-1);
+        if(environment.Count > 0)
+            environment.RemoveAt(environment.Count-1);
         return this;
     }
 

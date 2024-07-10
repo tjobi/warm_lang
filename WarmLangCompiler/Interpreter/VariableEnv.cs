@@ -1,5 +1,6 @@
 namespace WarmLangCompiler.Interpreter;
 using System.Collections.Immutable;
+using System.Text;
 using WarmLangCompiler.Interpreter.Values;
 public sealed class VariableEnv : IAssignableEnv<string,Value>
 {
@@ -54,7 +55,8 @@ public sealed class VariableEnv : IAssignableEnv<string,Value>
 
     public IEnv<string, Value> Pop()
     {
-        env.RemoveAt(env.Count-1);
+        if(env.Count > 0)
+            env.RemoveAt(env.Count-1);
         return this;
     }
 
@@ -62,5 +64,25 @@ public sealed class VariableEnv : IAssignableEnv<string,Value>
     {
         env.Add(ImmutableDictionary<string, Value>.Empty);
         return this;
+    }
+
+    public override string ToString()
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < env.Count; i++)
+        {
+            var layer = env[i];
+            sb.Append($"Layer: {i}");
+            for (int j = 0; j < i; j++)
+            {
+                sb.Append(' ');
+            }
+            foreach(var variable in layer.Keys)
+            {
+                sb.Append($"{variable}-({layer[variable]}),");
+            }
+            sb.Append('\n');
+        }
+        return sb.ToString();
     }
 }

@@ -22,6 +22,7 @@ public sealed class BoundInterpreter
     public static Value Run(BoundProgram program)
     {
         var runner = new BoundInterpreter(program);
+        Console.WriteLine(runner._variableEnvironment);
         return runner.Run();
     }
 
@@ -54,7 +55,8 @@ public sealed class BoundInterpreter
 
         PushEnvironments();
         Value res = Value.Void;
-        for (int i = 0; i < block.Statements.Length; i++)
+        bool returned = false;
+        for (int i = 0; i < block.Statements.Length && !returned; i++)
         {
             var stmnt = block.Statements[i];
             switch (stmnt)
@@ -73,8 +75,11 @@ public sealed class BoundInterpreter
                 case BoundReturnStatement ret:
                 {
                     if(ret.Expression is null)
-                        return Value.Void;
-                    return EvaluateExpression(ret.Expression);
+                        res = Value.Void;
+                    else
+                        res = EvaluateExpression(ret.Expression);
+                    returned = true;
+                    break;
                 }
                 default:
                 {
@@ -188,7 +193,6 @@ public sealed class BoundInterpreter
         var functionBody = _functionEnvironment.Lookup(function);
         var callArgs = call.Arguments;
         var funcParams = function.Parameters;
-        
         PushEnvironments();
         for (int i = 0; i < call.Arguments.Length; i++)
         {
