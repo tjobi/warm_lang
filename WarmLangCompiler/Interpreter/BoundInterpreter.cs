@@ -129,17 +129,14 @@ public sealed class BoundInterpreter
         if(conv.Type == TypeSymbol.Int)
             if(value is BoolValue bv)
                 return new IntValue(bv ? 1 : 0);
+            if(value is StrValue str)
+                return int.TryParse(str, out int res) ? new IntValue(res) : new ErrValue($"Couldn't convert {str} to an int");
         if(conv.Type == TypeSymbol.String)
         {
-            if(value is BoolValue bv)
-                return new StrValue(bv.Value.ToString());
-            if(value is IntValue i)
-                return new StrValue(i.Value.ToString());
+            return new StrValue(value.StdWriteString());
         }
         //Convert [] when used in variable declaration
         if(conv.Type is ListTypeSymbol)
-            return value;
-        if(conv.Type == TypeSymbol.Any)
             return value;
         throw new Exception($"{nameof(BoundInterpreter)} doesn't know conversion from '{value}' to '{conv.Type}'");
     }
@@ -224,6 +221,11 @@ public sealed class BoundInterpreter
         if(function == BuiltInFunctions.StdRead)
         {
             return new StrValue(Console.ReadLine() ?? "");
+        }
+        if(function == BuiltInFunctions.StrLen)
+        {
+            var evalRes = (StrValue) EvaluateExpression(call.Arguments[0]);
+            return new IntValue(evalRes.Value.Length);
         }
         throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know builtin {function}");
     }

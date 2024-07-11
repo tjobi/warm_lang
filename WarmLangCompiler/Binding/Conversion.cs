@@ -28,8 +28,6 @@ public sealed class Conversion
 
     public static Conversion GetConversion(TypeSymbol from, TypeSymbol to)
     {
-        if(from != TypeSymbol.Void && to == Any)
-            return Implicit;
         if(from == to)
             return Identity;
         
@@ -45,6 +43,14 @@ public sealed class Conversion
             if(to == TypeSymbol.String || to == Int)
                 return Explicit;
 
+        if(from is ListTypeSymbol && to == TypeSymbol.String)
+            return Explicit;
+
+        if(from == TypeSymbol.String)
+        {
+            if(to == Int)
+                return Explicit;
+        }
         //There is no conversion
         return None;
     }

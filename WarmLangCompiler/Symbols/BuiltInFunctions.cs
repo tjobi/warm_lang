@@ -19,15 +19,18 @@ public static class BuiltInFunctions
         return new FunctionSymbol(name, parameters, type, dummyDecl);
     }
 
-    public static readonly FunctionSymbol StdWrite = MakeFunction("stdWrite", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.Any)));
-    public static readonly FunctionSymbol StdWriteLine = MakeFunction("stdWriteLine", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.Any)));
+    public static readonly FunctionSymbol StdWrite = MakeFunction("stdWrite", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.String)));
+    public static readonly FunctionSymbol StdWriteLine = MakeFunction("stdWriteLine", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.String)));
     public static readonly FunctionSymbol StdRead = MakeFunction("stdRead", TypeSymbol.String, ImmutableArray<ParameterSymbol>.Empty);
+
+    public static readonly FunctionSymbol StrLen = MakeFunction("strLen", TypeSymbol.Int, ImmutableArray.Create(new ParameterSymbol("s", TypeSymbol.String)));
 
     public static IEnumerable<FunctionSymbol> GetBuiltInFunctions() 
     {
         yield return StdWrite;
         yield return StdWriteLine;
         yield return StdRead;
+        yield return StrLen;
     }
     public static bool IsBuiltInFunction(this FunctionSymbol function)
     {

@@ -1,6 +1,53 @@
-stdWrite("Put something into the terminal pls\n");
-stdWrite("...> ");
+function menuPicker() string {
+    int menuLength = 3;
+    string[] choices = ["Pancake", "Wedding Cake", "Brunsviger"];
 
-string input = stdRead();
+    stdWriteLine("Welcome to our dessert factory");
+    stdWriteLine("Today's menu:");
 
-stdWriteLine("Read: \"" + input + "\" from the terminal");
+    int i = 0;
+    while i < menuLength : i = i + 1 {
+        string toPrint = string(i + 1) + ": " + choices[i];
+        stdWriteLine(toPrint);
+    }
+
+    stdWriteLine("Pick a dessert by typing in its corresponding number:");
+    stdWrite("> ");
+
+    string input = stdRead();
+
+    string res = "";
+
+    if isNumber(input) {
+        int choice = int(input) - 1;
+        if choice >= 0 {
+            if choice <= menuLength {
+                res = choices[choice];
+                stdWriteLine("You've chosen \"" + res + "\". Good choice!");
+            } else {
+                stdWriteLine("You've selected a dessert ID that is too large");
+            }
+        } else {
+            stdWriteLine("You've selected a dessert ID that is too small");
+        }
+    } else {
+        stdWriteLine("Not cool broski, I asked for a number!");
+    }
+    return res;
+}
+
+function isNumber(string s) bool {
+    int i = 0;
+    while i < strLen(s) : i = i + 1 {
+        int charAtI = s[i];
+        if charAtI > 57 {
+            return false;
+        }
+        if charAtI < 48 {
+            return false;
+        }
+    }
+    return true;
+}
+
+menuPicker();

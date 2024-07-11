@@ -1,29 +1,18 @@
 namespace WarmLangCompiler.Interpreter;
-using System.Collections.Immutable;
 using System.Text;
 using WarmLangCompiler.Interpreter.Values;
 public sealed class VariableEnv : IAssignableEnv<string,Value>
 {
-    private readonly List<ImmutableDictionary<string,Value>> env;
+    private readonly List<Dictionary<string,Value>> env;
     public VariableEnv()
     {
-        env = new List<ImmutableDictionary<string, Value>>()
-        {
-            ImmutableDictionary<string, Value>.Empty
-        };
+        env = new List<Dictionary<string, Value>>() { new() };
     }
     public (Value, IEnv<string, Value>) Declare(string name, Value value)
     {
         var mostRecentScope = env.Last();
-        try
-        {
-            var newEnv = mostRecentScope.Add(name, value);
-            env[^1] = newEnv;
-            return (value, this);
-        } catch
-        {
-            throw new Exception($"Variable '{name}' is already defined");
-        }
+        mostRecentScope[name] = value;
+        return (value, this);
     }
 
     public (Value, IAssignableEnv<string, Value>) Assign(string name, Value value)
@@ -33,7 +22,7 @@ public sealed class VariableEnv : IAssignableEnv<string,Value>
             var scope = env[i];
             if(scope.ContainsKey(name))
             {
-                env[i] = scope.SetItem(name, value);
+                scope[name] = value;
                 return (value, this);
             }
         }
@@ -62,7 +51,7 @@ public sealed class VariableEnv : IAssignableEnv<string,Value>
 
     public IEnv<string, Value> Push()
     {
-        env.Add(ImmutableDictionary<string, Value>.Empty);
+        env.Add(new Dictionary<string, Value>());
         return this;
     }
 
