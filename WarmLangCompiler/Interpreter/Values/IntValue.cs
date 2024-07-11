@@ -12,6 +12,8 @@ public sealed record class IntValue : Value
 
     public override string ToString() => $"Int {Value}";
 
+    public override string StdWriteString() => Value.ToString();
+
     public static implicit operator int(IntValue i) => i.Value;
 
     public static IntValue operator +(IntValue a, IntValue b) => new((int)a+b);

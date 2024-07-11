@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using WarmLangLexerParser.AST;
-using WarmLangLexerParser;
 using System.Text;
 
 namespace WarmLangCompiler.Symbols;
@@ -8,11 +7,16 @@ namespace WarmLangCompiler.Symbols;
 public class FunctionSymbol : Symbol
 {
     //Function symbol contains: name, parameters, returnType, body
-    public FunctionSymbol(FuncDeclaration declaration, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type) : base(declaration.NameToken.Name!)
+    public FunctionSymbol(FuncDeclaration declaration, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
+    :this(declaration.NameToken.Name!, parameters, type, declaration) { }
+
+
+    internal FunctionSymbol(string name, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type, FuncDeclaration declaration) 
+    : base(name)
     {
-        Declaration = declaration;
         Parameters = parameters;
         Type = type;
+        Declaration = declaration;
     }
 
     public FuncDeclaration Declaration { get; }

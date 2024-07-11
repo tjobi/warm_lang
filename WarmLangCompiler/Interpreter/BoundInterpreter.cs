@@ -139,6 +139,8 @@ public sealed class BoundInterpreter
         //Convert [] when used in variable declaration
         if(conv.Type is ListTypeSymbol)
             return value;
+        if(conv.Type == TypeSymbol.Any)
+            return value;
         throw new Exception($"{nameof(BoundInterpreter)} doesn't know conversion from '{value}' to '{conv.Type}'");
     }
 
@@ -189,6 +191,8 @@ public sealed class BoundInterpreter
     private Value EvaluateCallExpression(BoundCallExpression call)
     {
         var function = call.Function;
+        if(function.IsBuiltInFunction())
+            return EvaluateCallBuiltinExpression(call);
         var functionBody = _functionEnvironment.Lookup(function);
         var callArgs = call.Arguments;
         var funcParams = function.Parameters;
@@ -203,6 +207,25 @@ public sealed class BoundInterpreter
         Value res = EvaluateStatement(functionBody);
         PopEnvironments();
         return res;
+    }
+
+    private Value EvaluateCallBuiltinExpression(BoundCallExpression call)
+    {
+        var function = call.Function;
+        if(function == BuiltInFunctions.StdWriteLine || function == BuiltInFunctions.StdWrite)
+        {
+            var toPrint = EvaluateExpression(call.Arguments[0]).StdWriteString();
+            if(function == BuiltInFunctions.StdWriteLine)
+                Console.WriteLine(toPrint);
+            else
+                Console.Write(toPrint);
+            return Value.Void;
+        }
+        if(function == BuiltInFunctions.StdRead)
+        {
+            return new StrValue(Console.ReadLine() ?? "");
+        }
+        throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know builtin {function}");
     }
 
     private Value EvaluateAssignmentExpression(BoundAssignmentExpression assign)

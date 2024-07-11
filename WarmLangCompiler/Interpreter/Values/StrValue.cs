@@ -11,6 +11,8 @@ public sealed record class StrValue : Value
 
     public override string ToString() => $"Str \"{Value}\"";
 
+    public override string StdWriteString() => Value;
+
     public static implicit operator string(StrValue str) => str.Value;
 
     public static StrValue operator +(StrValue a, StrValue b) => new(a.Value+b.Value);

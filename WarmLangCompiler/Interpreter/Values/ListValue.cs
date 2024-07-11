@@ -75,14 +75,20 @@ public sealed record class ListValue : Value
         return true;
     }
 
-    public override string ToString()
+    public override string ToString() => PrettyString(debug: true);
+
+    public override string StdWriteString() => PrettyString();
+
+    private string PrettyString(bool debug = false)
     {
-        var sb = new StringBuilder("List [");
-        
+        var sb = new StringBuilder();
+        if(debug)
+            sb.Append("Lst ");
+        sb.Append('[');
         for(int i = 0; i < Elements.Count; i++)
         {
             var val = Elements[i];
-            sb.Append(val.ToString());
+            sb.Append(debug ? val.ToString() : val.StdWriteString());
             if(i < Elements.Count-1)
             {
                 sb.Append(", ");

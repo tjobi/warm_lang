@@ -14,8 +14,8 @@ if(parsedArgs is null)
     return 16;
 }
 var (program, parserDebug, 
-     lexerDebug, longExceptions, 
-     interactive) = (ParsedArgs) parsedArgs!;
+     lexerDebug, binderDebug,
+     longExceptions, interactive) = (ParsedArgs) parsedArgs!;
 
 if(interactive) 
 {
@@ -61,6 +61,10 @@ try
 
     var binder = new Binder(diagnostics);
     var boundProgram = binder.BindProgram(root);
+    if(binderDebug)
+    {
+        Console.WriteLine($"Bound: {boundProgram}");
+    }
     if(diagnostics.Any())
     {
         Console.WriteLine("--Compilation failed on: --");
@@ -71,7 +75,6 @@ try
         Console.WriteLine("Exitting... no evaluation");
         return 1;
     }
-    Console.WriteLine($"Bound: {boundProgram}");
     var res = BoundInterpreter.Run(boundProgram);
     Console.WriteLine($"Evaluated '{program}' -> {res}");
 

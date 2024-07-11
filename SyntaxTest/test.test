@@ -1,10 +1,6 @@
-function f(int iters, int step, int start) int[] {
-    int i = 0;
-    while i < iters : i = i + 1 {
-        start = start + step;
-    }
-    return [start];
-}
+stdWrite("Put something into the terminal pls\n");
+stdWrite("...> ");
 
-int start = 2500;
-f(10, -5, start);
+string input = stdRead();
+
+stdWriteLine("Read: \"" + input + "\" from the terminal");

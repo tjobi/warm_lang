@@ -26,6 +26,12 @@ public sealed class Binder
         _scope = new BoundSymbolScope();
         _isGlobalScope = true;
         _functionStack = new();
+        _scope.PushScope(); //Push scope to contain builtin stuff
+        foreach(var func in BuiltInFunctions.GetBuiltInFunctions())
+        {
+            if(!_scope.TryDeclareFunction(func))
+                throw new Exception($"Couldn't push built in {func}");
+        }
     }
 
     public BoundProgram BindProgram(ASTNode root)
@@ -38,6 +44,8 @@ public sealed class Binder
             var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
             foreach(var function in _scope.GetFunctions())
             {
+                if(function.IsBuiltInFunction())
+                    continue;
                 var boundBody = BindFunctionBody(function);
                 functions.Add(function, boundBody);
             }
@@ -284,7 +292,6 @@ public sealed class Binder
         {
             return new BoundErrorExpression(ae);
         }
-        Console.WriteLine(boundAccess.Type);
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 

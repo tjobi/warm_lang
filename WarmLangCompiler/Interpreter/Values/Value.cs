@@ -6,8 +6,12 @@ public abstract record class Value
     private protected Value() { }
     public abstract override string ToString();
 
+    public abstract string StdWriteString();
+
     private record class VoidValue : Value
     {
+        public override string StdWriteString() => ToString();
+
         public override string ToString() => "void";
     }
 }

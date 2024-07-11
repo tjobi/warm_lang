@@ -11,4 +11,6 @@ public sealed record class ErrValue : Value
         asString = $"Err ({msg})";
     }
     public override string ToString() => asString;
+
+    public override string StdWriteString() => ToString();
 }
