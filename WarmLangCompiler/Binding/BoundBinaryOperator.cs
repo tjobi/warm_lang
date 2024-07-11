@@ -1,6 +1,7 @@
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser;
 using static WarmLangLexerParser.TokenKind;
+using static WarmLangCompiler.Symbols.TypeSymbol;
 
 namespace WarmLangCompiler.Binding;
 
@@ -58,28 +59,29 @@ public sealed class BoundBinaryOperator
 
     private static readonly BoundBinaryOperator[] _definedOperators = new BoundBinaryOperator[]{
         //Basic int operators
-        new(TPlus, TypeSymbol.Int),
-        new(TStar, TypeSymbol.Int),
-        new(TMinus, TypeSymbol.Int),
-        new(TSlash, TypeSymbol.Int),
-        new(TDoubleStar, TypeSymbol.Int),
+        new(TPlus, Int),
+        new(TStar, Int),
+        new(TMinus, Int),
+        new(TSlash, Int),
+        new(TDoubleStar, Int),
         //Equaility and relation on ints
-        new(TLessThan, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
-        new(TLessThanEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
-        new(TGreaterThan, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
-        new(TGreaterThanEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
-        new(TEqualEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
-        new(TBangEqual, TypeSymbol.Int, TypeSymbol.Int, TypeSymbol.Bool),
+        new(TLessThan, Int, Int, Bool),
+        new(TLessThanEqual, Int, Int, Bool),
+        new(TGreaterThan, Int, Int, Bool),
+        new(TGreaterThanEqual, Int, Int, Bool),
+        new(TEqualEqual, Int, Int, Bool),
+        new(TBangEqual, Int, Int, Bool),
         
         //builin for bools
-        new(TEqualEqual, TypeSymbol.Bool),
-        new(TBangEqual , TypeSymbol.Bool),
+        new(TEqualEqual, Bool),
+        new(TBangEqual , Bool),
 
         //builtin for string 
         new(TPlus, TypeSymbol.String),
+        new(TEqualEqual, TypeSymbol.String, TypeSymbol.String, Bool),
 
         //builtin list operators
-        new(TDoubleColon, TypeSymbol.IntList, TypeSymbol.Int, TypeSymbol.IntList),
-        new(TPlus,TypeSymbol.IntList),
+        new(TDoubleColon, IntList, Int, IntList),
+        new(TPlus,IntList),
     };
 }

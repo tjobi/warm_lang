@@ -284,6 +284,7 @@ public sealed class Binder
         {
             return new BoundErrorExpression(ae);
         }
+        Console.WriteLine(boundAccess.Type);
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 
@@ -308,7 +309,7 @@ public sealed class Binder
             case SubscriptAccess sa:
             {
                 var boundTarget = BindAccess(sa.Target);
-                if(boundTarget.Type is not ListTypeSymbol)
+                if(boundTarget.Type is not ListTypeSymbol && boundTarget.Type != TypeSymbol.String)
                 {
                     _diag.ReportCannotSubscriptIntoType(sa.Location, boundTarget.Type);
                     return new BoundInvalidAccess();

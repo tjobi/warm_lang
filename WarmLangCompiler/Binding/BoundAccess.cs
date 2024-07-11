@@ -39,15 +39,7 @@ public sealed class BoundExprAccess : BoundAccess
 
 public sealed class BoundSubscriptAccess : BoundAccess
 {
-    private static TypeSymbol GetType(BoundAccess target)
-    {
-        if(target.Type is ListTypeSymbol lts)
-        {
-            return lts.InnerType;
-        }
-        return target.Type;
-    }
-    public BoundSubscriptAccess(BoundAccess target, BoundExpression index) : base(GetType(target))
+    public BoundSubscriptAccess(BoundAccess target, BoundExpression index) : base(target.Type.NestedTypeOrThis())
     {
         Target = target;
         Index = index;

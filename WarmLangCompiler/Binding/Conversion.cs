@@ -31,7 +31,7 @@ public sealed class Conversion
         if(from == to)
             return Identity;
         
-        if(from.ResolveNestedType() == EmptyList && to is ListTypeSymbol)
+        if(from.ResolveDeelpyNestedType() == EmptyList && to is ListTypeSymbol)
         {
             return Implicit;
         }
