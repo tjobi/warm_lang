@@ -157,10 +157,17 @@ public sealed class BoundInterpreter
 
     private Value EvaluateBinaryExpression(BoundBinaryExpression binOp)
     {
+        var op = binOp.Operator;    
         var left = EvaluateExpression(binOp.Left);
+        
+        //Early returns of '&&' '||', right should could be an a assignment :O
+        if(op.Kind == TokenKind.TSeqAND && left is BoolValue bv && bv == false)
+            return BoolValue.False;
+        if(op.Kind == TokenKind.TSeqOR && left is BoolValue bvv && bvv == true)
+            return BoolValue.True;
+        
         var right = EvaluateExpression(binOp.Right);
 
-        var op = binOp.Operator;
         Value res = (op.Kind.AsString(),left,right) switch 
         {
             ("+", IntValue i1, IntValue i2) => i1 + i2,
@@ -179,6 +186,8 @@ public sealed class BoundInterpreter
             ("::", ListValue arr,_) => arr.Add(right),
             ("+", ListValue a1, ListValue a2) => a1 + a2,
             ("+", StrValue str1, StrValue str2) => str1 + str2,
+            ("&&", BoolValue b1, BoolValue b2) => BoolValue.FromBool(b1 && b2),
+            ("||", BoolValue b1, BoolValue b2) => BoolValue.FromBool(b1 || b2),
             _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} - Operator: '{op.Kind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")
         };
 

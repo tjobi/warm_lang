@@ -22,13 +22,11 @@ function menuPicker() string {
         //int choice = int(input) - 1;  //This is still very valid, int(someStr) will convert it to an int for now
         //but that ain't that much fun
         int choice = stringToInt(input) - 1;
-        if choice >= 0 {
-            if choice < menuLength {
-                res = choices[choice];
-                stdWriteLine("You've chosen \"" + res + "\". Good choice!");
-            } else {
-                stdWriteLine("You've selected a dessert ID that is too large");
-            }
+        if choice >= 0 && choice < menuLength {
+            res = choices[choice];
+            stdWriteLine("You've chosen \"" + res + "\". Good choice!");
+        } else if choice >= menuLength {
+            stdWriteLine("You've selected a dessert ID that is too large");
         } else {
             stdWriteLine("You've selected a dessert ID that is too small");
         }
@@ -44,10 +42,7 @@ function isNumber(string s) bool {
     int i = 0;
     while i < strLen(s) : i = i + 1 {
         int charAtI = s[i];
-        if charAtI > 57 { // 57 is the decimal value for '9'
-            return false;
-        }
-        if charAtI < 48 { //48 is the decimal value for '0'
+        if charAtI > 57 || charAtI < 48 && charAtI != 45 { // 57 is the decimal value for '9'
             return false;
         }
     }
@@ -59,10 +54,8 @@ function stringToInt(string s) int {
     int res = 0;
     int tenth = 1;
     while i >= 0 : i = i - 1, tenth = tenth * 10 {
-        if i == 0 { 
-            if s[i] == 45 { //is the string prefixed with a minus?
-                return -res;
-            }
+        if i == 0 && s[i] == 45 { //is the string prefixed with a minus?
+            return -res;
         }
         res = res + tenth * (s[i] - 48);
     }

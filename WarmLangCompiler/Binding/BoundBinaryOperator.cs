@@ -75,6 +75,8 @@ public sealed class BoundBinaryOperator
         //builin for bools
         new(TEqualEqual, Bool),
         new(TBangEqual , Bool),
+        new(TSeqAND, Bool),
+        new(TSeqOR, Bool),
 
         //builtin for string 
         new(TPlus, TypeSymbol.String),

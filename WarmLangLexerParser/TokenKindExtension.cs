@@ -25,6 +25,8 @@ public static class TokenKindExtension
             TInt                => "int",
             TBool               => "bool",
             TString             => "string",
+            TSeqAND             => "&&",
+            TSeqOR              => "||",
             _ => kind.ToString()
         };
     }

@@ -11,6 +11,8 @@ public enum TokenKind
     TPlus, TStar, TSlash, TMinus, TDoubleStar,
     TParentheses, TCurLeft, TCurRight, TParLeft, TParRight, TBracketLeft, TBracketRight, /*Brackets [] */
     TQuote, TTick, // " and '
+    TSeqAND, TSeqOR, // '&&' and '||' -> Logical AND OR. 
+    TAmp, TBar, // '&' and '|'
 
 
     //Keyword
