@@ -43,13 +43,15 @@ public class Parser
         return new SyntaxToken(TBadToken, Current.Location);
     }
 
-    private SyntaxToken MatchKinds(params TokenKind[] kinds)
+    private SyntaxToken MatchKinds(params TokenKind[] kinds) => MatchKinds(kinds);
+
+    private SyntaxToken MatchKinds(IEnumerable<TokenKind> kinds)
     {
         if(kinds.Contains(Current.Kind))
         {
             return NextToken();
         }
-        _diag.ReportUnexpectedTokenFromMany(kinds, Current.Kind, Current.Location);
+        _diag.ReportUnexpectedTokenFromMany(kinds.ToArray(), Current.Kind, Current.Location);
         return new SyntaxToken(TBadToken, Current.Location);
     }
 
@@ -81,8 +83,8 @@ public class Parser
             TWhile => ParseWhileStatement(),
             TReturn => ParseReturnStatement(),
             //TODO: May be a problem when we introduce more types? -- what to do?
-            TInt or TBool or TString => ParseVariableDeclaration(), 
             TFunc =>  ParseFunctionDeclaration(),
+            _ when IsStartOfVariableDeclaration() => ParseVariableDeclaration(),
             _ => ParseExpressionStatement()
         };
     }
@@ -437,15 +439,8 @@ public class Parser
 
     private TypeSyntaxNode ParseType()
     {
-        var type = MatchKinds(TInt, TIdentifier, TBool, TString); //MatchKinds can take many arguments, so MatchKinds(TInt, TBool, TStr) would match those 3 :D
-        TypeSyntaxNode typ = type.Kind switch 
-        {
-            TInt => new TypeSyntaxInt(type.Location),
-            TBool => new TypeSyntaxBool(type.Location),
-            TString => new TypeSyntaxString(type.Location),
-            TIdentifier => new TypeSyntaxUserDefined(type), //user-defined types
-            _ => new BadTypeSyntax(type.Location)
-        };
+        var type = MatchKinds(TokenKindExtension.GetPossibleTypeKinds());
+        var typ = TypeSyntaxNode.FromSyntaxToken(type);
         while(Current.Kind == TBracketLeft)
         {
             var bracketOpen = NextToken();
@@ -459,16 +454,13 @@ public class Parser
     private bool TryParseType(out TypeSyntaxNode? type)
     {
         var checkpoint = currentToken;
-        type = null;
-        if(Current.Kind is not TInt or TIdentifier)
-            return false;
-        var typeToken = NextToken();
-        TypeSyntaxNode typ = typeToken.Kind switch 
+        if(!Current.Kind.IsPossibleType())
         {
-            TInt => new TypeSyntaxInt(typeToken.Location),
-            TIdentifier => new TypeSyntaxUserDefined(typeToken), //user-defined types
-            _ => new BadTypeSyntax(typeToken.Location)
-        };
+            type = null;
+            return false;
+        }
+        var typeToken = NextToken();
+        type = TypeSyntaxNode.FromSyntaxToken(typeToken);
         while(Current.Kind == TBracketLeft)
         {
             var bracketOpen = NextToken();
@@ -479,11 +471,16 @@ public class Parser
             }
             var bracketClose = NextToken();
             var location = TextLocation.FromTo(typeToken.Location, bracketClose.Location);
-            typ = new TypeSyntaxList(location, typ);
+            type = new TypeSyntaxList(location, type);
         }
-        type = typ;
         return true;
     }
 
+    private bool IsStartOfVariableDeclaration()
+    {
+        //TODO: User-defined types, what to do?
+        // Get a reset point, try to parse identifier into identifier?
+        return Current.Kind.IsPossibleType() && Current.Kind != TIdentifier;
+    }
     
 }

@@ -30,4 +30,22 @@ public static class TokenKindExtension
             _ => kind.ToString()
         };
     }
+
+    public static bool IsPossibleType(this TokenKind kind) => kind switch
+    {
+        TInt => true,
+        TBool => true,
+        TIdentifier => true,
+        TString => true,
+        _ => false,
+    };
+
+    public static IEnumerable<TokenKind> GetPossibleTypeKinds()
+    {
+        foreach(var kind in Enum.GetValues<TokenKind>())
+        {
+            if(kind.IsPossibleType())
+                yield return kind;
+        }
+    }
 }
