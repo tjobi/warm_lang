@@ -161,14 +161,14 @@ public sealed class BoundInterpreter
         var left = EvaluateExpression(binOp.Left);
         
         //Early returns of '&&' '||', right should could be an a assignment :O
-        if(op.Kind == TokenKind.TSeqAND && left is BoolValue bv && bv == false)
+        if(op.Kind == BoundBinaryOperatorKind.LogicAND && left is BoolValue bv && bv == false)
             return BoolValue.False;
-        if(op.Kind == TokenKind.TSeqOR && left is BoolValue bvv && bvv == true)
+        if(op.Kind == BoundBinaryOperatorKind.LogicaOR && left is BoolValue bvv && bvv == true)
             return BoolValue.True;
         
         var right = EvaluateExpression(binOp.Right);
 
-        Value res = (op.Kind.AsString(),left,right) switch 
+        Value res = (op.OpTokenKind.AsString(),left,right) switch 
         {
             ("+", IntValue i1, IntValue i2) => i1 + i2,
             ("-", IntValue i1, IntValue i2) => i1 - i2,
@@ -188,7 +188,7 @@ public sealed class BoundInterpreter
             ("+", StrValue str1, StrValue str2) => str1 + str2,
             ("&&", BoolValue b1, BoolValue b2) => BoolValue.FromBool(b1 && b2),
             ("||", BoolValue b1, BoolValue b2) => BoolValue.FromBool(b1 || b2),
-            _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} - Operator: '{op.Kind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")
+            _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} - Operator: '{op.OpTokenKind.AsString()}' on {left.GetType().Name} and {right.GetType().Name} is not defined")
         };
 
         return res;
@@ -225,6 +225,17 @@ public sealed class BoundInterpreter
                 Console.WriteLine(toPrint);
             else
                 Console.Write(toPrint);
+            return Value.Void;
+        }
+        if(function == BuiltInFunctions.StdWriteC)
+        {
+            var evalRes = (IntValue) EvaluateExpression(call.Arguments[0]);
+            Console.WriteLine((char)evalRes.Value);
+            return Value.Void;
+        }
+        if(function == BuiltInFunctions.StdClear)
+        {
+            Console.Clear();
             return Value.Void;
         }
         if(function == BuiltInFunctions.StdRead)

@@ -2,23 +2,26 @@ using WarmLangCompiler.Symbols;
 using WarmLangLexerParser;
 using static WarmLangLexerParser.TokenKind;
 using static WarmLangCompiler.Symbols.TypeSymbol;
+using static WarmLangCompiler.Binding.BoundBinaryOperatorKind;
 
 namespace WarmLangCompiler.Binding;
 
 public sealed class BoundBinaryOperator
 {
-    private BoundBinaryOperator(TokenKind op, TypeSymbol type)
-    : this(op, type, type, type)
+    private BoundBinaryOperator(TokenKind op, BoundBinaryOperatorKind kind, TypeSymbol type)
+    : this(op, kind, type, type, type)
     { }
-    public BoundBinaryOperator(TokenKind op, TypeSymbol typeLeft, TypeSymbol typeRight, TypeSymbol resultType)
+    public BoundBinaryOperator(TokenKind opKind, BoundBinaryOperatorKind kind, TypeSymbol typeLeft, TypeSymbol typeRight, TypeSymbol resultType)
     {
-        Kind = op;
+        OpTokenKind = opKind;
+        Kind = kind;
         TypeLeft = typeLeft;
         TypeRight = typeRight;
         Type = resultType;
     }
 
-    public TokenKind Kind { get; }
+    public TokenKind OpTokenKind { get; }
+    public BoundBinaryOperatorKind Kind { get; }
     public TypeSymbol TypeLeft { get; }
     public TypeSymbol TypeRight { get; }
     public TypeSymbol Type { get; } //ResultType
@@ -28,7 +31,7 @@ public sealed class BoundBinaryOperator
         for (int i = 0; i < _definedOperators.Length; i++)
         {
             var dop = _definedOperators[i];
-            if(dop.Kind == op && left.Type == dop.TypeLeft && right.Type == dop.TypeRight)
+            if(dop.OpTokenKind == op && left.Type == dop.TypeLeft && right.Type == dop.TypeRight)
             {
                 return dop;
             }
@@ -43,14 +46,16 @@ public sealed class BoundBinaryOperator
         {
             //List concat '+' operator
             (TPlus, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType
-                => new BoundBinaryOperator(op, left, right, lts2.InnerType),
+                => new BoundBinaryOperator(op, ListConcat, left, right, lts2.InnerType),
 
             //List add '::' operator
-            (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, left, right, left),
+            (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, ListAdd, left, right, left),
             
             //List equality '==' & '!=' operator
-            (TEqualEqual or TBangEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) 
-                when lts1.InnerType == lts2.InnerType => new(op, left, right, TypeSymbol.Bool),
+            (TEqualEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) 
+                when lts1.InnerType == lts2.InnerType => new(op, BoundBinaryOperatorKind.Equals, left, right, Bool),
+            (TBangEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) 
+                when lts1.InnerType == lts2.InnerType => new(op, NotEquals, left, right, Bool),
             
             //No operator matches
             _ => null, 
@@ -59,31 +64,28 @@ public sealed class BoundBinaryOperator
 
     private static readonly BoundBinaryOperator[] _definedOperators = new BoundBinaryOperator[]{
         //Basic int operators
-        new(TPlus, Int),
-        new(TStar, Int),
-        new(TMinus, Int),
-        new(TSlash, Int),
-        new(TDoubleStar, Int),
+        new(TPlus, Addition, Int),
+        new(TStar, Multiplication, Int),
+        new(TMinus, Subtraction, Int),
+        new(TSlash, Division, Int),
+        new(TDoubleStar, Power, Int),
         //Equaility and relation on ints
-        new(TLessThan, Int, Int, Bool),
-        new(TLessThanEqual, Int, Int, Bool),
-        new(TGreaterThan, Int, Int, Bool),
-        new(TGreaterThanEqual, Int, Int, Bool),
-        new(TEqualEqual, Int, Int, Bool),
-        new(TBangEqual, Int, Int, Bool),
+        new(TLessThan, LessThan,Int, Int, Bool),
+        new(TLessThanEqual, LessThanEqual, Int, Int, Bool),
+        new(TGreaterThan, GreaterThan, Int, Int, Bool),
+        new(TGreaterThanEqual, GreaterThanEqual, Int, Int, Bool),
+        new(TEqualEqual, BoundBinaryOperatorKind.Equals, Int, Int, Bool),
+        new(TBangEqual, NotEquals, Int, Int, Bool),
         
         //builin for bools
-        new(TEqualEqual, Bool),
-        new(TBangEqual , Bool),
-        new(TSeqAND, Bool),
-        new(TSeqOR, Bool),
+        new(TEqualEqual, BoundBinaryOperatorKind.Equals, Bool),
+        new(TBangEqual, NotEquals, Bool),
+        new(TSeqAND, LogicAND, Bool),
+        new(TSeqOR, LogicaOR, Bool),
 
         //builtin for string 
-        new(TPlus, TypeSymbol.String),
-        new(TEqualEqual, TypeSymbol.String, TypeSymbol.String, Bool),
-
-        //builtin list operators
-        new(TDoubleColon, IntList, Int, IntList),
-        new(TPlus,IntList),
+        new(TPlus, StringConcat, TypeSymbol.String),
+        new(TEqualEqual, BoundBinaryOperatorKind.Equals, TypeSymbol.String, TypeSymbol.String, Bool),
+        new(TBangEqual, NotEquals, TypeSymbol.String, TypeSymbol.String, Bool),
     };
 }

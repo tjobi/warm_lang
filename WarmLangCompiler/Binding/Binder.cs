@@ -102,8 +102,9 @@ public sealed class Binder
     {
         var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
         var uniqueParameterNames = new HashSet<string>();
-        foreach(var (type, name) in funcDecl.Params)
+        for (int i = 0; i < funcDecl.Params.Count; i++)
         {
+            var (type, name) = funcDecl.Params[i];
             var paramType = type.ToTypeSymbol();
             var paramName = name.Name ?? throw new Exception($"BINDER: NO NAME FOR PARAMETER {name.Location}");
             if(uniqueParameterNames.Contains(paramName))
@@ -111,7 +112,7 @@ public sealed class Binder
                 _diag.ReportParameterDuplicateName(name);
             } else
             {
-                parameters.Add(new ParameterSymbol(paramName, paramType));
+                parameters.Add(new ParameterSymbol(paramName, paramType, i));
             }
         }
 

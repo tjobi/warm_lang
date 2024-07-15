@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.TypeSyntax;
 using WarmLangLexerParser.ErrorReporting;
@@ -451,7 +452,7 @@ public class Parser
         return typ;
     }
 
-    private bool TryParseType(out TypeSyntaxNode? type)
+    private bool TryParseType([NotNullWhen(true)] out TypeSyntaxNode? type)
     {
         var checkpoint = currentToken;
         if(!Current.Kind.IsPossibleType())

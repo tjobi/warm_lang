@@ -6,7 +6,8 @@ public record struct ParsedArgs(
     bool LexerDebug = false, 
     bool BinderDebug = false,
     bool TraceExceptions = false,
-    bool Interactive = false
+    bool Interactive = false,
+    bool Evaluate = false
     );
 public static class ArgsParser
 {
@@ -20,6 +21,7 @@ public static class ArgsParser
         Console.WriteLine("\t--binder-debug     - enables debug information for binder");
         Console.WriteLine("\t--trace            - prints a stacktrace if an exception goes uncaught");
         Console.WriteLine("\t-is,--interactive  - enables interactive mode");
+        Console.WriteLine("\t--eval             - evaluates the code without compiling");
     }
 
     public static ParsedArgs DefaultArgs(string program) => new(program);
@@ -61,6 +63,10 @@ public static class ArgsParser
                 {
                     parsedArgs.TraceExceptions = true;
                 } break;
+                case "--eval":
+                {
+                    parsedArgs.Evaluate = true;
+                } break;
                 default: 
                 {
                     if(File.Exists(arg) && isLookingForFile)
@@ -86,7 +92,7 @@ public static class ArgsParser
 
     public static void Deconstruct(this ParsedArgs args, out string program, out bool parserDebug,
                                    out bool lexerDebug, out bool binderDebug,
-                                   out bool longExceptions, out bool interactive )
+                                   out bool longExceptions, out bool interactive, out bool shouldEvaluate)
     {
         program = args.Program;
         parserDebug = args.ParserDebug;
@@ -94,6 +100,7 @@ public static class ArgsParser
         longExceptions = args.TraceExceptions;
         interactive = args.Interactive;
         binderDebug = args.BinderDebug;
+        shouldEvaluate = args.Evaluate;
         return;
     }
 }
