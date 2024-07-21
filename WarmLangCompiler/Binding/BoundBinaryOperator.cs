@@ -46,7 +46,7 @@ public sealed class BoundBinaryOperator
         {
             //List concat '+' operator
             (TPlus, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType
-                => new BoundBinaryOperator(op, ListConcat, left, right, lts2.InnerType),
+                => new BoundBinaryOperator(op, ListConcat, left, right, left),
 
             //List add '::' operator
             (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, ListAdd, left, right, left),

@@ -85,7 +85,7 @@ try
         return 0;
     }
 
-    Emitter.EmitProgram(boundProgram, diagnostics);
+    Emitter.EmitProgram(boundProgram, diagnostics, debug:true);
     foreach(var err in diagnostics)
     {
         Console.WriteLine(err);

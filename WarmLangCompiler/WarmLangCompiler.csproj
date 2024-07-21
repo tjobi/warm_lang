@@ -22,6 +22,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <DefineConstants>OS_WINDOWS</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <DefineConstants>OS_LINUX</DefineConstants>
+  </PropertyGroup>
 
 </Project>

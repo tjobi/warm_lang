@@ -1,21 +1,26 @@
 namespace WarmLangCompiler.ILGen;
 using WarmLangCompiler.Binding;
 using WarmLangCompiler.Symbols;
+using WarmLangCompiler.Binding.Lower;
 using WarmLangLexerParser.ErrorReporting;
 using static WarmLangCompiler.Binding.BoundBinaryOperatorKind;
+using static WarmLangCompiler.ILGen.EmitterTypeSymbolExtensions;
+
+using System.Collections.Immutable;
 
 using Mono.Cecil;
 using Mono.Cecil.Cil;
-using WarmLangCompiler.Binding.Lower;
 using Mono.Cecil.Rocks;
-using System.Collections.Immutable;
 
 public sealed class Emitter{
 
     private readonly ErrorWarrningBag _diag;
-    private readonly Dictionary<TypeSymbol, TypeReference> _cilTypes;
+    private readonly bool _debug;
+    
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _toStringConvert, _stringConcat, _stringEqual, _stringSubscript;
+    private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany;
+    private readonly MethodReference _referenceEquals;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
     private readonly Dictionary<BoundLabel, Instruction> _labels;
@@ -25,17 +30,14 @@ public sealed class Emitter{
     //mono.cecil stuff?
     private AssemblyDefinition _assemblyDef;
     private TypeDefinition _program;
+    private AssemblyDefinition _mscorlib;
 
-    private static readonly TypeSymbol _cilBaseType = new("unkown");
-    private static readonly (TypeSymbol type, string cilName)[] _builtInTypes = new (TypeSymbol, string)[]
-    {
-        (TypeSymbol.Int, "System.Int32"),       (TypeSymbol.Bool, "System.Boolean"), 
-        (TypeSymbol.String, "System.String"),   (TypeSymbol.Void, "System.Void"), 
-        (_cilBaseType, "System.Object"),
-    };
+    private readonly Dictionary<TypeSymbol, TypeReference> _cilTypes;
+    private TypeReference CilTypeOf(TypeSymbol type) => _cilTypes[type.AsRecognisedType()];
 
-    private Emitter(ErrorWarrningBag diag)
+    private Emitter(ErrorWarrningBag diag, bool debug = false)
     {
+        _debug = debug;
         _diag = diag;
         _funcs = new();
         _cilTypes = new();
@@ -49,13 +51,13 @@ public sealed class Emitter{
         
         //TODO: A hardcoded necessary file path is not very sexy
         // IL -> ".assembly extern mscorlib {}"
-        var mscorlib = AssemblyDefinition.ReadAssembly("/usr/lib/mono/4.8-api/mscorlib.dll");
-
-        foreach(var (type, cilName) in _builtInTypes)
+        _mscorlib = ReadMscorlib();
+        
+        foreach(var type in BuiltInTypes())
         {
-            foreach(var module in mscorlib.Modules)
+            foreach(var module in _mscorlib.Modules)
             {
-                var t = module.GetType(cilName);
+                var t = module.GetType(type.ToCilName());
                 if(t is not null)
                 {
                     _cilTypes[type] = _assemblyDef.MainModule.ImportReference(t);
@@ -63,33 +65,45 @@ public sealed class Emitter{
                 }
             }
         }
+
         // IL -> ".class private auto ansi beforefieldinit abstract sealed Program extends [mscorlib]System.Object {"
-        var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[_cilBaseType]);
+        var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[GetCILBaseTypeSymbol()]);
         _program = new TypeDefinition("", "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, systemObject);
         _assemblyDef.MainModule.Types.Add(_program);
-        _builtInFunctions = ResolveBuiltInMethods(mscorlib);
+        _builtInFunctions = ResolveBuiltInMethods(_mscorlib);
 
         //TODO: temp to string
-        var dotnetConvert = mscorlib.MainModule.GetType("System.Convert");
-        _toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", new[]{"System.Object"});
+        var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
+        _toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(GetCILBaseTypeSymbol()));
         
-        var dotnetString = mscorlib.MainModule.GetType("System.String");
-        _stringConcat = GetMethodFromTypeDefinition(dotnetString, "Concat", new[]{"System.String", "System.String"});
-        _stringEqual = GetMethodFromTypeDefinition(dotnetString, "op_Equality", new[]{"System.String", "System.String"});
-        _stringSubscript = GetMethodFromTypeDefinition(dotnetString, "get_Chars", new[]{"System.Int32"});
+        var dotnetString = _mscorlib.MainModule.GetType("System.String");
+        _stringConcat    = GetMethodFromTypeDefinition(dotnetString, "Concat", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
+        _stringEqual     = GetMethodFromTypeDefinition(dotnetString, "op_Equality", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
+        _stringSubscript = GetMethodFromTypeDefinition(dotnetString, "get_Chars", GetCilParamNames(TypeSymbol.Int));
+
+        var dotnetArrayList = _mscorlib.MainModule.GetType("System.Collections.ArrayList");
+        _listEmpty      = GetMethodFromTypeDefinition(dotnetArrayList, ".ctor", GetCilParamNames());
+        _listAdd        = GetMethodFromTypeDefinition(dotnetArrayList, "Add", GetCilParamNames(GetCILBaseTypeSymbol()));
+        _listRemove     = GetMethodFromTypeDefinition(dotnetArrayList, "RemoveAt", GetCilParamNames(TypeSymbol.Int));
+        _listSubscript  = GetMethodFromTypeDefinition(dotnetArrayList, "get_Item", GetCilParamNames(TypeSymbol.Int));
+        _listSet        = GetMethodFromTypeDefinition(dotnetArrayList, "set_Item", GetCilParamNames(TypeSymbol.Int, GetCILBaseTypeSymbol()));
+        _listAddMany    = GetMethodFromTypeDefinition(dotnetArrayList, "AddRange", new[]{"System.Collections.ICollection"});
+
+        var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
+        _referenceEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(GetCILBaseTypeSymbol(), GetCILBaseTypeSymbol()));
     }
 
     private ImmutableDictionary<FunctionSymbol, MethodReference> ResolveBuiltInMethods(AssemblyDefinition mscorlib)
     {
         var builder = ImmutableDictionary.CreateBuilder<FunctionSymbol,MethodReference>();
         var dotnetConsole = mscorlib.MainModule.GetType("System.Console");
-        builder[BuiltInFunctions.StdWriteLine]  = GetMethodFromTypeDefinition(dotnetConsole, "WriteLine", new string[]{"System.String"});
-        builder[BuiltInFunctions.StdWrite]      = GetMethodFromTypeDefinition(dotnetConsole, "Write", new[]{"System.String"});
+        builder[BuiltInFunctions.StdWriteLine]  = GetMethodFromTypeDefinition(dotnetConsole, "WriteLine", GetCilParamNames(TypeSymbol.String));
+        builder[BuiltInFunctions.StdWrite]      = GetMethodFromTypeDefinition(dotnetConsole, "Write", GetCilParamNames(TypeSymbol.String));
         builder[BuiltInFunctions.StdWriteC]     = GetMethodFromTypeDefinition(dotnetConsole, "Write", new[]{"System.Char"});
-        builder[BuiltInFunctions.StdRead]       = GetMethodFromTypeDefinition(dotnetConsole, "ReadLine", Array.Empty<string>());
-        builder[BuiltInFunctions.StdClear]      = GetMethodFromTypeDefinition(dotnetConsole, "Clear", Array.Empty<string>());
+        builder[BuiltInFunctions.StdRead]       = GetMethodFromTypeDefinition(dotnetConsole, "ReadLine", GetCilParamNames());
+        builder[BuiltInFunctions.StdClear]      = GetMethodFromTypeDefinition(dotnetConsole, "Clear", GetCilParamNames());
         var dotnetString = mscorlib.MainModule.GetType("System.String");
-        builder[BuiltInFunctions.StrLen]        = GetMethodFromTypeDefinition(dotnetString, "get_Length", Array.Empty<string>());
+        builder[BuiltInFunctions.StrLen]        = GetMethodFromTypeDefinition(dotnetString, "get_Length", GetCilParamNames());
         return builder.ToImmutable();
     }
     private MethodReference GetMethodFromTypeDefinition(TypeDefinition type, string methodName, string[] parameterTypes)
@@ -121,9 +135,22 @@ public sealed class Emitter{
         return null!;
     }
 
-    public static void EmitProgram(BoundProgram program, ErrorWarrningBag diag)
+    private static AssemblyDefinition ReadMscorlib()
     {
-        var emitter = new Emitter(diag);
+        #if OS_LINUX
+            string LINUX_PATH = "/usr/lib/mono/4.8-api/mscorlib.dll";
+            if(File.Exists(LINUX_PATH))
+                return AssemblyDefinition.ReadAssembly(LINUX_PATH);
+        #elif OS_WINDOWS
+            string WINDOWS_PATH = @"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorlib.dll";
+            if(File.Exists(WINDOWS_PATH))
+                return AssemblyDefinition.ReadAssembly(WINDOWS_PATH);
+        #endif
+        throw new NotImplementedException($"-- Compiler couldn't find 'mscorlib' allow user to specify mscorlib.dll location ---");
+    }
+    public static void EmitProgram(BoundProgram program, ErrorWarrningBag diag, bool debug = false)
+    {
+        var emitter = new Emitter(diag, debug);
         if(emitter._diag.Any())
             return;
         var outfile = Path.Combine(Directory.GetCurrentDirectory(), "out.dll");
@@ -164,11 +191,11 @@ public sealed class Emitter{
     {
         if(func is LocalFunctionSymbol)
             throw new NotImplementedException("Emitter doesn't support local functions just yet");
-        var funcDefintion = new MethodDefinition(func.Name, MethodAttributes.Static | MethodAttributes.Private, _cilTypes[func.Type]);
+        var funcDefintion = new MethodDefinition(func.Name, MethodAttributes.Static | MethodAttributes.Private, CilTypeOf(func.Type));
         
         foreach(var @param in func.Parameters)
         {
-            var paramDef = new ParameterDefinition(@param.Name, ParameterAttributes.None, _cilTypes[@param.Type]);
+            var paramDef = new ParameterDefinition(@param.Name, ParameterAttributes.None, CilTypeOf(@param.Type));
             funcDefintion.Parameters.Add(paramDef);
         }
         _funcs[func] = funcDefintion;
@@ -194,9 +221,13 @@ public sealed class Emitter{
             instr.Operand = targetInstr;
         }
         ilProcessor.Body.OptimizeMacros();
-        foreach(var instr in ilProcessor.Body.Instructions)
+
+        if(_debug)
         {
-            Console.WriteLine(instr);
+            foreach(var instr in ilProcessor.Body.Instructions)
+            {
+                Console.WriteLine(instr);
+            }
         }
     }
 
@@ -234,7 +265,7 @@ public sealed class Emitter{
 
     private void EmitVariableDeclaration(ILProcessor processor, BoundVarDeclaration varDecl)
     {
-        var variable = new VariableDefinition(_cilTypes[varDecl.Symbol.Type]);
+        var variable = new VariableDefinition(CilTypeOf(varDecl.Symbol.Type));
         _locals[varDecl.Symbol] = variable;
         processor.Body.Variables.Add(variable);
         
@@ -345,10 +376,10 @@ public sealed class Emitter{
         }
         if(conv.Type == TypeSymbol.String)
         {
+            // TODO: FIX printing, most important for lists, but others would also be cool. So that they match interpreter. 
             var convExprType = conv.Expression.Type;
-            var needsBoxing = convExprType == TypeSymbol.Bool || convExprType == TypeSymbol.Int;
-            if(needsBoxing)
-                processor.Emit(OpCodes.Box, _cilTypes[convExprType]);
+            if(convExprType.NeedsBoxing())
+                processor.Emit(OpCodes.Box, CilTypeOf(convExprType));
             processor.Emit(OpCodes.Call, _toStringConvert);
             return;
         }
@@ -361,7 +392,16 @@ public sealed class Emitter{
 
     private void EmitListExpression(ILProcessor processor, BoundListExpression listInit)
     {
-        throw new NotImplementedException();
+        processor.Emit(OpCodes.Newobj, _listEmpty);
+        foreach(var expr in listInit.Expressions)
+        {
+            processor.Emit(OpCodes.Dup);
+            EmitExpression(processor, expr);
+            if(expr.Type.NeedsBoxing())
+                processor.Emit(OpCodes.Box, CilTypeOf(expr.Type));
+            processor.Emit(OpCodes.Callvirt, _listAdd);
+            processor.Emit(OpCodes.Pop);  // System.Int32 ArrayList::Add(System.Object)  
+        }
     }
 
     private void EmitAssignmentExpression(ILProcessor processor, BoundAssignmentExpression assignment)
@@ -375,41 +415,29 @@ public sealed class Emitter{
                 EmitStoreLocation(processor, name.Symbol);
                 break;
             case BoundSubscriptAccess sa:
-                throw new NotImplementedException($"{nameof(EmitAssignmentExpression)} doesn't allow assigning when subscripting");
+                if(sa.Target.Type is ListTypeSymbol lts)
+                {
+                    var rhsType = CilTypeOf(assignment.RightHandSide.Type);
+                    //introduces a local variable, because 'System.Void ArrayList::set_Item(int32,object)' eats the right-hand-side
+                    //And we cannot emit the right hand side again, since it may mutate other state...
+                    var tmpVar = new VariableDefinition(rhsType);
+                    processor.Body.Variables.Add(tmpVar);
+                    EmitLoadAccess(processor, sa.Target);
+                    EmitExpression(processor, sa.Index);
+                    EmitExpression(processor, assignment.RightHandSide);
+                    processor.Emit(OpCodes.Stloc, tmpVar);
+                    processor.Emit(OpCodes.Ldloc, tmpVar);
+                    if(assignment.RightHandSide.Type.NeedsBoxing())
+                        processor.Emit(OpCodes.Box, rhsType);
+                    processor.Emit(OpCodes.Callvirt, _listSet);
+                    processor.Emit(OpCodes.Ldloc, tmpVar);
+                    return;
+                }
+                throw new NotImplementedException($"{nameof(EmitAssignmentExpression)} doesn't allow assignments into type '{assignment.Access.Type}'");
         }
     }
 
-    private void EmitAccessExpression(ILProcessor processor, BoundAccessExpression access)
-    {
-        EmitAccess(access.Access);
-        void EmitAccess(BoundAccess acc)
-        {
-            switch(acc)
-            {
-                case BoundNameAccess name:
-                    if(name.Symbol is ParameterSymbol ps)
-                    {
-                        processor.Emit(OpCodes.Ldarg, ps.Placement);
-                    } else {
-                        var variable = _locals[name.Symbol];
-                        processor.Emit(OpCodes.Ldloc, variable);
-                    }
-                    break;
-                case BoundSubscriptAccess sa:
-                    if(sa.Target.Type == TypeSymbol.String)
-                    {
-                        EmitAccess(sa.Target);
-                        EmitExpression(processor, sa.Index);
-                        processor.Emit(OpCodes.Callvirt, _stringSubscript);
-                        return;
-                    }
-
-                    throw new NotImplementedException($"{nameof(EmitAccessExpression)} doesn't do subscripting for '{sa.Target.Type.Name}' yet");
-                case BoundExprAccess ae:
-                    throw new NotImplementedException($"{nameof(EmitAccessExpression)} doesn't allow access to expressions yet");
-            }
-        }
-    }
+    private void EmitAccessExpression(ILProcessor processor, BoundAccessExpression access) => EmitLoadAccess(processor, access.Access);
 
     private void EmitCallExpression(ILProcessor processor, BoundCallExpression call)
     {
@@ -453,13 +481,48 @@ public sealed class Emitter{
     {
         var leftType = binary.Left.Type;
         var rightType = binary.Right.Type;
-        if(leftType is ListTypeSymbol || rightType is ListTypeSymbol)
-        {
-            throw new NotImplementedException($"Not implemented for {binary.Left.Type.Name}");
-        }
         if(binary.Operator.Kind == LogicAND || binary.Operator.Kind == LogicaOR)
         {
             EmitLogicalAndOR(processor, binary);
+            return;
+        }
+
+        if(leftType is ListTypeSymbol || rightType is ListTypeSymbol)
+        {
+            if(binary.Operator.Kind != ListConcat)
+                EmitExpression(processor, binary.Left);
+            
+            switch(binary.Operator.Kind)
+            {
+                case ListConcat: 
+                    processor.Emit(OpCodes.Newobj, _listEmpty);
+                    processor.Emit(OpCodes.Dup);
+                    processor.Emit(OpCodes.Dup);
+                    EmitExpression(processor, binary.Left);
+                    processor.Emit(OpCodes.Callvirt, _listAddMany);
+                    EmitExpression(processor, binary.Right);
+                    processor.Emit(OpCodes.Callvirt, _listAddMany);
+                    break;
+                case ListAdd:
+                    processor.Emit(OpCodes.Dup);
+                    EmitExpression(processor, binary.Right);
+                    processor.Emit(OpCodes.Callvirt, _listAdd);
+                    processor.Emit(OpCodes.Pop);
+                    break;
+                //TODO: Both NotEquals and Equals uses reference equality! we want the element equality.
+                case BoundBinaryOperatorKind.Equals:
+                    EmitExpression(processor, binary.Right);
+                    processor.Emit(OpCodes.Call, _referenceEquals);
+                    break;
+                case NotEquals:
+                    EmitExpression(processor, binary.Right);
+                    processor.Emit(OpCodes.Call, _referenceEquals);
+                    processor.Emit(OpCodes.Ldc_I4_0);
+                    processor.Emit(OpCodes.Ceq);
+                    break;
+                default:
+                    throw new NotImplementedException($"{nameof(EmitBinaryExpression)} doesn't implement '{binary.Operator.Kind}' for '{leftType}' and '{rightType}'");
+            }
             return;
         }
 
@@ -481,7 +544,6 @@ public sealed class Emitter{
                     processor.Emit(OpCodes.Ldc_I4_0);
                     processor.Emit(OpCodes.Ceq);
                     break;
-
             }
             return;
         }
@@ -611,6 +673,39 @@ public sealed class Emitter{
         }
         var variabledef = _locals[variable];
         processor.Emit(OpCodes.Stloc, variabledef);
+    }
+
+    private void EmitLoadAccess(ILProcessor processor, BoundAccess acc)
+    {
+        switch(acc)
+        {
+            case BoundNameAccess name:
+                if(name.Symbol is ParameterSymbol ps)
+                {
+                    processor.Emit(OpCodes.Ldarg, ps.Placement);
+                } else {
+                    var variable = _locals[name.Symbol];
+                    processor.Emit(OpCodes.Ldloc, variable);
+                }
+                break;
+            case BoundSubscriptAccess sa:
+                if(sa.Target.Type == TypeSymbol.String || sa.Target.Type is ListTypeSymbol)
+                {
+                    EmitLoadAccess(processor, sa.Target);
+                    EmitExpression(processor, sa.Index);
+                    if(sa.Target.Type == TypeSymbol.String)
+                        processor.Emit(OpCodes.Callvirt, _stringSubscript);
+                    else if(sa.Target.Type is ListTypeSymbol lts)
+                    {
+                        processor.Emit(OpCodes.Callvirt, _listSubscript);
+                        processor.Emit(OpCodes.Unbox_Any, CilTypeOf(lts.InnerType));
+                    }
+                    return;
+                }
+                throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't do subscripting for '{sa.Target.Type.Name}' yet");
+            case BoundExprAccess ae:
+                throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't allow access to expressions yet");
+        }
     }
 
 }
