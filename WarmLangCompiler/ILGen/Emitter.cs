@@ -19,7 +19,7 @@ public sealed class Emitter{
     
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _toStringConvert, _stringConcat, _stringEqual, _stringSubscript;
-    private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany;
+    private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany, _listLength;
     private readonly MethodReference _referenceEquals;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
@@ -49,7 +49,6 @@ public sealed class Emitter{
         var assemblyName = new AssemblyNameDefinition("App", new Version(1,0));
         _assemblyDef = AssemblyDefinition.CreateAssembly(assemblyName, "warmlang", ModuleKind.Console);
         
-        //TODO: A hardcoded necessary file path is not very sexy
         // IL -> ".assembly extern mscorlib {}"
         _mscorlib = ReadMscorlib();
         
@@ -88,6 +87,7 @@ public sealed class Emitter{
         _listSubscript  = GetMethodFromTypeDefinition(dotnetArrayList, "get_Item", GetCilParamNames(TypeSymbol.Int));
         _listSet        = GetMethodFromTypeDefinition(dotnetArrayList, "set_Item", GetCilParamNames(TypeSymbol.Int, GetCILBaseTypeSymbol()));
         _listAddMany    = GetMethodFromTypeDefinition(dotnetArrayList, "AddRange", new[]{"System.Collections.ICollection"});
+        _listLength     = GetMethodFromTypeDefinition(dotnetArrayList, "get_Count", GetCilParamNames());
 
         var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
         _referenceEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(GetCILBaseTypeSymbol(), GetCILBaseTypeSymbol()));
@@ -137,6 +137,7 @@ public sealed class Emitter{
 
     private static AssemblyDefinition ReadMscorlib()
     {
+        //TODO: Add a way for the user of compiler to specify path to dll, AND look through other versions of folder structure
         #if OS_LINUX
             string LINUX_PATH = "/usr/lib/mono/4.8-api/mscorlib.dll";
             if(File.Exists(LINUX_PATH))
@@ -474,7 +475,43 @@ public sealed class Emitter{
 
     private void EmitUnaryExpression(ILProcessor processor, BoundUnaryExpression unary)
     {
-        throw new NotImplementedException();
+        EmitExpression(processor, unary.Left);
+        switch(unary.Operator.Kind)
+        {
+            case BoundUnaryOperatorKind.UnaryPlus:
+                break;
+            case BoundUnaryOperatorKind.UnaryMinus:
+                processor.Emit(OpCodes.Neg);
+                break;
+            case BoundUnaryOperatorKind.LogicalNOT:
+                processor.Emit(OpCodes.Ldc_I4_0);
+                processor.Emit(OpCodes.Ceq);
+                break;
+            case BoundUnaryOperatorKind.ListRemoveLast:
+                var type = CilTypeOf(unary.Type);
+                var tmpVar = new VariableDefinition(type);
+                processor.Body.Variables.Add(tmpVar);
+
+                processor.Emit(OpCodes.Dup);                            //Duplicate to be consumed by _listsubcript
+                processor.Emit(OpCodes.Dup);                            //Duplicate, consumed by _listLength
+                processor.Emit(OpCodes.Callvirt, _listLength);          
+                processor.Emit(OpCodes.Ldc_I4_1);
+                processor.Emit(OpCodes.Sub);
+                processor.Emit(OpCodes.Callvirt, _listSubscript);
+                processor.Emit(OpCodes.Unbox_Any, type);                //Prepare return value from unary expression
+                processor.Emit(OpCodes.Stloc, tmpVar);                  //store away value, so we can remove the end
+                
+                processor.Emit(OpCodes.Dup);                            //Duplicate to be consumed by _listLength
+                processor.Emit(OpCodes.Callvirt, _listLength);
+                processor.Emit(OpCodes.Ldc_I4_1);
+                processor.Emit(OpCodes.Sub);          
+                processor.Emit(OpCodes.Callvirt, _listRemove);          //consumed the original list pointer and returns void
+
+                processor.Emit(OpCodes.Ldloc, tmpVar);                  //leave value of removed on top of stack. 
+                break;
+            default:
+                throw new NotImplementedException($"{nameof(EmitUnaryExpression)} doesn't know '{unary.Operator.Kind}' for type '{unary.Left.Type}'");
+        }
     }
 
     private void EmitBinaryExpression(ILProcessor processor, BoundBinaryExpression binary)

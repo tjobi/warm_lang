@@ -12,7 +12,6 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
     public TypeSyntaxNode? ReturnType { get; }
     public BlockStatement Body { get; }
 
-    //TODO: Remember to fix <parameters> when we add typing?
     public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, BlockStatement body)
     :this(funcKeyword, nameToken, parameters, null, body) 
     { }

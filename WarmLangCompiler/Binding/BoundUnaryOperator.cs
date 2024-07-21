@@ -6,13 +6,15 @@ namespace WarmLangCompiler.Binding;
 
 public sealed class BoundUnaryOperator
 {
-    public BoundUnaryOperator(TokenKind op, TypeSymbol left, TypeSymbol resultType)
+    public BoundUnaryOperator(BoundUnaryOperatorKind kind, TokenKind op, TypeSymbol left, TypeSymbol resultType)
     {
+        Kind = kind;
         Operator = op;
         Type = resultType;
         TypeLeft = left;
     }
 
+    public BoundUnaryOperatorKind Kind { get; }
     public TokenKind Operator { get; }
     public TypeSymbol TypeLeft { get; }
     public TypeSymbol Type { get; }
@@ -34,16 +36,20 @@ public sealed class BoundUnaryOperator
         //TODO: Should we cache these?
         return (op,left) switch
         {
-            (TLeftArrow, ListTypeSymbol lts) => new BoundUnaryOperator(op, left, lts.InnerType),
+            (TLeftArrow, ListTypeSymbol lts) => new BoundUnaryOperator(BoundUnaryOperatorKind.ListRemoveLast,op, left, lts.InnerType),
             _ => null, 
         };
     }
 
     private static readonly BoundUnaryOperator[] _definedOperators = new BoundUnaryOperator[]
     {
-        new(TPlus, TypeSymbol.Int, TypeSymbol.Int),
-        new(TMinus, TypeSymbol.Int, TypeSymbol.Int),
-        new(TLeftArrow, TypeSymbol.IntList, TypeSymbol.Int),
-        new(TBang, TypeSymbol.Bool, TypeSymbol.Bool),
+        new(BoundUnaryOperatorKind.UnaryPlus,  TPlus, TypeSymbol.Int, TypeSymbol.Int),
+        new(BoundUnaryOperatorKind.UnaryMinus, TMinus, TypeSymbol.Int, TypeSymbol.Int),
+        new(BoundUnaryOperatorKind.LogicalNOT, TBang, TypeSymbol.Bool, TypeSymbol.Bool),
     };
+}
+
+public enum BoundUnaryOperatorKind 
+{
+    UnaryMinus, UnaryPlus, LogicalNOT, ListRemoveLast
 }

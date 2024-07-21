@@ -149,7 +149,7 @@ public sealed class BoundInterpreter
         {
             ("+", IntValue i) => i,  //do nothing for the (+1) cases
             ("-", IntValue i) => new IntValue(-i), //flip it for the (-1) cases
-            ("<-", ListValue a) => a.RemoveLast(),  //TODO: Should it return the array or the value removed?
+            ("<-", ListValue a) => a.RemoveLast(),
             ("!", BoolValue b) => b.Negate(),
             _ => throw new NotImplementedException($"Unary {operatorAsString} is not defined on {exprValue.GetType()}")
         };
