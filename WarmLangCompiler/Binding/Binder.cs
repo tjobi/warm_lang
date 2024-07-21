@@ -106,7 +106,8 @@ public sealed class Binder
         {
             var (type, name) = funcDecl.Params[i];
             var paramType = type.ToTypeSymbol();
-            var paramName = name.Name ?? throw new Exception($"BINDER: NO NAME FOR PARAMETER {name.Location}");
+            //missing names have been reported by the parser
+            var paramName = name.Name ?? "NO_NAME"; 
             if(uniqueParameterNames.Contains(paramName))
             {
                 _diag.ReportParameterDuplicateName(name);
