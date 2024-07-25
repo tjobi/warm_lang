@@ -1,3 +1,8 @@
+function main() {
+    menuPicker();
+}
+main();
+
 function menuPicker() string {
     int menuLength = 3;     //There is no way to "get" the length fo a list, a little cringe...
     string[] choices = ["Pancake", "Wedding Cake", "Brunsviger"];
