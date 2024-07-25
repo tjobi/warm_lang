@@ -145,7 +145,7 @@ public class BinderTests
                 new BoundBinaryExpression(
                     binaryExpression,
                     new BoundListExpression(left, TypeSymbol.IntList, ImmutableArray<BoundExpression>.Empty),
-                    new BoundBinaryOperator(plus.Kind, TypeSymbol.IntList, TypeSymbol.IntList, TypeSymbol.IntList),
+                    new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, TypeSymbol.IntList, TypeSymbol.IntList, TypeSymbol.IntList),
                     new BoundListExpression(
                         right, TypeSymbol.IntList, 
                         new List<BoundExpression>
