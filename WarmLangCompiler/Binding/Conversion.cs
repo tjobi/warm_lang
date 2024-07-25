@@ -31,26 +31,28 @@ public sealed class Conversion
         if(from == to)
             return Identity;
         
-        if(from.ResolveDeelpyNestedType() == EmptyList && to is ListTypeSymbol)
-        {
-            return Implicit;
-        }
-
         if(from == Int)
             if(to == TypeSymbol.String || to == Bool)
                 return Explicit;
+        
         if(from == Bool)
             if(to == TypeSymbol.String || to == Int)
                 return Explicit;
-
-        if(from is ListTypeSymbol && to == TypeSymbol.String)
-            return Explicit;
 
         if(from == TypeSymbol.String)
         {
             if(to == Int)
                 return Explicit;
         }
+
+        if(from is ListTypeSymbol && to == TypeSymbol.String)
+            return Explicit;
+
+        if(from.ResolveDeelpyNestedType() == EmptyList && to is ListTypeSymbol)
+        {
+            return Implicit;
+        }
+
         //There is no conversion
         return None;
     }

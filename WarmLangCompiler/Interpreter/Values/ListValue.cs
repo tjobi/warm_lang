@@ -54,7 +54,7 @@ public sealed record class ListValue : Value
         return last;
     }
 
-    public bool IsEqualTo(ListValue b) => DeepEquality(this, b); 
+    public bool IsEqualTo(ListValue b) => Enumerable.SequenceEqual(Elements,b.Elements);//DeepEquality(this, b); 
 
     public static bool DeepEquality(ListValue a, ListValue b)
     {

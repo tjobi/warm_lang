@@ -4,7 +4,7 @@ using WarmLangCompiler.Symbols;
 using WarmLangCompiler.Binding.Lower;
 using WarmLangLexerParser.ErrorReporting;
 using static WarmLangCompiler.Binding.BoundBinaryOperatorKind;
-using static WarmLangCompiler.ILGen.EmitterTypeSymbolExtensions;
+using static WarmLangCompiler.ILGen.EmitterTypeSymbolHelpers;
 
 using System.Collections.Immutable;
 
@@ -20,7 +20,7 @@ public sealed class Emitter{
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _toStringConvert, _stringConcat, _stringEqual, _stringSubscript;
     private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany, _listLength;
-    private readonly MethodReference _referenceEquals;
+    private readonly MethodReference _objectEquals, _wlEquals;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
     private readonly Dictionary<BoundLabel, Instruction> _labels;
@@ -90,7 +90,10 @@ public sealed class Emitter{
         _listLength     = GetMethodFromTypeDefinition(dotnetArrayList, "get_Count", GetCilParamNames());
 
         var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
-        _referenceEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(GetCILBaseTypeSymbol(), GetCILBaseTypeSymbol()));
+        _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(GetCILBaseTypeSymbol(), GetCILBaseTypeSymbol()));
+
+        var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, _builtInFunctions[BuiltInFunctions.StdWriteLine], _toStringConvert, _objectEquals);
+        _wlEquals = functionHelper.CreateWlEquals();
     }
 
     private ImmutableDictionary<FunctionSymbol, MethodReference> ResolveBuiltInMethods(AssemblyDefinition mscorlib)
@@ -549,11 +552,11 @@ public sealed class Emitter{
                 //TODO: Both NotEquals and Equals uses reference equality! we want the element equality.
                 case BoundBinaryOperatorKind.Equals:
                     EmitExpression(processor, binary.Right);
-                    processor.Emit(OpCodes.Call, _referenceEquals);
+                    processor.Emit(OpCodes.Call, _wlEquals);
                     break;
                 case NotEquals:
                     EmitExpression(processor, binary.Right);
-                    processor.Emit(OpCodes.Call, _referenceEquals);
+                    processor.Emit(OpCodes.Call, _wlEquals);
                     processor.Emit(OpCodes.Ldc_I4_0);
                     processor.Emit(OpCodes.Ceq);
                     break;

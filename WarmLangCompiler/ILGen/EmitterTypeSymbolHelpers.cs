@@ -1,7 +1,7 @@
 using WarmLangCompiler.Symbols;
 using System.Collections.Immutable;
 namespace WarmLangCompiler.ILGen;
-public static class EmitterTypeSymbolExtensions
+public static class EmitterTypeSymbolHelpers
 {
     private static readonly TypeSymbol _cilBaseType = new("object"), _list = new("non-generic-list");
     private static readonly ImmutableDictionary<TypeSymbol, string> _toCIL = new (TypeSymbol, string)[]
@@ -11,10 +11,6 @@ public static class EmitterTypeSymbolExtensions
         (_cilBaseType, "System.Object"),        (_list, "System.Collections.ArrayList"),
     }.ToImmutableDictionary(tuple => tuple.Item1, tuple => tuple.Item2);
     private static readonly ImmutableDictionary<string,TypeSymbol> _fromCIL = _toCIL.ToImmutableDictionary(entry => entry.Value, entry => entry.Key);
-
-    public static string ToCilName(this TypeSymbol type) => _toCIL[type.AsRecognisedType()];
-
-    public static TypeSymbol AsRecognisedType(this TypeSymbol type) => type is ListTypeSymbol ? _list : type;
 
     public static TypeSymbol FromCilName(string name) => _fromCIL[name];
     public static IEnumerable<TypeSymbol> BuiltInTypes() => _toCIL.Select(t => t.Key);
@@ -33,6 +29,10 @@ public static class EmitterTypeSymbolExtensions
         return res;
     }
 
+    public static string ToCilName(this TypeSymbol type) => _toCIL[type.AsRecognisedType()];
+
+    public static TypeSymbol AsRecognisedType(this TypeSymbol type)
+        => type is ListTypeSymbol || type == TypeSymbol.EmptyList ? _list : type;
     public static bool NeedsBoxing(this TypeSymbol type) => type == TypeSymbol.Bool || type == TypeSymbol.Int; 
 
 }
