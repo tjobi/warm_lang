@@ -93,7 +93,7 @@ public sealed class Emitter{
         _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(GetCILBaseTypeSymbol(), GetCILBaseTypeSymbol()));
 
         var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, toStringConvert, _objectEquals, _stringConcat);
-        functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
+        //functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
         _wlEquals = functionHelper.CreateWLEquals();
         _wlToString = functionHelper.CreateWLToString();
     }
