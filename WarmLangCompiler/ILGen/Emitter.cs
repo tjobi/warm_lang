@@ -18,9 +18,9 @@ public sealed class Emitter{
     private readonly bool _debug;
     
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
-    private readonly MethodReference _toStringConvert, _stringConcat, _stringEqual, _stringSubscript;
+    private readonly MethodReference _stringConcat, _stringEqual, _stringSubscript;
     private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany, _listLength;
-    private readonly MethodReference _objectEquals, _wlEquals;
+    private readonly MethodReference _objectEquals, _wlEquals, _wlToString;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
     private readonly Dictionary<BoundLabel, Instruction> _labels;
@@ -71,9 +71,9 @@ public sealed class Emitter{
         _assemblyDef.MainModule.Types.Add(_program);
         _builtInFunctions = ResolveBuiltInMethods(_mscorlib);
 
-        //TODO: temp to string
+        // Needed for the implemenatation of __wl_tostring
         var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
-        _toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(GetCILBaseTypeSymbol()));
+        var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(GetCILBaseTypeSymbol()));
         
         var dotnetString = _mscorlib.MainModule.GetType("System.String");
         _stringConcat    = GetMethodFromTypeDefinition(dotnetString, "Concat", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
@@ -92,8 +92,10 @@ public sealed class Emitter{
         var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
         _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(GetCILBaseTypeSymbol(), GetCILBaseTypeSymbol()));
 
-        var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, _builtInFunctions[BuiltInFunctions.StdWriteLine], _toStringConvert, _objectEquals);
-        _wlEquals = functionHelper.CreateWlEquals();
+        var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, toStringConvert, _objectEquals, _stringConcat);
+        functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
+        _wlEquals = functionHelper.CreateWLEquals();
+        _wlToString = functionHelper.CreateWLToString();
     }
 
     private ImmutableDictionary<FunctionSymbol, MethodReference> ResolveBuiltInMethods(AssemblyDefinition mscorlib)
@@ -384,7 +386,7 @@ public sealed class Emitter{
             var convExprType = conv.Expression.Type;
             if(convExprType.NeedsBoxing())
                 processor.Emit(OpCodes.Box, CilTypeOf(convExprType));
-            processor.Emit(OpCodes.Call, _toStringConvert);
+            processor.Emit(OpCodes.Call, _wlToString);
             return;
         }
 

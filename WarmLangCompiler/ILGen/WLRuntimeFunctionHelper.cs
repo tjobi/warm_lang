@@ -1,5 +1,6 @@
 namespace WarmLangCompiler.ILGen;
 
+using System.Diagnostics.CodeAnalysis;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
@@ -12,23 +13,33 @@ public class WLRuntimeFunctionHelper
     private readonly MethodReference _listLength;
     private readonly MethodReference _listSubscript;
     private readonly MethodReference _stringEqual;
-    private readonly MethodReference _debugPrint;
     private readonly MethodReference _toStringConvert;
     private readonly MethodReference _objEquals;
+    private readonly MethodReference _stringConcat;
+    
+    private MethodReference? _debugPrint;
+    private bool _debug;
 
-    public WLRuntimeFunctionHelper(TypeDefinition program, Func<TypeSymbol, TypeReference> cilTypeOf, MethodReference listLength, MethodReference listSubscript, MethodReference stringEqual, MethodReference print, MethodReference toString, MethodReference objEquals)
+    public WLRuntimeFunctionHelper(TypeDefinition program, Func<TypeSymbol, TypeReference> cilTypeOf, MethodReference listLength, MethodReference listSubscript, MethodReference stringEqual, MethodReference toString, MethodReference objEquals, MethodReference stringConcat)
     {
         _program = program;
         _cilTypeOf = cilTypeOf;
         _listLength = listLength;
         _listSubscript = listSubscript;
         _stringEqual = stringEqual;
-        _debugPrint = print;
         _toStringConvert = toString;
         _objEquals = objEquals;
+        _stringConcat = stringConcat;
+        _debug = false;
     }
 
-        public MethodDefinition CreateWlEquals()
+    public void EnableDebugging(MethodReference writeLine)
+    {
+        _debugPrint = writeLine;
+        _debug = true;
+    }
+
+    public MethodDefinition CreateWLEquals()
     {
         var wlEqualsDef = new MethodDefinition("__wl_equals", MethodAttributes.Public | MethodAttributes.Static, _cilTypeOf(TypeSymbol.Bool));
         _program.Methods.Add(wlEqualsDef);
@@ -176,12 +187,123 @@ public class WLRuntimeFunctionHelper
 
         body.OptimizeMacros();
 
-        Console.WriteLine("___WL_EQUALS START___");
-        foreach(var instr in body.Instructions)
-            Console.WriteLine(instr);
-        Console.WriteLine("___WL_EQUALS END___\n\n\n");
-
+        if(_debug)
+        {
+            Console.WriteLine("---- START WL_EQUALS -----");
+            foreach(var instr in body.Instructions)
+                Console.WriteLine(instr);
+            Console.WriteLine("---- END WL_EQUALS -----");
+        }
 
         return wlEqualsDef;
+    }
+
+    public MethodDefinition CreateWLToString()
+    {
+        var wlToString = new MethodDefinition("__wl_tostring", MethodAttributes.Public | MethodAttributes.Static, _cilTypeOf(TypeSymbol.String));
+        _program.Methods.Add(wlToString);
+        var dotnetObject = _cilTypeOf(EmitterTypeSymbolHelpers.GetCILBaseTypeSymbol());
+        var arg = new ParameterDefinition("arg", ParameterAttributes.None, dotnetObject);
+        wlToString.Parameters.Add(arg);
+
+        var body = wlToString.Body;
+        body.InitLocals = true;
+        var processor = body.GetILProcessor();
+        
+        var returnInstr = processor.Create(OpCodes.Ret);
+        var convertStart = processor.Create(OpCodes.Ldarg, arg);
+
+        //if(arg is List)
+        var outString = new VariableDefinition(_cilTypeOf(TypeSymbol.String));
+        body.Variables.Add(outString);
+        var listTypeRef = _cilTypeOf(new ListTypeSymbol(TypeSymbol.Void));
+
+        processor.Emit(OpCodes.Ldarg, arg);
+        processor.Emit(OpCodes.Isinst, listTypeRef);
+        processor.Emit(OpCodes.Ldnull);
+        processor.Emit(OpCodes.Cgt_Un);
+        processor.Emit(OpCodes.Brfalse, convertStart);
+
+        var count = new VariableDefinition(_cilTypeOf(TypeSymbol.Int));
+        var asList = new VariableDefinition(listTypeRef);
+        body.Variables.Add(count);
+        body.Variables.Add(asList);
+        processor.Emit(OpCodes.Ldarg, arg);
+        processor.Emit(OpCodes.Castclass, listTypeRef);
+        processor.Emit(OpCodes.Stloc, asList);
+        processor.Emit(OpCodes.Ldloc, asList);
+        processor.Emit(OpCodes.Callvirt, _listLength);
+        processor.Emit(OpCodes.Stloc, count);
+
+        //string out = "[";
+        processor.Emit(OpCodes.Ldstr, "[");
+        processor.Emit(OpCodes.Stloc, outString);
+
+        //for(int i = 0; i < arg1.Count; i++)
+        var i = new VariableDefinition(_cilTypeOf(TypeSymbol.Int));
+        body.Variables.Add(i);
+        var loopConditionStart = processor.Create(OpCodes.Ldloc, i);
+        processor.Emit(OpCodes.Ldc_I4_0);
+        processor.Emit(OpCodes.Stloc, i);
+        processor.Emit(OpCodes.Br, loopConditionStart);
+
+        //loop body:
+        //  outString = outstring + wlToString(elm[i]);
+        var firstInBody = processor.Create(OpCodes.Ldloc, outString);
+        processor.Append(firstInBody);        
+        processor.Emit(OpCodes.Ldloc, asList);
+        processor.Emit(OpCodes.Ldloc, i);
+        processor.Emit(OpCodes.Callvirt, _listSubscript);
+        processor.Emit(OpCodes.Call, wlToString);
+
+        processor.Emit(OpCodes.Call, _stringConcat);  //string.Concat(outString, wlToString(arg[i]));
+        processor.Emit(OpCodes.Stloc, outString);     //outstring = ^
+        
+        // i++;
+        processor.Emit(OpCodes.Ldloc, i);
+        processor.Emit(OpCodes.Ldc_I4_1);        
+        processor.Emit(OpCodes.Add);
+        processor.Emit(OpCodes.Stloc, i);
+
+        //STILL in body -> Same as doing if(i < arg.Count - 1) outString += ", ";
+        //works by checking the value of i against count AFTER the increment. So if(++i < arg.Count) ...
+        processor.Emit(OpCodes.Ldloc, i);
+        processor.Emit(OpCodes.Ldloc, count);
+        processor.Emit(OpCodes.Clt);
+        processor.Emit(OpCodes.Brfalse, loopConditionStart);
+        processor.Emit(OpCodes.Ldloc, outString);
+        processor.Emit(OpCodes.Ldstr, ", ");
+        processor.Emit(OpCodes.Call, _stringConcat);
+        processor.Emit(OpCodes.Stloc, outString);
+
+        //loop condition   (i < arg.Count)
+        processor.Append(loopConditionStart);
+        processor.Emit(OpCodes.Ldloc, count);
+        processor.Emit(OpCodes.Clt);                    // i < arg1.count
+        processor.Emit(OpCodes.Brtrue, firstInBody);    //if (i < arg1.count) goto loopbody;
+
+        // outString = outString + "]";  
+        processor.Emit(OpCodes.Ldloc, outString);
+        processor.Emit(OpCodes.Ldstr, "]");
+        processor.Emit(OpCodes.Call, _stringConcat);
+        processor.Emit(OpCodes.Br, returnInstr);        //made it all the way through the loop, return true
+
+        //else use Convert.ToString(object)
+        //It will try to use in order: IConvertible.ToString -> IFormattable.ToString -> object.ToString 
+        processor.Append(convertStart);
+        processor.Emit(OpCodes.Call, _toStringConvert);
+        processor.Append(returnInstr);
+
+        body.OptimizeMacros();
+
+        if(_debug)
+        {
+            Console.WriteLine("---- START WLToString -----");
+            foreach(var instr in body.Instructions)
+                Console.WriteLine(instr);
+            Console.WriteLine("---- END WLToString -----");
+        }
+
+        return wlToString;
     }
 }
