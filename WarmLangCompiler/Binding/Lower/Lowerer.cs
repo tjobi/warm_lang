@@ -111,14 +111,14 @@ public static class Lowerer
             builder.Add(new BoundExprStatement(new ExprStatement(cont.Node), cont));
         }
         builder.Add(new BoundLabelStatement(wile.Node, labelCondition));
-        builder.Add(new BoundConditionalGotoStatement(wile.Node, wile.Condition, labelWhileBody, labelWhileEnd));
+        builder.Add(new BoundConditionalGotoStatement(wile.Node, wile.Condition, labelWhileBody, labelWhileEnd, fallThroughBranch: false));
         builder.Add(new BoundLabelStatement(wile.Node, labelWhileEnd));
         return RewriteStatement(new BoundBlockStatement(wile.Node, builder.ToImmutable()));
     }
 
     private static BoundStatement RewriteIfStatement(BoundIfStatement iff)
     {
-        //   if (condition) goto <labelTrue>; else goto <labelEnd>
+        //   if (condition) goto <labelThent>; else goto <labelEnd>
         // labelThen
         //   *code for thenBranch*
         // labelEnd:

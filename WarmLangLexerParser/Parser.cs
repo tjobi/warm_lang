@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.TypeSyntax;
 using WarmLangLexerParser.ErrorReporting;
@@ -82,7 +83,6 @@ public class Parser
             TIf => ParseIfStatement(),
             TWhile => ParseWhileStatement(),
             TReturn => ParseReturnStatement(),
-            //TODO: May be a problem when we introduce more types? -- what to do?
             TFunc =>  ParseFunctionDeclaration(),
             _ when IsStartOfVariableDeclaration() => ParseVariableDeclaration(),
             _ => ParseExpressionStatement()
@@ -418,8 +418,7 @@ public class Parser
         {
             var isReadingArgs = true;
             while(isReadingArgs && NotEndOfFile) 
-                //&& Current.Kind != TParRight) //TODO: removed this, so we don't allow 
-                                                //stuff like myFunc(2,), those trailing commas D:
+                //&& Current.Kind != TParRight) //removed, so we don't allow -> stuff like "myFunc(2,)"
             {
                 var arg = ParseExpression();
                 args.Add(arg);
@@ -451,7 +450,7 @@ public class Parser
         return typ;
     }
 
-    private bool TryParseType(out TypeSyntaxNode? type)
+    private bool TryParseType([NotNullWhen(true)] out TypeSyntaxNode? type)
     {
         var checkpoint = currentToken;
         if(!Current.Kind.IsPossibleType())

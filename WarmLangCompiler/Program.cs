@@ -1,5 +1,6 @@
 ﻿using WarmLangCompiler;
 using WarmLangCompiler.Binding;
+using WarmLangCompiler.ILGen;
 using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
@@ -15,7 +16,8 @@ if(parsedArgs is null)
 }
 var (program, parserDebug, 
      lexerDebug, binderDebug,
-     longExceptions, interactive) = (ParsedArgs) parsedArgs!;
+     longExceptions, interactive,
+     isEvaluateMode) = (ParsedArgs) parsedArgs!;
 
 if(interactive) 
 {
@@ -75,9 +77,20 @@ try
         Console.WriteLine("Exitting... no evaluation");
         return 1;
     }
-    var res = BoundInterpreter.Run(boundProgram);
-    Console.WriteLine($"Evaluated '{program}' -> {res}");
 
+    if(isEvaluateMode)
+    {
+        var res = BoundInterpreter.Run(boundProgram);
+        Console.WriteLine($"Evaluated '{program}' -> {res}");
+        return 0;
+    }
+
+    Emitter.EmitProgram(boundProgram, diagnostics, debug:true);
+    foreach(var err in diagnostics)
+    {
+        Console.WriteLine(err);
+    }
+    Console.WriteLine($"Compiled '{program}' to 'out.dll' with {diagnostics.Count()} errors");
 
 } catch(ParserException e)
 {

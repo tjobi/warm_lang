@@ -136,7 +136,6 @@ x;
     [Fact]
     public void TestLexerForIdentifierFollowedByEOF()
     {
-        //TODO: Does it need to tho? Should we really crash when there is no semi colon? :D
         //AAA
         string input = "int x = yyyyyy";
         var expectedTokens = new List<SyntaxToken>()
