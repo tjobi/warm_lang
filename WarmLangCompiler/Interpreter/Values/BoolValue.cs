@@ -24,7 +24,7 @@ public sealed record class BoolValue : Value
 
     public override string ToString() => $"Bool {StdWriteString()}";
 
-    public override string StdWriteString() => Value ? "true" : "false";
+    public override string StdWriteString() => Value ? "True" : "False";
 
     public static implicit operator bool(BoolValue boo) => boo.Value;
 }
