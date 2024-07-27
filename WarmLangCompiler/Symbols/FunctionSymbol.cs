@@ -37,13 +37,12 @@ public class FunctionSymbol : Symbol
         return sb.Append(')').ToString();
     }
 
-    public static FunctionSymbol CreateMain()
-    {
-        return new FunctionSymbol(
-            "wl_main",
+    public static FunctionSymbol CreateMain(string name = "wl_main")
+     => new(
+            name,
             ImmutableArray<ParameterSymbol>.Empty,
             TypeSymbol.Void,
             new TextLocation(0,0)
         );
-    }
+    
 }

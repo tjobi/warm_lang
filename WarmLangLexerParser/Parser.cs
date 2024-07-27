@@ -58,21 +58,37 @@ public class Parser
 
     public ASTNode Parse()
     {
-        ASTNode left = ParseEntry();
+        ASTNode root = ParseEntry();
         //Our language should finish parsing with an End Of File, no?
         var _ = MatchKind(TEOF);
-        return left;
+        return root;
     }
 
-    private StatementNode ParseEntry()
+    private ASTRoot ParseEntry()
     {
-        var statements = new List<StatementNode>();
-        while( NotEndOfFile && Current.Kind != TCurRight)
+        var statements = new List<TopLevelStamentNode>();
+        while(NotEndOfFile)
         {
-            var statement = ParseStatement(); 
+            var statement = ParseTopLevelStatment(); 
             statements.Add(statement);
         }
-        return new BlockStatement(tokens[0], statements, tokens[^1]);
+        TextLocation location;
+        if(statements.Count > 0)
+            location = TextLocation.FromTo(statements[0].Location, statements[^1].Location);
+        else
+            throw new Exception("Parser: Parsed 0 toplevelstatments, file empty?");
+        return new ASTRoot(statements, location);
+    }
+
+    private TopLevelStamentNode ParseTopLevelStatment()
+    {
+        var statement = ParseStatement();
+        return statement switch
+        {
+            VarDeclaration var => new TopLevelVarDeclaration(var),
+            FuncDeclaration var => new TopLevelFuncDeclaration(var),
+            _ => new TopLevelArbitraryStament(statement),
+        };
     }
 
     private StatementNode ParseStatement()

@@ -36,43 +36,77 @@ public sealed class Binder
         }
     }
 
-    public BoundProgram BindProgram(ASTNode root)
+    public BoundProgram BindProgram(ASTNode node)
     {
+        if(node is not ASTRoot root)
+            throw new NotImplementedException($"Binder only allows root to be '{nameof(ASTRoot)}'");
+        
         _isGlobalScope = true;
-        if(root is BlockStatement statement)
+        var (bound, globalStatments, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
+        _isGlobalScope = false; 
+
+        var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
+        foreach(var function in _scope.GetFunctions())
         {
-            var bound = Lowerer.LowerProgram(BindBlockStatement(statement));
-            _isGlobalScope = false; 
-            var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
-            foreach(var function in _scope.GetFunctions())
-            {
-                if(function.IsBuiltInFunction())
-                    continue;
-                var boundBody = BindFunctionBody(function, _unBoundBodyOf[function]);
-                functions.Add(function, boundBody);
-            }
-
-            FunctionSymbol entryPoint;
-            if(functions.Where(kv => kv.Key.Name == "main").FirstOrDefault() is {Key: FunctionSymbol key})
-            {
-                entryPoint = key;
-            } else {
-                var entryPointBuilder = ImmutableArray.CreateBuilder<BoundStatement>(bound.Statements.Length);
-                foreach(var stmnt in bound.Statements)
-                {
-                    if(stmnt is BoundFunctionDeclaration)
-                        continue;
-                    entryPointBuilder.Add(stmnt);
-                }
-                entryPoint = FunctionSymbol.CreateMain();
-                var entryBody = Lowerer.LowerBody(entryPoint, new BoundBlockStatement(bound.Node, entryPointBuilder.MoveToImmutable()));
-                functions[entryPoint] = entryBody;
-
-            }
-            return new BoundProgram(entryPoint, functions[entryPoint], functions.ToImmutable());
+            if(function.IsBuiltInFunction())
+                continue;
+            var boundBody = BindFunctionBody(function, _unBoundBodyOf[function]);
+            functions.Add(function, boundBody);
         }
-        else 
-            throw new NotImplementedException("Binder only allows root to be BlockStatements");
+
+        FunctionSymbol? main = null;
+        FunctionSymbol? scriptMain = null;
+        if(functions.Where(kv => kv.Key.Name == "main").FirstOrDefault() is {Key: FunctionSymbol mainSymbol, Value: BoundBlockStatement mainBody})
+        {
+            main = mainSymbol;
+        }
+        
+        if(hasGlobalNonDeclarationStatements)
+        {  
+            if(main is not null)
+                _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
+            
+            scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
+            var scriptMainBody = Lowerer.LowerBody(scriptMain, new BoundBlockStatement(bound.Node, globalStatments));
+            functions[scriptMain] = scriptMainBody;
+        }
+
+        var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>();
+        foreach(var stmnt in globalStatments)
+            if(stmnt is BoundVarDeclaration var)
+                globalVariables.Add(var);
+
+        return new BoundProgram(main, scriptMain, functions.ToImmutable(), globalVariables.ToImmutable());
+    }
+
+    private (BoundBlockStatement boundRoot, ImmutableArray<BoundStatement> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
+    {
+        var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>(root.Children.Count);
+        var globals = ImmutableArray.CreateBuilder<BoundStatement>(); //NON-function delcarations
+        var hasGlobalArbitraries = false;
+        foreach(var topLevelFunc in root.Children.Where(c => c is TopLevelFuncDeclaration))
+        {
+            topLevelstatments.Add(BindTopLevelStatement(topLevelFunc));
+        }
+        foreach(var toplevel in root.Children)
+        {
+            if(toplevel is not TopLevelFuncDeclaration)
+            {
+                var bound = BindTopLevelStatement(toplevel);
+                globals.Add(bound);
+                if(toplevel is TopLevelArbitraryStament)
+                    hasGlobalArbitraries = true;
+               topLevelstatments.Add(bound);
+            }
+        }
+        var boundChildren = Lowerer.LowerProgram(new BoundBlockStatement(topLevelstatments[0].Node, topLevelstatments.MoveToImmutable()));
+        //TODO: What should be the syntax element of the NODE? where in the source code does the root originate?
+        return (boundChildren, globals.ToImmutable(), hasGlobalArbitraries);
+    }
+
+    private BoundStatement BindTopLevelStatement(TopLevelStamentNode statement)
+    {
+        return BindStatement(statement.Statement);
     }
 
     private BoundStatement BindStatement(StatementNode statement)
@@ -90,16 +124,23 @@ public sealed class Binder
         };
     }
 
-    private BoundBlockStatement BindBlockStatement(BlockStatement st)
+    private BoundBlockStatement BindBlockStatement(BlockStatement st, bool pushScope = true)
     {
         var boundStatements = ImmutableArray.CreateBuilder<BoundStatement>();
-        _scope.PushScope();
+        if(pushScope)
+            _scope.PushScope();
         foreach(var stmnt in st.Children)
         {
             var bound = BindStatement(stmnt);
             boundStatements.Add(bound);
         }
-        _scope.PopScope();
+        if(_functionStack.Any())
+        {
+            Console.WriteLine($"Scope for '{_functionStack.Peek()}'");
+            _scope.Print();
+        }
+        if(pushScope)
+            _scope.PopScope();
         return new BoundBlockStatement(st, boundStatements.ToImmutable());
     }
 
@@ -109,7 +150,7 @@ public sealed class Binder
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type, allowimplicitListType: true);
 
-        var variable = new VariableSymbol(name, rightHandSide.Type);
+        var variable = !_isGlobalScope ? new VariableSymbol(name, rightHandSide.Type) : new GlobalVariableSymbol(name, rightHandSide.Type);
         if(!_scope.TryDeclareVariable(variable))
         {
             _diag.ReportNameAlreadyDeclared(varDecl.Identifier);
@@ -161,15 +202,16 @@ public sealed class Binder
     private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body, bool isGlobalFunc = true)
     {
         _functionStack.Push(function);
+        _scope.PushScope();
         foreach(var @param in function.Parameters)
         {
             _scope.TryDeclareVariable(@param);
         }
-        var boundBody = BindBlockStatement(body);
-        // if(isGlobalFunc) //Little bit of a waste ... but the LowerBody call also inserts a return if it is missing
+        var boundBody = BindBlockStatement(body, pushScope: false);
         boundBody = Lowerer.LowerBody(function, boundBody);
         if(!ControlFlowGraph.AllPathsReturn(boundBody))
             _diag.ReportNotAllCodePathsReturn(function);
+        _scope.PopScope();
         _functionStack.Pop();
         return boundBody;
     }

@@ -189,7 +189,7 @@ public sealed class Emitter{
         //            .Where(f => f.Key.Name == "main")
         //            .Select(f => _funcs[f.Key])
         //            .FirstOrDefault() ?? throw new Exception("UH OH - no main?");
-        var main = _funcs[program.EntryPoint];
+        var main = _funcs[program.MainFunc is not null ? program.MainFunc : program.ScriptMain!];
         _assemblyDef.EntryPoint = main;
         _assemblyDef.Write(outfile);
     }

@@ -113,5 +113,10 @@ internal static class BinderErrorWarnings
         var message = $"Cannot assign to subscript of '{type}' -- it is readonly";
         bag.Report(message, true, location);
     }
-    
+
+    internal static void ReportProgramHasBothMainAndTopLevelStatements(this ErrorWarrningBag bag, TextLocation mainFunc)
+    {
+        var message = $"Program cannot contain both a main function and global statements";
+        bag.Report(message, true, mainFunc);
+    }
 }
