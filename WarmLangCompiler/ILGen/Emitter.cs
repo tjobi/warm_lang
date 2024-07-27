@@ -175,16 +175,11 @@ public sealed class Emitter{
         return globalsType;
     } 
    
-    public static void EmitProgram(BoundProgram program, ErrorWarrningBag diag, bool debug = false)
+    public static void EmitProgram(string outfile, BoundProgram program, ErrorWarrningBag diag, bool debug = false)
     {
         var emitter = new Emitter(diag, debug);
         if(emitter._diag.Any())
             return;
-        var outfile = Path.Combine(Directory.GetCurrentDirectory(), "out.dll");
-        if(!Path.Exists(outfile))
-            File.Create(outfile);
-        else
-            File.WriteAllText(outfile, string.Empty);
         emitter.EmitProgram(outfile, program);
     }
 
