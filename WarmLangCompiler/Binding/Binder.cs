@@ -134,11 +134,6 @@ public sealed class Binder
             var bound = BindStatement(stmnt);
             boundStatements.Add(bound);
         }
-        if(_functionStack.Any())
-        {
-            Console.WriteLine($"Scope for '{_functionStack.Peek()}'");
-            _scope.Print();
-        }
         if(pushScope)
             _scope.PopScope();
         return new BoundBlockStatement(st, boundStatements.ToImmutable());
