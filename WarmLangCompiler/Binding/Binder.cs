@@ -18,6 +18,7 @@ public sealed class Binder
     /// This means, we don't know anything about local functions when binding function bodies.
     /// </summary>
     private bool _isGlobalScope;
+    private Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
     private readonly Stack<FunctionSymbol> _functionStack;
     public Binder(ErrorWarrningBag bag)
@@ -26,6 +27,7 @@ public sealed class Binder
         _scope = new BoundSymbolScope();
         _isGlobalScope = true;
         _functionStack = new();
+        _unBoundBodyOf = new();
         _scope.PushScope(); //Push scope to contain builtin stuff
         foreach(var func in BuiltInFunctions.GetBuiltInFunctions())
         {
@@ -46,10 +48,28 @@ public sealed class Binder
             {
                 if(function.IsBuiltInFunction())
                     continue;
-                var boundBody = BindFunctionBody(function);
+                var boundBody = BindFunctionBody(function, _unBoundBodyOf[function]);
                 functions.Add(function, boundBody);
             }
-            return new BoundProgram(bound, functions.ToImmutable());
+
+            FunctionSymbol entryPoint;
+            if(functions.Where(kv => kv.Key.Name == "main").FirstOrDefault() is {Key: FunctionSymbol key})
+            {
+                entryPoint = key;
+            } else {
+                var entryPointBuilder = ImmutableArray.CreateBuilder<BoundStatement>(bound.Statements.Length);
+                foreach(var stmnt in bound.Statements)
+                {
+                    if(stmnt is BoundFunctionDeclaration)
+                        continue;
+                    entryPointBuilder.Add(stmnt);
+                }
+                entryPoint = FunctionSymbol.CreateMain();
+                var entryBody = Lowerer.LowerBody(entryPoint, new BoundBlockStatement(bound.Node, entryPointBuilder.MoveToImmutable()));
+                functions[entryPoint] = entryBody;
+
+            }
+            return new BoundProgram(entryPoint, functions[entryPoint], functions.ToImmutable());
         }
         else 
             throw new NotImplementedException("Binder only allows root to be BlockStatements");
@@ -118,9 +138,10 @@ public sealed class Binder
         }
 
         var returnType = funcDecl.ReturnType.ToTypeSymbol();
+        var nameToken = funcDecl.NameToken;
         var function = _isGlobalScope 
-                       ? new FunctionSymbol(funcDecl, parameters.ToImmutable(), returnType)
-                       : new LocalFunctionSymbol(funcDecl, parameters.ToImmutable(), returnType);
+                       ? new FunctionSymbol(nameToken, parameters.ToImmutable(), returnType)
+                       : new LocalFunctionSymbol(nameToken, parameters.ToImmutable(), returnType);
         if(!_scope.TryDeclareFunction(function))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
@@ -128,20 +149,23 @@ public sealed class Binder
         }
         if(!_isGlobalScope && function is LocalFunctionSymbol f)
         {
-            var boundBody = BindFunctionBody(function, isGlobalFunc: false);
+            var boundBody = BindFunctionBody(function, funcDecl.Body, isGlobalFunc: false);
             f.Body = boundBody;
+        } else 
+        {
+            _unBoundBodyOf[function] = funcDecl.Body;
         }
         return new BoundFunctionDeclaration(funcDecl, function);
     }
 
-    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, bool isGlobalFunc = true)
+    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body, bool isGlobalFunc = true)
     {
         _functionStack.Push(function);
         foreach(var @param in function.Parameters)
         {
             _scope.TryDeclareVariable(@param);
         }
-        var boundBody = BindBlockStatement(function.Declaration.Body);
+        var boundBody = BindBlockStatement(body);
         // if(isGlobalFunc) //Little bit of a waste ... but the LowerBody call also inserts a return if it is missing
         boundBody = Lowerer.LowerBody(function, boundBody);
         if(!ControlFlowGraph.AllPathsReturn(boundBody))

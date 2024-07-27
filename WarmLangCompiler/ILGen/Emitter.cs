@@ -185,10 +185,11 @@ public sealed class Emitter{
         //TODO: What to do for entrypoint?
         // _writer.WriteLine(".method private hidebysig static void Main ( string[] args) cil managed {");
         // _writer.WriteLine(".entrypoint");
-        var main = program.Functions
-                   .Where(f => f.Key.Name == "main")
-                   .Select(f => _funcs[f.Key])
-                   .FirstOrDefault() ?? throw new Exception("UH OH - no main?");
+        // var main = program.Functions
+        //            .Where(f => f.Key.Name == "main")
+        //            .Select(f => _funcs[f.Key])
+        //            .FirstOrDefault() ?? throw new Exception("UH OH - no main?");
+        var main = _funcs[program.EntryPoint];
         _assemblyDef.EntryPoint = main;
         _assemblyDef.Write(outfile);
     }
