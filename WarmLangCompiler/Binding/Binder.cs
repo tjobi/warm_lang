@@ -12,12 +12,6 @@ public sealed class Binder
     private readonly ErrorWarrningBag _diag;
     private readonly BoundSymbolScope _scope;
 
-    /// <summary>
-    /// Used for binding functions - to allow local functions.
-    /// The first pass through of syntax tree only considers function "definitions", their headers.
-    /// This means, we don't know anything about local functions when binding function bodies.
-    /// </summary>
-    private bool _isGlobalScope;
     private Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
     private readonly Stack<FunctionSymbol> _functionStack;
@@ -25,7 +19,6 @@ public sealed class Binder
     {
         _diag = bag;
         _scope = new BoundSymbolScope();
-        _isGlobalScope = true;
         _functionStack = new();
         _unBoundBodyOf = new();
         _scope.PushScope(); //Push scope to contain builtin stuff
@@ -41,9 +34,7 @@ public sealed class Binder
         if(node is not ASTRoot root)
             throw new NotImplementedException($"Binder only allows root to be '{nameof(ASTRoot)}'");
         
-        _isGlobalScope = true;
         var (bound, globalStatments, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
-        _isGlobalScope = false; 
 
         var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
         foreach(var function in _scope.GetFunctions())
@@ -106,16 +97,16 @@ public sealed class Binder
 
     private BoundStatement BindTopLevelStatement(TopLevelStamentNode statement)
     {
-        return BindStatement(statement.Statement);
+        return BindStatement(statement.Statement, isGlobalScope: true);
     }
 
-    private BoundStatement BindStatement(StatementNode statement)
+    private BoundStatement BindStatement(StatementNode statement, bool isGlobalScope = false)
     {
         return statement switch 
         {
             BlockStatement st => BindBlockStatement(st),
-            VarDeclaration varDecl => BindVarDeclaration(varDecl),
-            FuncDeclaration funcDecl => BindFunctionDeclaration(funcDecl),
+            VarDeclaration varDecl => BindVarDeclaration(varDecl, isGlobalScope),
+            FuncDeclaration funcDecl => BindFunctionDeclaration(funcDecl, isGlobalScope),
             IfStatement ifStatement => BindIfStatement(ifStatement),
             WhileStatement wile => BindWhileStatement(wile),
             ReturnStatement ret => BindReturnStatement(ret),
@@ -139,13 +130,13 @@ public sealed class Binder
         return new BoundBlockStatement(st, boundStatements.ToImmutable());
     }
 
-    private BoundStatement BindVarDeclaration(VarDeclaration varDecl)
+    private BoundStatement BindVarDeclaration(VarDeclaration varDecl, bool isGlobalScope)
     {
         var type = varDecl.Type.ToTypeSymbol();
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type, allowimplicitListType: true);
 
-        var variable = !_isGlobalScope ? new VariableSymbol(name, rightHandSide.Type) : new GlobalVariableSymbol(name, rightHandSide.Type);
+        var variable = !isGlobalScope ? new VariableSymbol(name, rightHandSide.Type) : new GlobalVariableSymbol(name, rightHandSide.Type);
         if(!_scope.TryDeclareVariable(variable))
         {
             _diag.ReportNameAlreadyDeclared(varDecl.Identifier);
@@ -154,7 +145,7 @@ public sealed class Binder
         return new BoundVarDeclaration(varDecl, variable, rightHandSide);
     }
 
-    private BoundStatement BindFunctionDeclaration(FuncDeclaration funcDecl)
+    private BoundStatement BindFunctionDeclaration(FuncDeclaration funcDecl, bool isGlobalScope = false)
     {
         var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
         var uniqueParameterNames = new HashSet<string>();
@@ -175,7 +166,7 @@ public sealed class Binder
 
         var returnType = funcDecl.ReturnType.ToTypeSymbol();
         var nameToken = funcDecl.NameToken;
-        var function = _isGlobalScope 
+        var function = isGlobalScope 
                        ? new FunctionSymbol(nameToken, parameters.ToImmutable(), returnType)
                        : new LocalFunctionSymbol(nameToken, parameters.ToImmutable(), returnType);
         if(!_scope.TryDeclareFunction(function))
@@ -183,9 +174,9 @@ public sealed class Binder
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
             return new BoundErrorStatement(funcDecl);
         }
-        if(!_isGlobalScope && function is LocalFunctionSymbol f)
+        if(!isGlobalScope && function is LocalFunctionSymbol f)
         {
-            var boundBody = BindFunctionBody(function, funcDecl.Body, isGlobalFunc: false);
+            var boundBody = BindFunctionBody(function, funcDecl.Body);
             f.Body = boundBody;
         } else 
         {
@@ -194,7 +185,7 @@ public sealed class Binder
         return new BoundFunctionDeclaration(funcDecl, function);
     }
 
-    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body, bool isGlobalFunc = true)
+    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body)
     {
         _functionStack.Push(function);
         _scope.PushScope();
