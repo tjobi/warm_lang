@@ -1,7 +1,4 @@
-function main() {
-    menuPicker();
-}
-main();
+menuPicker();
 
 function menuPicker() string {
     int menuLength = 3;     //There is no way to "get" the length fo a list, a little cringe...
@@ -40,8 +37,6 @@ function menuPicker() string {
     }
     return res;
 }
-
-menuPicker();
 
 function isNumber(string s) bool {
     int i = 0;

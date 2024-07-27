@@ -27,6 +27,9 @@ public sealed class Emitter{
     private readonly Dictionary<VariableSymbol, VariableDefinition> _locals;
     private readonly Dictionary<int, BoundLabel> _awaitingLabels;
 
+    private readonly TypeDefinition _globalsType;
+    private readonly Dictionary<VariableSymbol, FieldDefinition> _globals;
+
     //mono.cecil stuff?
     private AssemblyDefinition _assemblyDef;
     private TypeDefinition _program;
@@ -44,6 +47,7 @@ public sealed class Emitter{
         _labels = new();
         _locals = new();
         _awaitingLabels = new();
+        _globals = new();
 
         // IL -> ".assembly 'App' {}"
         var assemblyName = new AssemblyNameDefinition("App", new Version(1,0));
@@ -69,6 +73,10 @@ public sealed class Emitter{
         var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[GetCILBaseTypeSymbol()]);
         _program = new TypeDefinition("", "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, systemObject);
         _assemblyDef.MainModule.Types.Add(_program);
+
+        _globalsType = CreateGlobalsType(systemObject);
+        _assemblyDef.MainModule.Types.Add(_globalsType);
+
         _builtInFunctions = ResolveBuiltInMethods(_mscorlib);
 
         // Needed for the implemenatation of __wl_tostring
@@ -154,6 +162,19 @@ public sealed class Emitter{
         #endif
         throw new NotImplementedException($"-- Compiler couldn't find 'mscorlib' allow user to specify mscorlib.dll location ---");
     }
+   
+    private TypeDefinition CreateGlobalsType(TypeReference systemObject)
+    {
+        var globalsType = new TypeDefinition("", "GLOBALS", TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit 
+                                                            | TypeAttributes.Public  | TypeAttributes.Abstract 
+                                                            | TypeAttributes.Sealed, systemObject);
+        var globalConstructor = new MethodDefinition(".cctor", MethodAttributes.Private | MethodAttributes.HideBySig
+                                                               | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName 
+                                                               | MethodAttributes.Static , CilTypeOf(TypeSymbol.Void));
+        globalsType.Methods.Add(globalConstructor);
+        return globalsType;
+    } 
+   
     public static void EmitProgram(BoundProgram program, ErrorWarrningBag diag, bool debug = false)
     {
         var emitter = new Emitter(diag, debug);
@@ -177,18 +198,19 @@ public sealed class Emitter{
             EmitFunctionDeclaration(func);
         }
 
+        var globalsProcessor = _globalsType.Methods[0].Body.GetILProcessor();
+        foreach(var globalVar in program.GlobalVariables)
+        {
+            EmitGlobalVariableDeclaration(globalsProcessor, globalVar);
+        }
+        globalsProcessor.Emit(OpCodes.Ret);
+        globalsProcessor.Body.OptimizeMacros();
+
         foreach(var (func, body) in program.Functions)
         {
             EmitFunctionBody(func, body);
         }
-
-        //TODO: What to do for entrypoint?
-        // _writer.WriteLine(".method private hidebysig static void Main ( string[] args) cil managed {");
-        // _writer.WriteLine(".entrypoint");
-        // var main = program.Functions
-        //            .Where(f => f.Key.Name == "main")
-        //            .Select(f => _funcs[f.Key])
-        //            .FirstOrDefault() ?? throw new Exception("UH OH - no main?");
+        
         var main = _funcs[program.MainFunc is not null ? program.MainFunc : program.ScriptMain!];
         _assemblyDef.EntryPoint = main;
         _assemblyDef.Write(outfile);
@@ -238,6 +260,15 @@ public sealed class Emitter{
         }
     }
 
+    private void EmitGlobalVariableDeclaration(ILProcessor processor, BoundVarDeclaration globalVar)
+    {
+        var fieldDef = new FieldDefinition(globalVar.Symbol.Name, FieldAttributes.Public | FieldAttributes.Static, CilTypeOf(globalVar.Type));
+        _globalsType.Fields.Add(fieldDef);
+        EmitExpression(processor, globalVar.RightHandSide);
+        processor.Emit(OpCodes.Stsfld, fieldDef);
+        _globals[globalVar.Symbol] = fieldDef;
+    }
+
     private void EmitStatement(ILProcessor processor, BoundStatement statement)
     {
         switch(statement)
@@ -272,7 +303,7 @@ public sealed class Emitter{
 
     private void EmitVariableDeclaration(ILProcessor processor, BoundVarDeclaration varDecl)
     {
-        var variable = new VariableDefinition(CilTypeOf(varDecl.Symbol.Type));
+        var variable = new VariableDefinition(CilTypeOf(varDecl.Type));
         _locals[varDecl.Symbol] = variable;
         processor.Body.Variables.Add(variable);
         
@@ -714,6 +745,11 @@ public sealed class Emitter{
             processor.Emit(OpCodes.Starg, ps.Placement);
             return;
         }
+        if(variable is GlobalVariableSymbol gs)
+        {
+            processor.Emit(OpCodes.Stsfld, _globals[gs]);
+            return;
+        }
         var variabledef = _locals[variable];
         processor.Emit(OpCodes.Stloc, variabledef);
     }
@@ -726,6 +762,9 @@ public sealed class Emitter{
                 if(name.Symbol is ParameterSymbol ps)
                 {
                     processor.Emit(OpCodes.Ldarg, ps.Placement);
+                } else if(name.Symbol is GlobalVariableSymbol gs) {
+                    var variable = _globals[gs];
+                    processor.Emit(OpCodes.Ldsfld, variable);
                 } else {
                     var variable = _locals[name.Symbol];
                     processor.Emit(OpCodes.Ldloc, variable);
