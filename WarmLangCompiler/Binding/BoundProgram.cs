@@ -5,13 +5,26 @@ namespace WarmLangCompiler.Binding;
 
 public sealed class BoundProgram
 {
-    public BoundProgram(BoundBlockStatement statement, ImmutableDictionary<FunctionSymbol, BoundBlockStatement> functions)
+    public BoundProgram(FunctionSymbol? mainFunc, FunctionSymbol? scriptMain, ImmutableDictionary<FunctionSymbol, BoundBlockStatement> functions, ImmutableArray<BoundVarDeclaration> globalVariables)
     {
-        Statement = statement;
+        MainFunc = mainFunc;
+        ScriptMain = scriptMain;
         Functions = functions;
+        GlobalVariables = globalVariables;
     }
-    public BoundBlockStatement Statement { get; }
-    public ImmutableDictionary<FunctionSymbol, BoundBlockStatement> Functions { get; }
 
-    public override string ToString() => $"Bound program for:\n  {Statement}";
+    public FunctionSymbol? MainFunc { get; }
+    public FunctionSymbol? ScriptMain { get; }
+    public ImmutableDictionary<FunctionSymbol, BoundBlockStatement> Functions { get; }
+    public ImmutableArray<BoundVarDeclaration> GlobalVariables { get; }
+
+    public bool IsValid => MainFunc is not null || ScriptMain is not null;
+
+    public override string ToString()
+    {
+        if(!IsValid)
+            return "Non-valid program - not entry points";
+        var entry = MainFunc is null ? ScriptMain! : MainFunc;
+        return entry.ToString() + " " + Functions[entry];
+    }
 }

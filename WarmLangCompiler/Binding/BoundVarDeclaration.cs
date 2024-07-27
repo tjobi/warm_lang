@@ -14,4 +14,6 @@ public sealed class BoundVarDeclaration : BoundStatement
 
     public VariableSymbol Symbol { get; }
     public BoundExpression RightHandSide { get; }
+
+    public TypeSymbol Type => Symbol.Type;
 }

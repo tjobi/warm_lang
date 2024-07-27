@@ -5,6 +5,8 @@ namespace WarmLangCompiler.Binding;
 public sealed class BoundSymbolScope
 {
     private readonly List<Dictionary<string,Symbol>> _scopeStack;
+    
+    public Dictionary<string, Symbol> GlobalScope => _scopeStack[0];
 
     public BoundSymbolScope()
     {
@@ -19,6 +21,8 @@ public sealed class BoundSymbolScope
     public Dictionary<string, Symbol> PopScope()
     {
         var mostRecentScope = _scopeStack[^1];
+        if(_scopeStack.Count > 0)
+            _scopeStack.RemoveAt(_scopeStack.Count-1);
         return mostRecentScope;
     }
 
@@ -40,12 +44,22 @@ public sealed class BoundSymbolScope
 
     public bool TryDeclare(string name, Symbol type)
     {
+        if(type is GlobalVariableSymbol)
+            return TryDeclareGlobal(name, type);
         var mostRecentScope = _scopeStack[^1];
         if(mostRecentScope.ContainsKey(name))
         {
             return false;
         }
         mostRecentScope.Add(name, type);
+        return true;
+    }
+
+    private bool TryDeclareGlobal(string name, Symbol type)
+    {
+        if(GlobalScope.ContainsKey(name))
+            return false;
+        GlobalScope.Add(name, type);
         return true;
     }
 
@@ -74,7 +88,7 @@ public sealed class BoundSymbolScope
             var layer = _scopeStack[i];
             foreach(var key in layer.Keys)
             {
-                Console.WriteLine($"\t({key},{layer[key]})");
+                Console.WriteLine($"  ({key},{layer[key]})");
             }
         }
     }

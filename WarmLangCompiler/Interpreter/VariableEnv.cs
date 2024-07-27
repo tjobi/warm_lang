@@ -1,57 +1,78 @@
 namespace WarmLangCompiler.Interpreter;
+
 using System.Text;
 using WarmLangCompiler.Interpreter.Values;
-public sealed class VariableEnv : IAssignableEnv<string,Value>
+using WarmLangCompiler.Symbols;
+
+public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
 {
-    private readonly List<Dictionary<string,Value>> env;
+    private readonly List<Dictionary<VariableSymbol,Value>> env;
+
+    private Dictionary<VariableSymbol, Value> _globalScope => env[0];
     public VariableEnv()
     {
-        env = new List<Dictionary<string, Value>>() { new() };
+        env = new List<Dictionary<VariableSymbol, Value>>() { new() };
     }
-    public (Value, IEnv<string, Value>) Declare(string name, Value value)
+
+    public (Value, IEnv<VariableSymbol, Value>) Declare(VariableSymbol name, Value value)
     {
-        var mostRecentScope = env.Last();
-        mostRecentScope[name] = value;
+        Dictionary<VariableSymbol, Value> scope;
+        if(name is GlobalVariableSymbol)
+            scope = _globalScope;
+        else
+            scope = env.Last();
+        scope[name] = value;
         return (value, this);
     }
 
-    public (Value, IAssignableEnv<string, Value>) Assign(string name, Value value)
+    public (Value, IAssignableEnv<VariableSymbol, Value>) Assign(VariableSymbol name, Value value)
     {
-        for (int i = env.Count - 1; i >= 0 ; i--)
+        if(name is GlobalVariableSymbol && _globalScope.ContainsKey(name))
         {
-            var scope = env[i];
-            if(scope.ContainsKey(name))
+            _globalScope[name] = value;
+            return (value, this);
+        } else {
+            for (int i = env.Count - 1; i >= 0 ; i--)
             {
-                scope[name] = value;
-                return (value, this);
+                var scope = env[i];
+                if(scope.ContainsKey(name))
+                {
+                    scope[name] = value;
+                    return (value, this);
+                }
             }
         }
         throw new Exception($"Name {name} does not exist");
     }
 
-    public Value Lookup(string name)
+    public Value Lookup(VariableSymbol name)
     {
-        for (int i = env.Count - 1; i >= 0 ; i--)
+        if(name is GlobalVariableSymbol && _globalScope.ContainsKey(name))
+            return _globalScope[name];
+        else 
         {
-            var scope = env[i];
-            if(scope.TryGetValue(name, out var res))
+            for (int i = env.Count - 1; i >= 0 ; i--)
             {
-                return res;
+                var scope = env[i];
+                if(scope.TryGetValue(name, out var res))
+                {
+                    return res;
+                }
             }
         }
         throw new Exception($"Variable {name} has not been declared.");
     }
 
-    public IEnv<string, Value> Pop()
+    public IEnv<VariableSymbol, Value> Pop()
     {
         if(env.Count > 0)
             env.RemoveAt(env.Count-1);
         return this;
     }
 
-    public IEnv<string, Value> Push()
+    public IEnv<VariableSymbol, Value> Push()
     {
-        env.Add(new Dictionary<string, Value>());
+        env.Add(new Dictionary<VariableSymbol, Value>());
         return this;
     }
 

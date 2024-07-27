@@ -9,14 +9,26 @@ namespace WarmLangCompiler.Interpreter;
 public sealed class BoundInterpreter
 {
     private readonly BoundProgram program;
+    private readonly FunctionSymbol _entryPoint;
     private VariableEnv _variableEnvironment;
     private FunctionEnv _functionEnvironment;
 
     public BoundInterpreter(BoundProgram program)
     {
         this.program = program;
-        _variableEnvironment = new();
+        if(program.MainFunc is not null)
+            _entryPoint = program.MainFunc;
+        else if(program.ScriptMain is not null)
+            _entryPoint = program.ScriptMain;
+        else 
+            throw new Exception($"Received a program where both '{nameof(program.MainFunc)}' and '{nameof(program.ScriptMain)}' are missing");
+        
         _functionEnvironment = new(program.Functions);
+        _variableEnvironment = new();
+        foreach(var globalVar in program.GlobalVariables)
+        {
+            EvaluateVarDeclaration(globalVar);
+        }
     }
 
     public static Value Run(BoundProgram program)
@@ -25,7 +37,7 @@ public sealed class BoundInterpreter
         return runner.Run();
     }
 
-    public Value Run() => EvaluateStatement(program.Statement);
+    public Value Run() => EvaluateStatement(_functionEnvironment.Lookup(_entryPoint));
 
     private Value EvaluateStatement(BoundStatement statement)
     {
@@ -93,7 +105,7 @@ public sealed class BoundInterpreter
     private Value EvaluateVarDeclaration(BoundVarDeclaration varDecl)
     {
         var initializer = EvaluateExpression(varDecl.RightHandSide);
-        _variableEnvironment.Declare(varDecl.Symbol.Name, initializer);
+        _variableEnvironment.Declare(varDecl.Symbol, initializer);
         return initializer;
     }
 
@@ -206,7 +218,7 @@ public sealed class BoundInterpreter
         for (int i = 0; i < call.Arguments.Length; i++)
         {
             //var paramType = funcParams[i].Type; //We have checked this type in the binder, should be all good!
-            var paramName = funcParams[i].Name;
+            var paramName = funcParams[i];
             var paramValue = EvaluateExpression(callArgs[i]);
             _variableEnvironment.Declare(paramName, paramValue);
         }
@@ -258,7 +270,7 @@ public sealed class BoundInterpreter
             case BoundNameAccess nameAccess:
             {
                 res = EvaluateExpression(assign.RightHandSide);
-                _variableEnvironment.Assign(nameAccess.Symbol.Name, res);
+                _variableEnvironment.Assign(nameAccess.Symbol, res);
             } break;
             case BoundSubscriptAccess sa:
             {
@@ -291,7 +303,7 @@ public sealed class BoundInterpreter
         {
             case BoundNameAccess nameAccess:
             {
-                return _variableEnvironment.Lookup(nameAccess.Symbol.Name);
+                return _variableEnvironment.Lookup(nameAccess.Symbol);
             }
             case BoundExprAccess ae: 
             {
@@ -330,7 +342,7 @@ public sealed class BoundInterpreter
     {
         return accessTarget switch
         {
-            BoundNameAccess na => _variableEnvironment.Lookup(na.Symbol.Name),
+            BoundNameAccess na => _variableEnvironment.Lookup(na.Symbol),
             BoundExprAccess ea => EvaluateExpression(ea.Expression),
             _ => throw new Exception($"{nameof(BoundInterpreter)} access expression - your code didn't work bro"),
         };

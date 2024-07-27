@@ -1,27 +1,28 @@
 using System.Collections.Immutable;
-using WarmLangLexerParser.AST;
 using System.Text;
+using WarmLangLexerParser;
 
 namespace WarmLangCompiler.Symbols;
 
 public class FunctionSymbol : Symbol
 {
     //Function symbol contains: name, parameters, returnType, body
-    public FunctionSymbol(FuncDeclaration declaration, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
-    :this(declaration.NameToken.Name!, parameters, type, declaration) { }
+    public FunctionSymbol(SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
+    :this(nameToken.Name!, parameters, type, nameToken.Location) { }
 
 
-    internal FunctionSymbol(string name, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type, FuncDeclaration declaration) 
+    internal FunctionSymbol(string name, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type, TextLocation location) 
     : base(name)
     {
         Parameters = parameters;
         Type = type;
-        Declaration = declaration;
+        Location = location;
     }
-
-    public FuncDeclaration Declaration { get; }
+    
     public ImmutableArray<ParameterSymbol> Parameters { get; }
     public TypeSymbol Type { get; }
+
+    public TextLocation Location { get; }
 
     public override string ToString()
     {
@@ -35,4 +36,13 @@ public class FunctionSymbol : Symbol
         }
         return sb.Append(')').ToString();
     }
+
+    public static FunctionSymbol CreateMain(string name = "wl_main")
+     => new(
+            name,
+            ImmutableArray<ParameterSymbol>.Empty,
+            TypeSymbol.Void,
+            new TextLocation(0,0)
+        );
+    
 }

@@ -7,7 +7,9 @@ public record struct ParsedArgs(
     bool BinderDebug = false,
     bool TraceExceptions = false,
     bool Interactive = false,
-    bool Evaluate = false
+    bool Evaluate = false,
+    bool EmitterDebug = false,
+    string? OutPath = null
     );
 public static class ArgsParser
 {
@@ -15,10 +17,12 @@ public static class ArgsParser
     {
         Console.WriteLine("Usage:");
         Console.WriteLine("\tprogram            - path to a .test file to lex, parse, and evaluate");
+        Console.WriteLine("\t-o, --out          - specifies the outpath of compiled dll");
         Console.WriteLine("\t-lh, --lang-help   - Show command line help");
         Console.WriteLine("\t--lex-debug        - enables debug information for lexer");
         Console.WriteLine("\t--parser-debug     - enables debug information for parser");
         Console.WriteLine("\t--binder-debug     - enables debug information for binder");
+        Console.WriteLine("\t--emitter-debug    - enables debug information from emitter - prints the instructions of function bodies");
         Console.WriteLine("\t--trace            - prints a stacktrace if an exception goes uncaught");
         Console.WriteLine("\t-is,--interactive  - enables interactive mode");
         Console.WriteLine("\t--eval             - evaluates the code without compiling");
@@ -32,8 +36,9 @@ public static class ArgsParser
 
         var isLookingForFile = true;
         var argsContainedProgram = false;
-        foreach (var arg in args)
+        for (int i = 0; i < args.Length; i++)
         {
+            var arg = args[i];
             switch(arg)
             {
                 case "-lh": //short for "lang help" otherwise it is caught by "dotnet run"
@@ -42,6 +47,19 @@ public static class ArgsParser
                     Help();
                     return null;
                 }
+                case "-o":
+                case "--out":
+                {
+                    if(i < args.Length)
+                    {
+                        i++;
+                        parsedArgs.OutPath = args[i];
+                    } else
+                    {
+                        Help();
+                        return null;
+                    }
+                } break;
                 case "-is":
                 case "--interactive":
                 {
@@ -50,6 +68,10 @@ public static class ArgsParser
                 case "--lex-debug":
                 {
                     parsedArgs.LexerDebug = true;
+                } break;
+                case "--emitter-debug":
+                {
+                    parsedArgs.EmitterDebug = true;
                 } break;
                 case "--parser-debug":
                 {
@@ -92,7 +114,8 @@ public static class ArgsParser
 
     public static void Deconstruct(this ParsedArgs args, out string program, out bool parserDebug,
                                    out bool lexerDebug, out bool binderDebug,
-                                   out bool longExceptions, out bool interactive, out bool shouldEvaluate)
+                                   out bool longExceptions, out bool interactive, out bool shouldEvaluate,
+                                   out bool emitterDebug, out string? outPath)
     {
         program = args.Program;
         parserDebug = args.ParserDebug;
@@ -101,6 +124,8 @@ public static class ArgsParser
         interactive = args.Interactive;
         binderDebug = args.BinderDebug;
         shouldEvaluate = args.Evaluate;
+        emitterDebug = args.EmitterDebug;
+        outPath = args.OutPath;
         return;
     }
 }

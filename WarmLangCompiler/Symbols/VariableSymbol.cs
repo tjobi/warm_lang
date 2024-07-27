@@ -9,4 +9,6 @@ public class VariableSymbol : Symbol
     }
 
     public TypeSymbol Type { get; }
+
+    public override string ToString() => $"{Type} {Name}";
 }
