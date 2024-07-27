@@ -7,6 +7,8 @@ using WarmLangCompiler.Symbols;
 public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
 {
     private readonly List<Dictionary<VariableSymbol,Value>> env;
+
+    private Dictionary<VariableSymbol, Value> _globalScope => env[0];
     public VariableEnv()
     {
         env = new List<Dictionary<VariableSymbol, Value>>() { new() };
@@ -16,7 +18,7 @@ public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
     {
         Dictionary<VariableSymbol, Value> scope;
         if(name is GlobalVariableSymbol)
-            scope = env[0];
+            scope = _globalScope;
         else
             scope = env.Last();
         scope[name] = value;
@@ -25,13 +27,19 @@ public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
 
     public (Value, IAssignableEnv<VariableSymbol, Value>) Assign(VariableSymbol name, Value value)
     {
-        for (int i = env.Count - 1; i >= 0 ; i--)
+        if(name is GlobalVariableSymbol && _globalScope.ContainsKey(name))
         {
-            var scope = env[i];
-            if(scope.ContainsKey(name))
+            _globalScope[name] = value;
+            return (value, this);
+        } else {
+            for (int i = env.Count - 1; i >= 0 ; i--)
             {
-                scope[name] = value;
-                return (value, this);
+                var scope = env[i];
+                if(scope.ContainsKey(name))
+                {
+                    scope[name] = value;
+                    return (value, this);
+                }
             }
         }
         throw new Exception($"Name {name} does not exist");
@@ -39,12 +47,17 @@ public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
 
     public Value Lookup(VariableSymbol name)
     {
-        for (int i = env.Count - 1; i >= 0 ; i--)
+        if(name is GlobalVariableSymbol && _globalScope.ContainsKey(name))
+            return _globalScope[name];
+        else 
         {
-            var scope = env[i];
-            if(scope.TryGetValue(name, out var res))
+            for (int i = env.Count - 1; i >= 0 ; i--)
             {
-                return res;
+                var scope = env[i];
+                if(scope.TryGetValue(name, out var res))
+                {
+                    return res;
+                }
             }
         }
         throw new Exception($"Variable {name} has not been declared.");
