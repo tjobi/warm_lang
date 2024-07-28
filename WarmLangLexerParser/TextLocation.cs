@@ -17,9 +17,11 @@ public record TextLocation(int StartLine, int StartColumn, int EndLine, int EndC
         return new TextLocation(start.StartLine, start.StartColumn, end.EndLine, end.EndColumn);
     }
 
+    public int Length => EndColumn - StartColumn;
+    
     public static TextLocation FromTo(SyntaxToken from, SyntaxToken to) => FromTo(from.Location, to.Location);
 
-    public int Length => EndColumn - StartColumn;
+    public static readonly TextLocation EmptyFile = new(1,1, 1);  
 
     public override string ToString()
     {

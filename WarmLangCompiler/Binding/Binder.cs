@@ -33,7 +33,7 @@ public sealed class Binder
     {
         if(node is not ASTRoot root)
             throw new NotImplementedException($"Binder only allows root to be '{nameof(ASTRoot)}'");
-        
+
         var (bound, globalStatments, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
 
         var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
@@ -90,8 +90,10 @@ public sealed class Binder
                topLevelstatments.Add(bound);
             }
         }
-        var boundChildren = Lowerer.LowerProgram(new BoundBlockStatement(topLevelstatments[0].Node, topLevelstatments.MoveToImmutable()));
-        //TODO: What should be the syntax element of the NODE? where in the source code does the root originate?
+        //What if we parsed an empty file?
+        var rootNode = root.Children.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
+        var boundChildren = Lowerer.LowerProgram(new BoundBlockStatement(rootNode, topLevelstatments.MoveToImmutable()));
+        
         return (boundChildren, globals.ToImmutable(), hasGlobalArbitraries);
     }
 

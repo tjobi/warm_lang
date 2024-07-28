@@ -53,14 +53,8 @@ public class BinderTests
         //int x = 5;
         var vardecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"), ConstCreater(5));
         var input = MakeRoot(vardecl);    
-        var expected = new BoundProgram(
-            null,
-            null,
-            ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty,
-            new BoundVarDeclaration[]{
-                new(vardecl, new VariableSymbol("x", TypeSymbol.Int), 
-                new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int))
-            }.ToImmutableArray()            
+        var expected = CreateBoundProgram(
+            new BoundVarDeclaration(vardecl, new VariableSymbol("x", TypeSymbol.Int), new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int))
         );
 
         var boundProgram = _binder.BindProgram(input);

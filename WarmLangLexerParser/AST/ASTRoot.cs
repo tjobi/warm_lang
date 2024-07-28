@@ -10,7 +10,7 @@ public sealed class ASTRoot : ASTNode
     }
 
     public ASTRoot(List<TopLevelStamentNode> children)
-    :this(children, children.Count > 0 ? TextLocation.FromTo(children[0].Location, children[^1].Location) : new TextLocation(0,0)) { }
+    :this(children, children.Count > 0 ? TextLocation.FromTo(children[0].Location, children[^1].Location) : TextLocation.EmptyFile) { }
 
     public List<TopLevelStamentNode> Children { get; }
 

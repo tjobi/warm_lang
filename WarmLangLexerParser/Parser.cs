@@ -76,7 +76,7 @@ public class Parser
         if(statements.Count > 0)
             location = TextLocation.FromTo(statements[0].Location, statements[^1].Location);
         else
-            throw new Exception("Parser: Parsed 0 toplevelstatments, file empty?");
+            location = TextLocation.EmptyFile;
         return new ASTRoot(statements, location);
     }
 

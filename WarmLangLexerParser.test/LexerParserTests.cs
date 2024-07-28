@@ -29,6 +29,8 @@ public class LexerParserTests
     private Parser GetParser(Lexer lexer) => new(lexer.Lex(), _diag);
     private Parser GetParser(IList<SyntaxToken> tokens) => new(tokens, _diag);
 
+    private Parser GetParserFromString(string input) => GetParser(GetLexer(input));
+
     private BlockStatement MakeEntryBlock(TextLocation start, TextLocation end, params StatementNode[] statements)
     {
         var open = MakeToken(TBadToken, start);
@@ -1299,5 +1301,17 @@ h"";";
         result[3].Name!.Should().Be("y\ny");
         result.Should().BeEquivalentTo(expected);
         _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserEmptyInput()
+    {
+        var input = "";
+
+        var expected = MakeRoot();
+
+        var parsed = GetParserFromString(input).Parse();
+
+        parsed.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
     }
 }
