@@ -20,6 +20,8 @@ public sealed class BoundProgram
 
     public bool IsValid => MainFunc is not null || ScriptMain is not null;
 
+    public BoundBlockStatement Entry => IsValid ? Functions[MainFunc ?? ScriptMain!] : throw new Exception("INVALID BOUND PROGRAM");
+
     public override string ToString()
     {
         if(!IsValid)

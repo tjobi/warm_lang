@@ -9,6 +9,9 @@ public sealed class ASTRoot : ASTNode
         Children = children;
     }
 
+    public ASTRoot(List<TopLevelStamentNode> children)
+    :this(children, children.Count > 0 ? TextLocation.FromTo(children[0].Location, children[^1].Location) : new TextLocation(0,0)) { }
+
     public List<TopLevelStamentNode> Children { get; }
 
     public override string ToString()

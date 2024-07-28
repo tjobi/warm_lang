@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.TypeSyntax;
 using WarmLangLexerParser;
+using WarmLangCompiler.Binding.Lower;
 
 public class BinderTests
 {
@@ -17,36 +18,57 @@ public class BinderTests
     {
         _diag = new ErrorWarrningBag();
         _binder = new Binder(_diag);
-        
     }
 
     private static BlockStatement CreateBlockStatement(params StatementNode[] statements) => new(MakeToken(TCurLeft,1,1), statements.ToList(), MakeToken(TCurRight,1,1));
     private static BoundBlockStatement CreateBoundBlockStatement(StatementNode syntax, params BoundStatement[] statements) => new(syntax, statements.ToImmutableArray());
-    private static BoundProgram CreateBoundProgram(StatementNode syntax, params BoundStatement[] statements) => new(CreateBoundBlockStatement(syntax, statements), ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty);
+    private static BoundProgram CreateBoundProgram(params BoundStatement[] statements) 
+    {
+        var globals = statements.Where(s => s is BoundVarDeclaration).Select(s => (BoundVarDeclaration)s).ToImmutableArray();
+        var body = statements.Where(s => s is not BoundFunctionDeclaration or BoundVarDeclaration).ToImmutableArray();
+        var scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
+        var functions = ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty
+        .Add(
+            scriptMain, Lowerer.LowerBody(scriptMain, new BoundBlockStatement(body[0].Node, body))
+        );
+        return new BoundProgram(null, scriptMain, functions, globals);
+    }
     private static ConstExpression ConstCreater(int val) => new(val, new TextLocation(1,1));
     private static SyntaxToken MakeVariableToken(string name) => MakeToken(TIdentifier, new TextLocation(1,1, length:name.Length), name);
+
+    private static ASTRoot MakeRoot(params StatementNode[] statements)
+    {
+        var children = statements.Select(s => (TopLevelStamentNode) (s switch {
+                                                VarDeclaration var => new TopLevelVarDeclaration(var),
+                                                FuncDeclaration func => new TopLevelFuncDeclaration(func),
+                                                _ => new TopLevelArbitraryStament(s)
+                                                }))
+                                  .ToList();
+        return new ASTRoot(children);
+    }
 
     [Fact]
     public void BindVariableDeclarationForConstantInteger()
     {
-        var input = CreateBlockStatement(
-            new VarDeclaration(_syntaxInt,MakeVariableToken("x"), ConstCreater(5))
-        );        
+        //int x = 5;
+        var vardecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"), ConstCreater(5));
+        var input = MakeRoot(vardecl);    
         var expected = new BoundProgram(
-            new BoundBlockStatement(input, new BoundStatement[]
-            {
-                new BoundVarDeclaration(
-                    new VarDeclaration(_syntaxInt,MakeVariableToken("x"),ConstCreater(5)),
-                    new VariableSymbol("x",TypeSymbol.Int),
-                    new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)
-                ),
-            }.ToImmutableArray()),
-            ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty
+            null,
+            null,
+            ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty,
+            new BoundVarDeclaration[]{
+                new(vardecl, new VariableSymbol("x", TypeSymbol.Int), 
+                new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int))
+            }.ToImmutableArray()            
         );
 
         var boundProgram = _binder.BindProgram(input);
 
-        boundProgram.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        //Some funky fluent assertions happen when using "BeEquivalentTo" on the boundProgram
+        //boundProgram.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
+        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
 
@@ -62,16 +84,15 @@ public class BinderTests
                     },
                     MakeToken(TBracketRight,1,1));
         var varDecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"),rhs);
-        var input = CreateBlockStatement(varDecl);
-        var expected = new BoundProgram(CreateBoundBlockStatement(
-            input,
+        var input = MakeRoot(varDecl);
+        var expected = CreateBoundProgram(
             new BoundVarDeclaration(varDecl,new VariableSymbol("x", TypeSymbol.Int),
                 new BoundListExpression(
                     rhs,
                     TypeSymbol.IntList,
                     new BoundExpression[]{new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)}.ToImmutableArray())
             )
-        ),ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty);
+        );
         var expectedErrorBag = new ErrorWarrningBag();
         expectedErrorBag.ReportCannotConvertToType(rhs.Location, TypeSymbol.Int, TypeSymbol.IntList);
 
@@ -87,21 +108,21 @@ public class BinderTests
         //int[] x = [];
         var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),MakeToken(TBracketRight,1,1), null);
         var varDecl = new VarDeclaration(_syntaxIntList,MakeVariableToken("x"),rhs);
-        var input = CreateBlockStatement(varDecl);
-        var expected = new BoundProgram(
-            CreateBoundBlockStatement(input,
-                new BoundVarDeclaration(varDecl,new VariableSymbol("x", TypeSymbol.IntList),
+        var input = MakeRoot(varDecl);
+        var expected = CreateBoundProgram(
+            new BoundVarDeclaration(varDecl,new VariableSymbol("x", TypeSymbol.IntList),
                     new BoundTypeConversionExpression(rhs, TypeSymbol.IntList,
                         new BoundListExpression(
                             rhs,
                             TypeSymbol.EmptyList, new ImmutableArray<BoundExpression>())
                     )
                 )
-            ), ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty);
-
+        );
+        
         var boundProgram = _binder.BindProgram(input);
 
-        boundProgram.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
+        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
 
@@ -111,16 +132,18 @@ public class BinderTests
         //x;
         var nameAccess = new NameAccess(MakeToken(TIdentifier,0,0,"x"));
         var accessExpr = new AccessExpression(nameAccess);
-        var input = CreateBlockStatement(new ExprStatement(accessExpr));
-        var expected = CreateBoundProgram(input,
-            new BoundExprStatement(new ExprStatement(accessExpr),new BoundErrorExpression(accessExpr))
-        );
+        var exprStmnt = new ExprStatement(accessExpr);
+        var input = MakeRoot(exprStmnt);
+        var expected = CreateBoundProgram(new BoundErrorStatement(exprStmnt));
+
         var expectedErrorBag = new ErrorWarrningBag();
         expectedErrorBag.ReportNameDoesNotExist(nameAccess.Location, nameAccess.Name);
 
         var boundProgram = _binder.BindProgram(input);
 
-        boundProgram.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        
+        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
+        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEquivalentTo(expectedErrorBag);
     }
 
@@ -137,9 +160,9 @@ public class BinderTests
                 MakeToken(TCurRight,1,1));
         var binaryExpression = new BinaryExpression(left,plus,right);
         var exprStatement = new ExprStatement(binaryExpression);
-        var input = CreateBlockStatement(exprStatement);
+        var input = MakeRoot(exprStatement);
 
-        var expected = CreateBoundProgram(input,
+        var expected = CreateBoundProgram(
             new BoundExprStatement(
                 exprStatement, 
                 new BoundBinaryExpression(
@@ -152,11 +175,13 @@ public class BinderTests
                         {
                             new BoundConstantExpression(two, TypeSymbol.Int),
                         }.ToImmutableArray())
-                    )));
+                    ))
+        );
         
         var boundProgram = _binder.BindProgram(input);
 
-        boundProgram.Should().BeEquivalentTo(expected,  opt => opt.RespectingRuntimeTypes());
+        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
+        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();
     }
 
@@ -173,9 +198,9 @@ public class BinderTests
                 MakeToken(TCurRight,1,1));
         var binaryExpression = new BinaryExpression(left,plus,right);
         var exprStatement = new ExprStatement(binaryExpression);
-        var input = CreateBlockStatement(exprStatement);
+        var input = MakeRoot(exprStatement);
 
-        var expected = CreateBoundProgram(input,
+        var expected = CreateBoundProgram(
             new BoundExprStatement(
                 exprStatement, 
                 new BoundErrorExpression(binaryExpression)));
@@ -185,7 +210,9 @@ public class BinderTests
         expectedBag.ReportBinaryOperatorCannotBeApplied(new TextLocation(1,1), plus, TypeSymbol.EmptyList, TypeSymbol.IntList);
         expectedBag.ReportTypeOfEmptyListMustBeExplicit(new TextLocation(1,1));
 
-        boundProgram.Should().BeEquivalentTo(expected,  opt => opt.RespectingRuntimeTypes());
+        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
+        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
+        
         _diag.Count().Should().Be(2);
         _diag.Should().BeEquivalentTo(
             expectedBag, 

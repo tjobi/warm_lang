@@ -52,7 +52,7 @@ public sealed class Binder
             main = mainSymbol;
         }
         
-        if(hasGlobalNonDeclarationStatements)
+        if(hasGlobalNonDeclarationStatements || main is null)
         {  
             if(main is not null)
                 _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
@@ -61,7 +61,7 @@ public sealed class Binder
             var scriptMainBody = Lowerer.LowerBody(scriptMain, new BoundBlockStatement(bound.Node, globalStatments));
             functions[scriptMain] = scriptMainBody;
         }
-
+    
         var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>();
         foreach(var stmnt in globalStatments)
             if(stmnt is BoundVarDeclaration var)
