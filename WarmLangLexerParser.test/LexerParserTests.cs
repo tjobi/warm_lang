@@ -5,7 +5,6 @@ using static SyntaxToken;
 using static TokenKind;
 using WarmLangLexerParser.ErrorReporting;
 using WarmLangLexerParser.AST.TypeSyntax;
-using Xunit.Sdk;
 
 public class LexerParserTests
 { 
@@ -39,6 +38,16 @@ public class LexerParserTests
 
     private BlockStatement MakeEntryBlock(string input, params StatementNode[] statements)
     => MakeEntryBlock(new TextLocation(1,1), new TextLocation(1,input.Length+1), statements);
+
+    private static ASTRoot MakeRoot(params StatementNode[] topLevelStatements)
+    {
+        var children = topLevelStatements.Select(s => (TopLevelStamentNode) (s switch {
+                                                VarDeclaration var => new TopLevelVarDeclaration(var),
+                                                FuncDeclaration func => new TopLevelFuncDeclaration(func),
+                                                _ => new TopLevelArbitraryStament(s)
+                                                })).ToList();
+        return new ASTRoot(children);
+    }
 
     [Fact]
     public void TestLexerCommentShouldSucceed()
@@ -155,9 +164,9 @@ x;
     }
 
     [Theory]
-    [InlineData("5*(4+4);", "{(Cst 5 * (Cst 4 + Cst 4));}")]
-    [InlineData("5*4+4;", "{((Cst 5 * Cst 4) + Cst 4);}")]
-    [InlineData("(5*(4+4))*5;", "{((Cst 5 * (Cst 4 + Cst 4)) * Cst 5);}")]
+    [InlineData("5*(4+4);", "Root: {(Cst 5 * (Cst 4 + Cst 4));}")]
+    [InlineData("5*4+4;", "Root: {((Cst 5 * Cst 4) + Cst 4);}")]
+    [InlineData("(5*(4+4))*5;", "Root: {((Cst 5 * (Cst 4 + Cst 4)) * Cst 5);}")]
     public void TestLexerParserPrecedenceShouldSucceed(string input, string expected)
     {
         //AAA
@@ -196,7 +205,7 @@ x;
     public void TestLexerParserVariableAssignment()
     {
         string input = "int x = 5; x = 10;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxInt(new TextLocation(1,1,length:3)),
                 MakeToken(TIdentifier,new TextLocation(1,5), "x"),
@@ -222,7 +231,7 @@ x;
         string input = "x = 10;";
         var expectedNameToken = MakeToken(TIdentifier,1,1, "x");
         ExpressionNode expectedExpr = new ConstExpression(MakeToken(TConst, new TextLocation(1,5,length:2), intValue:10));
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new AssignmentExpression(
                     new NameAccess(expectedNameToken),
@@ -267,7 +276,7 @@ x;
     public void TestLexerParserIfThenElseStatement()
     {
         string input = "if 0 {2;} else {5;}";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new IfStatement(
                 MakeToken(TIf,1,1,1,3),
                 new ConstExpression(0, new TextLocation(1,4)),
@@ -301,7 +310,7 @@ x;
     public void TestLexerParserIfThenStatement()
     {
         string input = "if 0 { 2; }";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new IfStatement(
                 MakeToken(TIf,1,1),
                 new ConstExpression(MakeToken(TConst,1,4,intValue:0)),
@@ -356,7 +365,7 @@ x;
     public void TestLexerParserFunctionDeclarationKeywordNoParams()
     {
         var input = "function f(){ int x = 10; x; }";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new FuncDeclaration(
                 MakeToken(TFunc,new TextLocation(1,1,length:8)),
                 MakeToken(TIdentifier,1,10,"f"),
@@ -385,7 +394,7 @@ x;
     public void TestLexerParserFunctionDeclarationKeyword()
     {
         var input = "function f(int y, int z, int l){ int x = 10; x + y; }";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new FuncDeclaration(
                 MakeToken(TFunc,1,1,1,9),
                 MakeToken(TIdentifier,1,10,"f"),
@@ -424,7 +433,7 @@ x;
     public void TextLexerParserFunctionCall()
     {
         var input = "f();";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new CallExpression(
                     MakeToken(TIdentifier, 1,1, "f"),
@@ -444,7 +453,7 @@ x;
     public void TextLexerParserFunctionCallWithParams()
     {
         var input = "f(2+5,10);";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new CallExpression(
                     MakeToken(TIdentifier, 1,1, "f"), 
@@ -474,7 +483,7 @@ x;
     public void TestLexerParserUnaryMinus()
     {
         var input = "int x = -1;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxInt(new TextLocation(1,1,length:3)),
                 MakeToken(TIdentifier,1,5,"x"),
@@ -495,7 +504,7 @@ x;
     public void TestLexerParserDoubleUnaryMinus()
     {
         var input = "int x = - -1;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxInt(new TextLocation(1,1,length:3)),
                 MakeToken(TIdentifier,1,5, "x"),
@@ -516,7 +525,7 @@ x;
     public void TestLexerParserDoubleUnaryPlus()
     {
         var input = "int x = + + 1;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxInt(new TextLocation(1,1, length:3)),
                 MakeToken(TIdentifier,1,5,"x"),
@@ -537,7 +546,7 @@ x;
     public void TestLexerParserForListInitialization()
     {
         var input = "int[] xs = [1,2,3+5];";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxList(new TextLocation(1,1,length:5),
                     new TypeSyntaxInt(new TextLocation(1,1,length:3))),
@@ -568,7 +577,7 @@ x;
     public void TestLexerParserForListSubscript()
     {
         var input = "xs[2]";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new AccessExpression(
                     new SubscriptAccess(
@@ -589,7 +598,7 @@ x;
     public void TestLexerParserForListElementAssignment()
     {
         var input = "xs[2] = 25;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new AssignmentExpression(
                     new SubscriptAccess(
@@ -613,7 +622,7 @@ x;
     public void TestLexerParserListElementAssignmentEqualsListElement()
     {
         var input = "xs[2] = xs[10];";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new AssignmentExpression(
                     new SubscriptAccess(
@@ -641,7 +650,7 @@ x;
     public void TestLexerParserForEmptyList()
     {
         var input = "int[] xs = [];";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxList(
                     new TextLocation(1,1,length:3+2), new TypeSyntaxInt(new TextLocation(1,1, length:3))),
@@ -664,7 +673,7 @@ x;
     public void TestLexerParserAddElementToList()
     {
         var input = "int[] xs = []; xs :: 5;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxList(
                     new TextLocation(1,1, length:3+2), 
@@ -695,7 +704,7 @@ x;
     public void TestLexerParserRemoveElementFromList()
     {
         var input = "<-xs;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
@@ -715,7 +724,7 @@ x;
     public void TestLexerParserRemoveAddPrecedence()
     {
         var input = "<- xs :: 20;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TLeftArrow,new TextLocation(1,1,length:2)),
@@ -739,7 +748,7 @@ x;
     public void TestLexerParserSuffixUnaryPrecedence()
     {
         var input = "<- <- xs;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
@@ -762,7 +771,7 @@ x;
     public void TestLexerParsePrefixAndSuffixPrecedence()
     {
         var input = "<- -xs;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
@@ -785,7 +794,7 @@ x;
     public void TestLexerParseParanthesisAndUnaryOperator()
     {
         var input = "-(<- xs);";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TMinus,1,1),
@@ -809,7 +818,7 @@ x;
     public void TestLexerParseParanthesisAndFunctionCall()
     {
         var input = "-(func(2));";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TMinus,1,1),
@@ -834,7 +843,7 @@ x;
     public void TestLexerParseParanthesisAndVariableAssignment()
     {
         var input = "<-(xs = []);";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TLeftArrow, new TextLocation(1,1,length:2)),
@@ -861,7 +870,7 @@ x;
     public void TestLexerParseDoubleSubscript()
     {
         var input = "xs[1][1];";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new AccessExpression(
                     new SubscriptAccess(
@@ -886,7 +895,7 @@ x;
     public void TestLexerParseSubscriptIntoCallExpression()
     {
         var input = "returnsList()[1];";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new AccessExpression(
                     new SubscriptAccess(
@@ -914,7 +923,7 @@ x;
     public void LexerParserLeftArrowFunctionCall()
     {
         var input = "<- f();";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
                     MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
@@ -939,7 +948,7 @@ x;
     public void LexerParserMissingSemicolon()
     {
         var input = "x+2";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new BinaryExpression(
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,1,"x"))),
@@ -963,7 +972,7 @@ x;
     public void LexerParserMissingExpressionAndSemicolon()
     {
         var input = "x+;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ExprStatement(
                 new BinaryExpression(
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,1,"x"))),
@@ -989,7 +998,7 @@ x;
     public void LexerParserWhileStatement()
     {
         var input = "while x {}";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new WhileStatement(
                 MakeToken(TWhile,1,1, 1,6),
                 new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,7),"x"))),
@@ -1011,7 +1020,7 @@ x;
     public void LexerParserFaultyWhileStatement()
     {
         var input = "while x f();";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new WhileStatement(
                 MakeToken(TWhile,new TextLocation(1,1, length:6)),
                 new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,7,"x"))),
@@ -1049,7 +1058,7 @@ x;
     public void LexerParserWhileStatementWithCont()
     {
         var input = "while x : 2+2 {}";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new WhileStatement(
                 MakeToken(TWhile,1,1,1,6),
                 new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,7,"x"))),
@@ -1079,7 +1088,7 @@ x;
     public void LexerParserWhileStatementWithMoreThanOnecont()
     {
         var input = "while x : 2+2,5+5 {}";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new WhileStatement(
                 MakeToken(TWhile, new TextLocation(1,1,1,6)),
                 new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,7),"x"))),
@@ -1114,7 +1123,7 @@ x;
     public void LexerParserFunctionWithReturnType()
     {
         var input = "function f() int {2;}";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new FuncDeclaration(
                 MakeToken(TFunc,new TextLocation(1,1,length:8)),
                 MakeToken(TIdentifier,1,10, "f"),
@@ -1141,7 +1150,7 @@ x;
     public void TestReturnStatementNoExpression()
     {
         var input = "return;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ReturnStatement(MakeToken(TReturn, new TextLocation(1,1,length:6)), null)
         );
 
@@ -1156,7 +1165,7 @@ x;
     public void TestReturnStatementWithExpression()
     {
         var input = "return 2+2;";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new ReturnStatement(
                 MakeToken(TReturn, new TextLocation(1,1,length:6)),
                 new BinaryExpression(
@@ -1178,7 +1187,7 @@ x;
     public void TestLexerParserIfElse()
     {
         var input = "if 0 { } else if 1 { }";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new IfStatement(
                 MakeToken(TIf, new TextLocation(1,1,length:2)),
                 new ConstExpression(0, new TextLocation(1,4)),
@@ -1203,7 +1212,7 @@ x;
     public void LexerParserTestStringLiteral()
     {
         var input = """string s = "hi there";""";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxString(new TextLocation(1,1,length:6)),
                 MakeToken(TIdentifier,1,8,"s"),
@@ -1224,7 +1233,7 @@ x;
     public void LexerParserTestStringLiteralPlus()
     {
         var input = """string s = "hi there" + "y";""";
-        var expected = MakeEntryBlock(input,
+        var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxString(new TextLocation(1,1,length:6)),
                 MakeToken(TIdentifier,1,8,"s"),
