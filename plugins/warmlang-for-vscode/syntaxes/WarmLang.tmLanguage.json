@@ -20,6 +20,9 @@
 				},
 				{
 					"include": "#punctuation-semicolon"
+				},
+				{
+					"include": "#punctuation-colon"
 				}
 			]
 		},
@@ -53,14 +56,25 @@
 		},
 		"comments": {
 			"patterns": [{
-				"name": "comment.line.double-slash",
-				"begin": "//",
+				"begin": "(^\\s+)?(?=//)",
 				"beginCaptures": {
-					"0": {
-						"name": "punctuation.definition.comment.WarmLang"
+					"1": {
+						"name": "punctuation.whitespace.comment.leading.WarmLang"
 					}
 				},
-				"end": "(?=$)"
+				"end": "(?=$)",
+				"patterns": [
+					{
+						"name": "comment.line",
+						"begin": "(?<!/)//(?:(?!/)|(?=//))",
+						"beginCaptures": {
+							"0": {
+								"name": "punctuation.definition.comment.WarmLang"
+							}
+						},
+						"end": "(?=$)"
+					}
+				]
 			}]
 		},
 		"operators": {
@@ -76,6 +90,10 @@
 				{
 					"name":"keyword.operator.logical.WarmLang",
 					"match": "&&|\\!|\\|\\|"
+				},
+				{
+					"name":"keyword.operator.assignment.WarmLang",
+					"match": "\\="
 				},
 				{
 					"name":"keyword.operator.lists.WarmLang",
@@ -169,6 +187,10 @@
 		"punctuation-semicolon": {
 			"name":"punctuation.terminator.statement.WarmLang",
 			"match": ";"
+		},
+		"punctuation-colon": {
+			"name":"punctuation.seperator.statement.WarmLang",
+			"match": ":"
 		},
 		"punctuation-comma": {
 			"name":"punctuation.seperator.comma.WarmLang",
