@@ -1,0 +1,25 @@
+{
+  "name": "warmlang-for-vscode",
+  "displayName": "WarmLang",
+  "description": "Syntax highlighting (and more?) for the WarmLang language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "WarmLang",
+      "aliases": ["WarmLang", "WarmLang"],
+      "extensions": [".wl"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "WarmLang",
+      "scopeName": "source.wl",
+      "path": "./syntaxes/WarmLang.tmLanguage.json"
+    }]
+  }
+}

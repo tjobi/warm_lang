@@ -1,0 +1,179 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "WarmLang",
+	"patterns": [
+		{
+			"include": "#statements"
+		},
+		{
+			"include": "#expressions"
+		}
+	],
+	"repository": {
+		"statements": {
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#punctuation-semicolon"
+				}
+			]
+		},
+		"expressions": {
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#type-builtin"
+				},
+				{
+					"include": "#call-expression"
+				},
+				{
+					"include": "#operators"
+				},
+				{
+					"include": "#strings"
+				},
+				{
+					"include": "#literal"
+				},
+				{
+					"include": "#identifier"
+				},
+				{
+					"include": "#punctuation-semicolon"
+				}
+			]
+		},
+		"comments": {
+			"patterns": [{
+				"name": "comment.line.double-slash",
+				"begin": "//",
+				"beginCaptures": {
+					"0": {
+						"name": "punctuation.definition.comment.WarmLang"
+					}
+				},
+				"end": "(?=$)"
+			}]
+		},
+		"operators": {
+			"patterns": [
+				{
+					"name":"keyword.operator.comparison.WarmLang",
+					"match": "!=|=="
+				},
+				{
+					"name":"keyword.operator.relational.WarmLang",
+					"match": "<=|>=|<|>"
+				},
+				{
+					"name":"keyword.operator.logical.WarmLang",
+					"match": "&&|\\!|\\|\\|"
+				},
+				{
+					"name":"keyword.operator.lists.WarmLang",
+					"match": "::|<-"
+				},
+				{
+					"name":"keyword.operator.arithmetic.WarmLang",
+					"match": "\\+|-|/|\\*"
+				}
+		 	]
+		},
+		"type-builtin": {
+			"patterns": [
+				{
+					"name":"keyword.type.WarmLang",
+					"match": "\\b(string|bool|int)\\b"
+				}
+			]
+		},
+		"call-expression": {
+			"patterns": [
+				{
+					"begin": "([_[:alpha:]][_[:alpha:]]*)\\s*(?=\\()",
+					"beginCaptures": {
+						"0": {
+							"name": "entity.name.function.WarmLang"
+						}
+					},
+					"end": "(?=\\))",
+					"patterns": [
+						{
+							"include": "#expressions"
+						},
+						{
+							"include": "#punctuation-comma"
+						}
+					]
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.WarmLang",
+				"match": "\\b(if|else|while|return|function)\\b"
+			}]
+		},
+		"strings": {
+			"name": "string.quoted.double.WarmLang",
+			"begin": "\"",
+			"beginCaptures": {
+				"0": {
+					"name": "string.quoted.double.begin.WarmLang"
+				}
+			},
+			"end": "(\")|((?:[^\\\\\\n])$)",
+			"endCaptures": {
+				"1": {
+					"name": "string.quoted.double.end.WarmLang"
+				},
+				"2": {
+					"name": "invalid.illegal.newline.WarmLang"
+				}
+			},
+			"patterns": [
+				{
+					"name": "constant.character.escape.WarmLang",
+					"match": "\\\\([nr\"\\\\])"
+				}
+			]
+		},
+		"identifier": {
+			"name": "variable.other.WarmLang",
+			"match": "[_[:alpha:]][_[:alpha:]]*"
+		},
+		"literal": {
+			"patterns": [
+				{
+					"name": "constant.language.bool.true.WarmLang",
+					"match": "(?<!\\.)\\btrue\\b"
+				},
+				{
+					"name": "constant.language.bool.false.WarmLang",
+					"match": "(?<!\\.)\\b(false)\\b"
+				},
+				{
+					"name":"constant.numeric.int.WarmLang",
+					"match": "[0-9]+"
+				}
+			]
+		},
+		"punctuation-semicolon": {
+			"name":"punctuation.terminator.statement.WarmLang",
+			"match": ";"
+		},
+		"punctuation-comma": {
+			"name":"punctuation.seperator.comma.WarmLang",
+			"match": ","
+		}
+	},
+	"scopeName": "source.wl"
+}
