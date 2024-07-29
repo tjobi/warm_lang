@@ -360,7 +360,7 @@ public class Parser
                 case TBracketLeft:
                 {
                     var open = MatchKind(TBracketLeft);
-                    var expr = ParsePrimaryExpression();
+                    var expr = ParseExpression();
                     var close = MatchKind(TBracketRight);
                     if(res is AccessExpression ae)
                     {
