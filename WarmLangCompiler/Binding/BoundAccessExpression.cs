@@ -1,5 +1,6 @@
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
+using WarmLangCompiler.Binding.BoundAccessing;
 
 namespace WarmLangCompiler.Binding;
 

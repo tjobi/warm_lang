@@ -371,6 +371,13 @@ public class Parser
                         res = new AccessExpression(new SubscriptAccess(new ExprAccess(res), expr));
                     }
                 } continue;
+                case TDot:
+                {
+                    var dot = MatchKind(TDot);
+                    var member = MatchKind(TIdentifier);
+                    var target = res is AccessExpression ae ? ae.Access : new ExprAccess(res);
+                    res = new AccessExpression(new MemberAccess(target, member));
+                } continue;
                 default:
                     return res;
             }

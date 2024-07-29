@@ -119,4 +119,10 @@ internal static class BinderErrorWarnings
         var message = $"Program cannot contain both a main function and global statements";
         bag.Report(message, true, mainFunc);
     }
+
+    internal static void ReportCouldNotFindMemberForType(this ErrorWarrningBag bag, TextLocation location, TypeSymbol type, string? name)
+    {
+        var message = $"Type '{type}' does not contain a definition for '{name ?? "<null>"}'. Are you sure you spelt it right?";
+        bag.Report(message, true, location);
+    }
 }

@@ -2,6 +2,7 @@ namespace WarmLangCompiler.ILGen;
 using WarmLangCompiler.Binding;
 using WarmLangCompiler.Symbols;
 using WarmLangCompiler.Binding.Lower;
+using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangLexerParser.ErrorReporting;
 using static WarmLangCompiler.Binding.BoundBinaryOperatorKind;
 using static WarmLangCompiler.ILGen.EmitterTypeSymbolHelpers;
@@ -215,7 +216,7 @@ public sealed class Emitter{
     {
         if(func is LocalFunctionSymbol)
             throw new NotImplementedException("Emitter doesn't support local functions just yet");
-        var funcDefintion = new MethodDefinition(func.Name, MethodAttributes.Static | MethodAttributes.Private, CilTypeOf(func.Type));
+        var funcDefintion = new MethodDefinition(func.Name, MethodAttributes.Static | MethodAttributes.Public, CilTypeOf(func.Type));
         
         foreach(var @param in func.Parameters)
         {
@@ -248,10 +249,12 @@ public sealed class Emitter{
 
         if(_debug)
         {
+            Console.WriteLine($"-- FUNCTION '{func.Name}'");
             foreach(var instr in ilProcessor.Body.Instructions)
             {
                 Console.WriteLine(instr);
             }
+            Console.WriteLine($"-- END      '{func.Name}'");
         }
     }
 
@@ -763,6 +766,21 @@ public sealed class Emitter{
                     processor.Emit(OpCodes.Ldloc, variable);
                 }
                 break;
+            case BoundMemberAccess mba:
+                var access = mba.Target;
+                EmitLoadAccess(processor, access);
+                if(mba.Member.Name == "len")
+                {
+                    Console.WriteLine($"Testing ? {access.Type}.{mba.Member.Name}, {access.Type == TypeSymbol.String}");
+                    if(access.Type == TypeSymbol.String)
+                        processor.Emit(OpCodes.Callvirt, _builtInFunctions[BuiltInFunctions.StrLen]);
+                    else if(access.Type is ListTypeSymbol)
+                        processor.Emit(OpCodes.Callvirt, _listLength);
+                    else
+                        throw new NotImplementedException($"{nameof(Emitter)} doesn't know 'len' for '{access.Type}'");
+                    return;
+                }
+                throw new NotImplementedException($"{nameof(Emitter)} doesn't know how to emit '{access.Type}.{mba.Member}' yet");
             case BoundSubscriptAccess sa:
                 if(sa.Target.Type == TypeSymbol.String || sa.Target.Type is ListTypeSymbol)
                 {

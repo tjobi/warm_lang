@@ -3,6 +3,7 @@ namespace WarmLangCompiler.Binding;
 using System.Collections.Immutable;
 using WarmLangCompiler.Binding.ControlFlow;
 using WarmLangCompiler.Binding.Lower;
+using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
@@ -11,16 +12,17 @@ public sealed class Binder
 {
     private readonly ErrorWarrningBag _diag;
     private readonly BoundSymbolScope _scope;
-
-    private Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
-
+    private readonly BinderTypeHelper _typeHelper;
+    private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
     private readonly Stack<FunctionSymbol> _functionStack;
+
     public Binder(ErrorWarrningBag bag)
     {
         _diag = bag;
         _scope = new BoundSymbolScope();
         _functionStack = new();
         _unBoundBodyOf = new();
+        _typeHelper = new();
         _scope.PushScope(); //Push scope to contain builtin stuff
         foreach(var func in BuiltInFunctions.GetBuiltInFunctions())
         {
@@ -363,6 +365,17 @@ public sealed class Binder
                 }
                 _diag.ReportNameDoesNotExist(na.Location, na.Name);
                 return new BoundInvalidAccess();
+            }
+            case MemberAccess ma:
+            {
+                var boundTarget = BindAccess(ma.Target);
+                var boundMember = _typeHelper.FindMember(boundTarget.Type, ma.MemberToken.Name!);
+                if(boundMember is null)
+                {
+                    _diag.ReportCouldNotFindMemberForType(ma.Location, boundTarget.Type, ma.MemberToken.Name);
+                    return new BoundInvalidAccess();
+                }
+                return new BoundMemberAccess(boundTarget, boundMember);
             }
             case ExprAccess exprAccess: 
             {

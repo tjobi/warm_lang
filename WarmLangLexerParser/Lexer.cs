@@ -61,6 +61,10 @@ public class Lexer
                     token = SyntaxToken.MakeToken(TComma, Line, Column);
                     AdvanceText();
                 } break;
+                case '.': {
+                    token = SyntaxToken.MakeToken(TDot, Line, Column);
+                    AdvanceText();
+                } break;
                 case '=': {
                     token = SyntaxToken.MakeToken(TEqual, Line, Column);
                     AdvanceText();

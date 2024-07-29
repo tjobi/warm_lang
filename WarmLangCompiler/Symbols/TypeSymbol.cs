@@ -10,6 +10,8 @@ public class TypeSymbol : Symbol
     public static readonly TypeSymbol IntList = new ListTypeSymbol("list<int>", Int); //TODO: how to generic?
     public static readonly TypeSymbol Error = new("err");
 
+    public static readonly TypeSymbol ListBase = new("only-for-use-by-compiler");
+
     public TypeSymbol(string name) : base(name) { }
 
     public override string ToString() => Name;

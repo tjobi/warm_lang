@@ -1,5 +1,6 @@
 using WarmLangCompiler.Binding;
 using WarmLangCompiler.Binding.Lower;
+using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangCompiler.Interpreter.Values;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser;
@@ -308,6 +309,23 @@ public sealed class BoundInterpreter
             case BoundExprAccess ae: 
             {
                 return EvaluateExpression(ae.Expression);
+            }
+            case BoundMemberAccess bma:
+            {
+                BoundAccess accTarget = bma.Target;
+                while(accTarget.HasNested)
+                {
+                    if(accTarget is BoundSubscriptAccess sa) accTarget = sa.Target;
+                    else if(accTarget is BoundMemberAccess ma) accTarget = ma.Target;
+                }
+                var valTarget = GetValueFromAccess(accTarget);
+                
+                return valTarget switch
+                {
+                    StrValue str => new IntValue(str.Value.Length),
+                    ListValue lst => new IntValue(lst.Length),
+                    _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{bma.Target.Type}.{bma.Member}'")
+                };
             }
             case BoundSubscriptAccess sa:
                 {
