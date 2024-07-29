@@ -34,8 +34,8 @@ public sealed class BinderTypeHelper
 
     public MemberSymbol? FindMember(TypeSymbol type, string name)
     {
-        if(type is ListTypeSymbol lst)
-            type = lst.BasicList;
+        if(type is ListTypeSymbol)
+            type = TypeSymbol.ListBase;
         if(NotSeen(type))
             throw new Exception($"{nameof(BinderTypeHelper)} - hasn't seen '{type}'");
         if(name is null) //TODO: Do we need to?
