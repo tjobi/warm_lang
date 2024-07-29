@@ -771,7 +771,6 @@ public sealed class Emitter{
                 EmitLoadAccess(processor, access);
                 if(mba.Member.Name == "len")
                 {
-                    Console.WriteLine($"Testing ? {access.Type}.{mba.Member.Name}, {access.Type == TypeSymbol.String}");
                     if(access.Type == TypeSymbol.String)
                         processor.Emit(OpCodes.Callvirt, _builtInFunctions[BuiltInFunctions.StrLen]);
                     else if(access.Type is ListTypeSymbol)
@@ -797,7 +796,9 @@ public sealed class Emitter{
                 }
                 throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't do subscripting for '{sa.Target.Type.Name}' yet");
             case BoundExprAccess ae:
-                throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't allow access to expressions yet");
+                EmitExpression(processor, ae.Expression);
+                break;
+
         }
     }
 
