@@ -166,7 +166,7 @@
 		},
 		"identifier": {
 			"name": "variable.other.WarmLang",
-			"match": "[_[:alpha:]][_[:alpha:]]*"
+			"match": "[_[:alpha:]][_[:alpha:]0-9]*"
 		},
 		"literal": {
 			"patterns": [
