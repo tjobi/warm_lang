@@ -575,6 +575,8 @@ public sealed class Emitter{
                 case ListAdd:
                     processor.Emit(OpCodes.Dup);
                     EmitExpression(processor, binary.Right);
+                    if(binary.Right.Type.NeedsBoxing())
+                        processor.Emit(OpCodes.Box, CilTypeOf(binary.Right.Type));
                     processor.Emit(OpCodes.Callvirt, _listAdd);
                     processor.Emit(OpCodes.Pop);
                     break;

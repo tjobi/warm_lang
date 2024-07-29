@@ -23,5 +23,5 @@ n = 0;
 while n < 5 : res3 :: n, n = n + 1 { } 
 // at this point res3 is [0,1,2,3,4]
 
-res1 + res2 + res3; 
+stdWriteLine(string(res1 + res2 + res3)); 
 //returns [0,1,2,3,4,0,1,2,3,4,0,1,2,3,4]
