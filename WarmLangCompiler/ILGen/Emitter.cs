@@ -411,8 +411,7 @@ public sealed class Emitter{
         {
             // TODO: FIX printing, most important for lists, but others would also be cool. So that they match interpreter. 
             var convExprType = conv.Expression.Type;
-            if(convExprType.NeedsBoxing())
-                processor.Emit(OpCodes.Box, CilTypeOf(convExprType));
+            EmitBoxIfNeeded(processor, convExprType);
             processor.Emit(OpCodes.Call, _wlToString);
             return;
         }
@@ -430,8 +429,7 @@ public sealed class Emitter{
         {
             processor.Emit(OpCodes.Dup);
             EmitExpression(processor, expr);
-            if(expr.Type.NeedsBoxing())
-                processor.Emit(OpCodes.Box, CilTypeOf(expr.Type));
+            EmitBoxIfNeeded(processor, expr.Type);
             processor.Emit(OpCodes.Callvirt, _listAdd);
             processor.Emit(OpCodes.Pop);  // System.Int32 ArrayList::Add(System.Object)  
         }
@@ -460,8 +458,7 @@ public sealed class Emitter{
                     EmitExpression(processor, assignment.RightHandSide);
                     processor.Emit(OpCodes.Stloc, tmpVar);
                     processor.Emit(OpCodes.Ldloc, tmpVar);
-                    if(assignment.RightHandSide.Type.NeedsBoxing())
-                        processor.Emit(OpCodes.Box, rhsType);
+                    EmitBoxIfNeeded(processor, assignment.RightHandSide.Type);
                     processor.Emit(OpCodes.Callvirt, _listSet);
                     processor.Emit(OpCodes.Ldloc, tmpVar);
                     return;
@@ -575,8 +572,7 @@ public sealed class Emitter{
                 case ListAdd:
                     processor.Emit(OpCodes.Dup);
                     EmitExpression(processor, binary.Right);
-                    if(binary.Right.Type.NeedsBoxing())
-                        processor.Emit(OpCodes.Box, CilTypeOf(binary.Right.Type));
+                    EmitBoxIfNeeded(processor, binary.Right.Type);
                     processor.Emit(OpCodes.Callvirt, _listAdd);
                     processor.Emit(OpCodes.Pop);
                     break;
@@ -785,6 +781,12 @@ public sealed class Emitter{
             case BoundExprAccess ae:
                 throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't allow access to expressions yet");
         }
+    }
+
+    private void EmitBoxIfNeeded(ILProcessor processor, TypeSymbol previousExprType)
+    {
+        if(previousExprType.NeedsBoxing())
+            processor.Emit(OpCodes.Box, CilTypeOf(previousExprType));
     }
 
 }
