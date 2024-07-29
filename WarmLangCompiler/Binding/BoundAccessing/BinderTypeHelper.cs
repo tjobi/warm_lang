@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding.BoundAccessing;
@@ -14,6 +15,8 @@ public sealed class BinderTypeHelper
     private bool NotSeen(TypeSymbol type) => !_typeMembers.ContainsKey(type);
 
     public bool Has(TypeSymbol type) => !NotSeen(type);
+
+    public ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>> TypeMembers => new(_typeMembers);
 
     public bool TryAddType(TypeSymbol type)
     {

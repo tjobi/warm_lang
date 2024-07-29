@@ -1,21 +1,24 @@
 using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
 
 public sealed class BoundProgram
 {
-    public BoundProgram(FunctionSymbol? mainFunc, FunctionSymbol? scriptMain, ImmutableDictionary<FunctionSymbol, BoundBlockStatement> functions, ImmutableArray<BoundVarDeclaration> globalVariables)
+    public BoundProgram(FunctionSymbol? mainFunc, FunctionSymbol? scriptMain, ImmutableDictionary<FunctionSymbol, BoundBlockStatement> functions, ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>> typeMembers,ImmutableArray<BoundVarDeclaration> globalVariables)
     {
         MainFunc = mainFunc;
         ScriptMain = scriptMain;
         Functions = functions;
+        TypeMembers = typeMembers;
         GlobalVariables = globalVariables;
     }
 
     public FunctionSymbol? MainFunc { get; }
     public FunctionSymbol? ScriptMain { get; }
     public ImmutableDictionary<FunctionSymbol, BoundBlockStatement> Functions { get; }
+    public ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>> TypeMembers { get; }
     public ImmutableArray<BoundVarDeclaration> GlobalVariables { get; }
 
     public bool IsValid => MainFunc is not null || ScriptMain is not null;

@@ -250,6 +250,11 @@ public sealed class Emitter{
         if(_debug)
         {
             Console.WriteLine($"-- FUNCTION '{func.Name}'");
+            foreach(var variable in ilProcessor.Body.Variables)
+            {
+                Console.Write("    ");
+                Console.WriteLine(variable);
+            }
             foreach(var instr in ilProcessor.Body.Instructions)
             {
                 Console.WriteLine(instr);
@@ -769,14 +774,9 @@ public sealed class Emitter{
             case BoundMemberAccess mba:
                 var access = mba.Target;
                 EmitLoadAccess(processor, access);
-                if(mba.Member.Name == "len")
+                if(mba.Member.IsBuiltin)
                 {
-                    if(access.Type == TypeSymbol.String)
-                        processor.Emit(OpCodes.Callvirt, _builtInFunctions[BuiltInFunctions.StrLen]);
-                    else if(access.Type is ListTypeSymbol)
-                        processor.Emit(OpCodes.Callvirt, _listLength);
-                    else
-                        throw new NotImplementedException($"{nameof(Emitter)} doesn't know 'len' for '{access.Type}'");
+                    EmitBuiltinTypeMember(processor, access.Type, mba.Member);
                     return;
                 }
                 throw new NotImplementedException($"{nameof(Emitter)} doesn't know how to emit '{access.Type}.{mba.Member}' yet");
@@ -800,6 +800,24 @@ public sealed class Emitter{
                 break;
 
         }
+    }
+
+    private void EmitBuiltinTypeMember(ILProcessor processor, TypeSymbol type, MemberSymbol member)
+    {
+        if(member.Name == "len")
+        {
+            if(type == TypeSymbol.String)
+            {
+                processor.Emit(OpCodes.Callvirt, _builtInFunctions[BuiltInFunctions.StrLen]);
+                return;
+            }
+            else if(type is ListTypeSymbol)
+            {
+                processor.Emit(OpCodes.Callvirt, _listLength);
+                return;
+            }
+        }
+        throw new NotImplementedException($"{nameof(Emitter)}-{nameof(EmitBuiltinTypeMember)} doesn't know '{type}.{member}'");
     }
 
     private void EmitBoxIfNeeded(ILProcessor processor, TypeSymbol previousExprType)

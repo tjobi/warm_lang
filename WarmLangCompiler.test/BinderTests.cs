@@ -5,6 +5,8 @@ using WarmLangLexerParser.AST;
 using WarmLangLexerParser.AST.TypeSyntax;
 using WarmLangLexerParser;
 using WarmLangCompiler.Binding.Lower;
+using WarmLangCompiler.Binding.BoundAccessing;
+using System.Collections.ObjectModel;
 
 public class BinderTests
 {
@@ -31,7 +33,10 @@ public class BinderTests
         .Add(
             scriptMain, Lowerer.LowerBody(scriptMain, new BoundBlockStatement(body[0].Node, body))
         );
-        return new BoundProgram(null, scriptMain, functions, globals);
+        
+        var typeMembers = new ReadOnlyDictionary<TypeSymbol,IList<MemberSymbol>>(BuiltinMembers.CreateMembersForBuiltins());
+
+        return new BoundProgram(null, scriptMain, functions, typeMembers, globals);
     }
     private static ConstExpression ConstCreater(int val) => new(val, new TextLocation(1,1));
     private static SyntaxToken MakeVariableToken(string name) => MakeToken(TIdentifier, new TextLocation(1,1, length:name.Length), name);

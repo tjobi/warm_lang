@@ -9,18 +9,18 @@ public static class BuiltinMembers
         var members = new Dictionary<TypeSymbol, IList<MemberSymbol>>
         {
             [TypeSymbol.String]   = StringMembers().ToList(),
-            [TypeSymbol.ListBase] = StringMembers().ToList(),
+            [TypeSymbol.ListBase] = ListMembers().ToList(),
         };
         return members;
     }
 
     private static IEnumerable<MemberSymbol> StringMembers()
     {
-        yield return new MemberFieldSymbol("len", TypeSymbol.Int);
+        yield return new MemberFieldSymbol("len", TypeSymbol.Int, true);
     }
 
     private static IEnumerable<MemberSymbol> ListMembers()
     {
-        yield return new MemberFieldSymbol("len", TypeSymbol.Int);
+        yield return new MemberFieldSymbol("len", TypeSymbol.Int, true);
     }
 }

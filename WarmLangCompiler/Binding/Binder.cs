@@ -69,7 +69,7 @@ public sealed class Binder
             if(stmnt is BoundVarDeclaration var)
                 globalVariables.Add(var);
 
-        return new BoundProgram(main, scriptMain, functions.ToImmutable(), globalVariables.ToImmutable());
+        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeHelper.TypeMembers, globalVariables.ToImmutable());
     }
 
     private (BoundBlockStatement boundRoot, ImmutableArray<BoundStatement> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
