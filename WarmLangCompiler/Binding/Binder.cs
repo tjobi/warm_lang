@@ -360,7 +360,10 @@ public sealed class Binder
                     if(symbol is FunctionSymbol func)
                     {
                         if(!expectFunc)
-                            throw new Exception($"'{nameof(Binder)}.{nameof(BindAccess)}' expected a varible but received a function symbol");
+                        {
+                            _diag.ReportExpectedVariableName(na.Location, na.Name);
+                            return new BoundInvalidAccess();
+                        }
                         return new BoundFuncAccess(func);
                     }
                 }

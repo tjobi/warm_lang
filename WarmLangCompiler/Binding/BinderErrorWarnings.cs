@@ -131,4 +131,11 @@ internal static class BinderErrorWarnings
         var message = "Expected a function name";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportExpectedVariableName(this ErrorWarrningBag bag, TextLocation location, string name)
+    {
+        var message = $"The name '{name}' is not variable but a function. Did you forget to call it?";
+        bag.Report(message, true, location);
+    }
+    
 }
