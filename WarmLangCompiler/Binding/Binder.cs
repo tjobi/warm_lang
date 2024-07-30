@@ -7,6 +7,7 @@ using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
+using System.Runtime.CompilerServices;
 
 public sealed class Binder
 {
@@ -305,32 +306,25 @@ public sealed class Binder
     }
 
     private BoundExpression BindCallExpression(CallExpression ce)
-    {   
+    {
         //We have reached a cast 'bool(25)' or 'int(true)' or 'string(2555)'
-        if(ce.Arguments.Count == 1 && ce.Called.Kind.ToTypeSymbol() is TypeSymbol to)
-            return BindTypeConversion(ce.Arguments[0], to, allowExplicit: true);
-        
+        if (ce.Arguments.Count == 1 && ce.Called is AccessPredefinedType predefined)
+            return BindTypeConversion(ce.Arguments[0], predefined.Syntax.ToTypeSymbol(), allowExplicit: true);
+
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(ce.Arguments.Count);
-        foreach(var arg in ce.Arguments)
+        foreach (var arg in ce.Arguments)
         {
             var bound = BindExpression(arg);
             arguments.Add(bound);
         }
-        var functionName = ce.Called.Name!;
-        if(!_scope.TryLookup(functionName, out var symbol))
-        {
-            _diag.ReportNameDoesNotExist(ce.Called);
-            return new BoundErrorExpression(ce);    
-        }
 
-        if (symbol is not FunctionSymbol function)
-        {
-            _diag.ReportNameIsNotAFunction(ce.Called);
+        var function = BindAccessCallExpression(ce);
+        if(function is null)
             return new BoundErrorExpression(ce);
-        }
-        if(arguments.Count != function.Parameters.Length)
+
+        if (arguments.Count != function.Parameters.Length)
         {
-            _diag.ReportFunctionCallMismatchArguments(ce.Called, function.Parameters.Length, arguments.Count);
+            _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, function.Name, function.Parameters.Length, arguments.Count);
             return new BoundErrorExpression(ce);
         }
 
@@ -353,7 +347,7 @@ public sealed class Binder
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 
-    private BoundAccess BindAccess(Access access)
+    private BoundAccess BindAccess(Access access, bool expectFunc = false)
     {
         switch(access)
         {
@@ -361,7 +355,14 @@ public sealed class Binder
             {
                 if(_scope.TryLookup(na.Name, out var symbol) && symbol is not null)
                 {
-                    return new BoundNameAccess((VariableSymbol)symbol);
+                    if(symbol is VariableSymbol variable)
+                        return new BoundNameAccess(variable);
+                    if(symbol is FunctionSymbol func)
+                    {
+                        if(!expectFunc)
+                            throw new Exception($"'{nameof(Binder)}.{nameof(BindAccess)}' expected a varible but received a function symbol");
+                        return new BoundFuncAccess(func);
+                    }
                 }
                 _diag.ReportNameDoesNotExist(na.Location, na.Name);
                 return new BoundInvalidAccess();
@@ -501,5 +502,31 @@ public sealed class Binder
         if(conversion.IsIdentity)
             return expr;
         return new BoundTypeConversionExpression(expr.Node, to, expr);
+    }
+
+    private FunctionSymbol? BindAccessCallExpression(CallExpression ce)
+    {
+        var accessSymbol = BindAccess(ce.Called, expectFunc: true);
+        switch(accessSymbol)
+        {
+            case BoundFuncAccess acc:
+                return acc.Func;
+            case BoundMemberAccess {Member: MemberFuncSymbol acc}:
+                return acc.Function;
+
+            case BoundNameAccess acc:
+                _diag.ReportNameIsNotAFunction(ce.Called.Location, acc.Symbol.Name);
+                return null;
+            case BoundMemberAccess bma:
+                _diag.ReportNameIsNotAFunction(ce.Called.Location, bma.Member.Name);
+                return null;
+            case BoundInvalidAccess:
+                return null;
+            
+            default: 
+                //TODO: comeback for higher-order functions
+                _diag.ReportExpectedFunctionName(ce.Called.Location);
+                return null;
+        }
     }
 }

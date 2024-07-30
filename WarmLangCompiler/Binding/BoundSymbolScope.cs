@@ -4,9 +4,9 @@ namespace WarmLangCompiler.Binding;
 
 public sealed class BoundSymbolScope
 {
-    private readonly List<Dictionary<string,Symbol>> _scopeStack;
+    private readonly List<Dictionary<string,EntitySymbol>> _scopeStack;
     
-    public Dictionary<string, Symbol> GlobalScope => _scopeStack[0];
+    public Dictionary<string, EntitySymbol> GlobalScope => _scopeStack[0];
 
     public BoundSymbolScope()
     {
@@ -18,7 +18,7 @@ public sealed class BoundSymbolScope
         _scopeStack.Add(new());
     }
 
-    public Dictionary<string, Symbol> PopScope()
+    public Dictionary<string, EntitySymbol> PopScope()
     {
         var mostRecentScope = _scopeStack[^1];
         if(_scopeStack.Count > 0)
@@ -26,7 +26,7 @@ public sealed class BoundSymbolScope
         return mostRecentScope;
     }
 
-    public bool TryLookup(string name, out Symbol? type)
+    public bool TryLookup(string name, out EntitySymbol? type)
     {
         for (int i = _scopeStack.Count - 1; i >= 0 ; i--)
         {
@@ -42,7 +42,7 @@ public sealed class BoundSymbolScope
 
     public bool TryDeclareFunction(FunctionSymbol function) => TryDeclare(function.Name, function);
 
-    public bool TryDeclare(string name, Symbol type)
+    public bool TryDeclare(string name, EntitySymbol type)
     {
         if(type is GlobalVariableSymbol)
             return TryDeclareGlobal(name, type);
@@ -55,7 +55,7 @@ public sealed class BoundSymbolScope
         return true;
     }
 
-    private bool TryDeclareGlobal(string name, Symbol type)
+    private bool TryDeclareGlobal(string name, EntitySymbol type)
     {
         if(GlobalScope.ContainsKey(name))
             return false;
@@ -66,7 +66,7 @@ public sealed class BoundSymbolScope
     public IList<FunctionSymbol> GetFunctions() => GetSymbol<FunctionSymbol>();
 
     public IList<TSymbol> GetSymbol<TSymbol>()
-        where TSymbol : Symbol
+        where TSymbol : EntitySymbol
     {
         List<TSymbol> res = new();
         foreach(var scope in _scopeStack)

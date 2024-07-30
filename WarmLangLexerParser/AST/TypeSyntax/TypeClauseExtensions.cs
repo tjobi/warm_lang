@@ -6,6 +6,8 @@ public static class TypeSyntaxExtensions
     {
         TypeSyntaxInt => TokenKind.TInt,
         TypeSyntaxList => TokenKind.TArray,
+        TypeSyntaxString => TokenKind.TString,
+        TypeSyntaxBool => TokenKind.TString,
         _ => TokenKind.TVar //TODO: user-defined types?
     };
 }

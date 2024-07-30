@@ -319,20 +319,13 @@ public class Parser
             }
             break;
             case TBool or TInt or TString: {
-                var nameToken = NextToken();
-                nameToken = new SyntaxToken(nameToken.Kind,nameToken.Location, name: nameToken.Kind.AsString(), 0);
-                res = ParseCallExpression(nameToken); 
+                var typeToken = ParseType();//NextToken();
+                res = new AccessExpression(new AccessPredefinedType(typeToken));
+                //res = ParseCallExpression(new AccessPredefinedType(typeToken)); 
             } break;
             case TIdentifier: {
                 var nameToken = NextToken();
-                if(Current.Kind == TParLeft)
-                {
-                    res = ParseCallExpression(nameToken);
-                }
-                else 
-                {
-                    res = new AccessExpression(new NameAccess(nameToken));
-                }
+                res = new AccessExpression(new NameAccess(nameToken));
             } break;
             default: {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
@@ -352,31 +345,25 @@ public class Parser
             switch(Current.Kind)
             {
                 //TODO: Enable again, once we allow functions as types
-                    //So we can do something like myFuncList[2](parameter1, parameter2);
-                // case TParLeft:
-                // {
-                //     res = ParseCallExpression(res);  
-                // } continue;
+                //So we can do something like myFuncList[2](parameter1, parameter2);
+                case TParLeft:
+                {
+                    res = ParseCallExpression(res);  
+                } continue;
                 case TBracketLeft:
                 {
                     var open = MatchKind(TBracketLeft);
                     var expr = ParseExpression();
                     var close = MatchKind(TBracketRight);
-                    if(res is AccessExpression ae)
-                    {
-                        res = new AccessExpression(new SubscriptAccess(ae.Access, expr));
-                    }
-                    else 
-                    {
-                        res = new AccessExpression(new SubscriptAccess(new ExprAccess(res), expr));
-                    }
+                    var subscript = new SubscriptAccess(AccessFromExpression(res), expr);
+                    res = new AccessExpression(subscript);
                 } continue;
                 case TDot:
                 {
                     var dot = MatchKind(TDot);
                     var member = MatchKind(TIdentifier);
-                    var target = res is AccessExpression ae ? ae.Access : new ExprAccess(res);
-                    res = new AccessExpression(new MemberAccess(target, member));
+                    var memberAcess = new MemberAccess(AccessFromExpression(res), member);
+                    res = new AccessExpression(memberAcess);
                 } continue;
                 default:
                     return res;
@@ -432,9 +419,9 @@ public class Parser
         return new ListInitExpression(open, close, type);
     }
 
-    private ExpressionNode ParseCallExpression(SyntaxToken called)
+    private ExpressionNode ParseCallExpression(ExpressionNode called) => ParseCallExpression(AccessFromExpression(called));
+    private ExpressionNode ParseCallExpression(Access called)
     {
-        //var nameToken = called;
         var openPar = MatchKind(TParLeft);
         var args = new List<ExpressionNode>();
         if(Current.Kind != TParRight)
@@ -504,5 +491,8 @@ public class Parser
         // Get a reset point, try to parse identifier into identifier?
         return Current.Kind.IsPossibleType() && Current.Kind != TIdentifier;
     }
+
+    private Access AccessFromExpression(ExpressionNode expr) => expr is AccessExpression ae ? ae.Access : new ExprAccess(expr); 
+    
     
 }

@@ -4,23 +4,21 @@ using WarmLangLexerParser;
 
 namespace WarmLangCompiler.Symbols;
 
-public class FunctionSymbol : Symbol
+public class FunctionSymbol : EntitySymbol
 {
-    //Function symbol contains: name, parameters, returnType, body
+    //Function symbol contains: name, parameters, returnType
     public FunctionSymbol(SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
     :this(nameToken.Name!, parameters, type, nameToken.Location) { }
 
 
     internal FunctionSymbol(string name, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type, TextLocation location) 
-    : base(name)
+    : base(name, type)
     {
         Parameters = parameters;
-        Type = type;
         Location = location;
     }
     
     public ImmutableArray<ParameterSymbol> Parameters { get; }
-    public TypeSymbol Type { get; }
 
     public TextLocation Location { get; }
 

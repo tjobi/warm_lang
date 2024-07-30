@@ -59,17 +59,17 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportFunctionCallMismatchArguments(this ErrorWarrningBag bag, SyntaxToken called, int expectedNumArgs, int realNumArgs)
+    internal static void ReportFunctionCallMismatchArguments(this ErrorWarrningBag bag, TextLocation location, string name, int expectedNumArgs, int realNumArgs)
     {
         //TODO: Go through the arguments, and find the ones that are missing.
-        var message = $"Function '{called.Name}' expected {expectedNumArgs} arguments but got {realNumArgs}";
-        bag.Report(message, true, called.Location);
+        var message = $"Function '{name}' expected {expectedNumArgs} arguments but got {realNumArgs}";
+        bag.Report(message, true, location);
     }
 
-    internal static void ReportNameIsNotAFunction(this ErrorWarrningBag bag, SyntaxToken called)
+    internal static void ReportNameIsNotAFunction(this ErrorWarrningBag bag, TextLocation location, string name)
     {
-        var message = $"The name '{called.Name}' is not a function and thus cannot be called";
-        bag.Report(message, true, called.Location);
+        var message = $"The name '{name}' is not a function and cannot be called";
+        bag.Report(message, true, location);
     }    
 
     internal static void ReportCannotReturnOutsideFunction(this ErrorWarrningBag bag, SyntaxToken retToken)
@@ -123,6 +123,12 @@ internal static class BinderErrorWarnings
     internal static void ReportCouldNotFindMemberForType(this ErrorWarrningBag bag, TextLocation location, TypeSymbol type, string? name)
     {
         var message = $"Type '{type}' does not contain a definition for '{name ?? "<null>"}'. Are you sure you spelt it right?";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportExpectedFunctionName(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = "Expected a function name";
         bag.Report(message, true, location);
     }
 }
