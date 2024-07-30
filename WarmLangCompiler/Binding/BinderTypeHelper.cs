@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using WarmLangCompiler.Symbols;
 
-namespace WarmLangCompiler.Binding.BoundAccessing;
+namespace WarmLangCompiler.Binding;
 
 public sealed class BinderTypeHelper
 {

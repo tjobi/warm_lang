@@ -1,6 +1,4 @@
-using WarmLangCompiler.Symbols;
-
-namespace WarmLangCompiler.Binding.BoundAccessing;
+namespace WarmLangCompiler.Symbols;
 
 public static class BuiltinMembers
 {
