@@ -116,7 +116,7 @@
 		"call-expression": {
 			"patterns": [
 				{
-					"begin": "([_[:alpha:]][_[:alpha:]]*)\\s*(?=\\()",
+					"begin": "([_[:alpha:]][_[:alpha:]0-9]*)\\s*(?=\\()",
 					"beginCaptures": {
 						"0": {
 							"name": "entity.name.function.WarmLang"
