@@ -17,14 +17,32 @@ public class FunctionSymbol : EntitySymbol
         Parameters = parameters;
         Location = location;
     }
-    
+
+    public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
+    :this(nameToken.Name!, parameters, type, nameToken.Location)
+    {
+        OwnerType = ownerType;
+    }
+
     public ImmutableArray<ParameterSymbol> Parameters { get; }
 
     public TextLocation Location { get; }
+    public TypeSymbol? OwnerType { get; private set; }
 
+    public bool IsMemberFunc => OwnerType is not null;
+
+    public void SetOwnerType(TypeSymbol type) 
+    {
+        OwnerType ??= type;
+    }
     public override string ToString()
     {
-        var sb = new StringBuilder().Append($"{Name}(");
+        var sb = new StringBuilder();
+        if(IsMemberFunc)
+        {
+            sb.Append($"{OwnerType}.");
+        }
+        sb.Append($"{Name}(");
         for (int i = 0; i < Parameters.Length; i++)
         {
             var parm = Parameters[i];

@@ -38,7 +38,7 @@ public sealed class BoundInterpreter
         return runner.Run();
     }
 
-    public Value Run() => EvaluateStatement(_functionEnvironment.Lookup(_entryPoint));
+    public Value Run() => EvaluateStatement(_functionEnvironment.Lookup(_entryPoint)!);
 
     private Value EvaluateStatement(BoundStatement statement)
     {
@@ -213,6 +213,14 @@ public sealed class BoundInterpreter
         if(function.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(call);
         var functionBody = _functionEnvironment.Lookup(function);
+        if(functionBody is null && function.IsMemberFunc)
+        {
+            functionBody = program.TypeMemberInformation.TypeFunctions[function.OwnerType!][function];
+        }
+        if(functionBody is null)
+        {
+            throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'");
+        }
         var callArgs = call.Arguments;
         var funcParams = function.Parameters;
         PushEnvironments();

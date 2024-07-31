@@ -38,7 +38,7 @@ public sealed class FunctionEnv : IEnv<FunctionSymbol, BoundBlockStatement>
         return (body, this);
     }
 
-    public BoundBlockStatement Lookup(FunctionSymbol name)
+    public BoundBlockStatement? Lookup(FunctionSymbol name)
     {
         for (int i = environment.Count - 1; i >= 0 ; i--)
         {
@@ -48,7 +48,7 @@ public sealed class FunctionEnv : IEnv<FunctionSymbol, BoundBlockStatement>
                 return res;
             }
         }
-        throw new Exception($"BoundFuncEnv -> Function '{name}' has not been declared.");
+        return null;
     }
 
     public IEnv<FunctionSymbol, BoundBlockStatement> Pop()

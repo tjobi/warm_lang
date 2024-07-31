@@ -7,18 +7,20 @@ using ParameterList = IList<(TypeSyntaxNode type, SyntaxToken name)> ;
 
 public sealed class FuncDeclaration : StatementNode //should it be a different thing entirely?
 {
+    public TypeSyntaxNode? OwnerType { get; }
     public SyntaxToken NameToken { get; }
     public ParameterList Params { get; }
     public TypeSyntaxNode? ReturnType { get; }
     public BlockStatement Body { get; }
 
     public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, BlockStatement body)
-    :this(funcKeyword, nameToken, parameters, null, body) 
+    :this(null, funcKeyword, nameToken, parameters, null, body) 
     { }
 
-    public FuncDeclaration(SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, TypeSyntaxNode? returnType, BlockStatement body)
+    public FuncDeclaration(TypeSyntaxNode? ownerType, SyntaxToken funcKeyword, SyntaxToken nameToken, ParameterList parameters, TypeSyntaxNode? returnType, BlockStatement body)
     : base(TextLocation.FromTo(funcKeyword.Location, body.Location))
     {
+        OwnerType = ownerType;
         NameToken = nameToken;
         Params = parameters;
         ReturnType = returnType;
@@ -27,7 +29,11 @@ public sealed class FuncDeclaration : StatementNode //should it be a different t
 
     public override string ToString()
     {
-        var sb = new StringBuilder($"{NameToken.Name!} (");
+        var sb = new StringBuilder();
+        if(OwnerType is not null)
+            sb.Append($"{OwnerType}.");
+        sb.Append(NameToken.Name);
+        sb.Append(" (");
         for (int i = 0; i < Params.Count; i++)
         {
             var (typ, name) = Params[i];

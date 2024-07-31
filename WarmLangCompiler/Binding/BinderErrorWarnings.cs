@@ -137,5 +137,11 @@ internal static class BinderErrorWarnings
         var message = $"The name '{name}' is not variable but a function. Did you forget to call it?";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportLocalMemberFuncDeclaration(this ErrorWarrningBag bag, SyntaxToken funcNameToken, TextLocation typeLocation, TypeSymbol type)
+    {
+        var message = $"Function members cannot be declared in a local scope, move '{type}.{funcNameToken.Name}' outside of function body";
+        bag.Report(message, true, TextLocation.FromTo(typeLocation, funcNameToken.Location));
+    }
     
 }

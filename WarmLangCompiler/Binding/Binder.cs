@@ -7,7 +7,6 @@ using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
-using System.Runtime.CompilerServices;
 
 public sealed class Binder
 {
@@ -48,6 +47,15 @@ public sealed class Binder
             functions.Add(function, boundBody);
         }
 
+        foreach(var (type, memberFuncs) in _typeHelper.GetFunctionMembers())
+        {
+            foreach(var func in memberFuncs)
+            {
+                var boundBody = BindFunctionBody(func, _unBoundBodyOf[func]);
+                _typeHelper.BindMemberFunc(type, func, boundBody);
+            }
+        }
+
         FunctionSymbol? main = null;
         FunctionSymbol? scriptMain = null;
         if(functions.Where(kv => kv.Key.Name == "main").FirstOrDefault() is {Key: FunctionSymbol mainSymbol, Value: BoundBlockStatement mainBody})
@@ -65,7 +73,7 @@ public sealed class Binder
             functions[scriptMain] = scriptMainBody;
         }
 
-        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeHelper.TypeMembers, globalVariables);
+        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeHelper.ToTypeMemberInformation(), globalVariables);
     }
 
     private (BoundBlockStatement boundRoot, ImmutableArray<BoundVarDeclaration> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
@@ -173,7 +181,21 @@ public sealed class Binder
         var function = isGlobalScope 
                        ? new FunctionSymbol(nameToken, parameters.ToImmutable(), returnType)
                        : new LocalFunctionSymbol(nameToken, parameters.ToImmutable(), returnType);
-        if(!_scope.TryDeclareFunction(function))
+        
+        if(funcDecl.OwnerType is not null)
+        {
+            var ownerType = funcDecl.OwnerType.ToTypeSymbol();
+            if(isGlobalScope)
+            {
+                var symbol = new MemberFuncSymbol(function);
+                _typeHelper.AddMember(ownerType, symbol);
+                function.SetOwnerType(ownerType); //TODO: this is quite ugly
+            } else 
+            {
+                _diag.ReportLocalMemberFuncDeclaration(funcDecl.NameToken, funcDecl.OwnerType.Location, ownerType);
+            }
+        }
+        if(!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
             return new BoundErrorStatement(funcDecl);
