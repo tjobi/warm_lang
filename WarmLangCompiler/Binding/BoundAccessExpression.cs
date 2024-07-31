@@ -12,6 +12,9 @@ public sealed class BoundAccessExpression : BoundExpression
         Access = access;
     }
 
+    public BoundAccessExpression(ExpressionNode node, BoundAccess access)
+    : this(node, access.Type, access) { }
+
     public BoundAccessExpression(ExpressionNode node, VariableSymbol symbol)
     : this(node, symbol.Type, new BoundNameAccess(symbol))
     { }

@@ -331,22 +331,31 @@ public sealed class Binder
         //We have reached a cast 'bool(25)' or 'int(true)' or 'string(2555)'
         if (ce.Arguments.Count == 1 && ce.Called is AccessPredefinedType predefined)
             return BindTypeConversion(ce.Arguments[0], predefined.Syntax.ToTypeSymbol(), allowExplicit: true);
+        
+        var function = BindAccessCallExpression(ce, out var accessToCall);
+        if(function is null)
+            return new BoundErrorExpression(ce);
 
-        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(ce.Arguments.Count);
+        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
+        if(function.IsMemberFunc)
+        {
+            if(accessToCall is BoundMemberAccess bma && bma.Member is MemberFuncSymbol)
+            {
+                arguments.Add(new BoundAccessExpression(ce, bma.Target));
+            }
+            else 
+                throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}");
+        }
+
         foreach (var arg in ce.Arguments)
         {
             var bound = BindExpression(arg);
             arguments.Add(bound);
         }
 
-        var function = BindAccessCallExpression(ce);
-        if(function is null)
-            return new BoundErrorExpression(ce);
-
-        if (arguments.Count != function.Parameters.Length)
+        if(arguments.Count != function.Parameters.Length)
         {
             _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, function.Name, function.Parameters.Length, arguments.Count);
-            return new BoundErrorExpression(ce);
         }
 
         for (int i = 0; i < arguments.Count; i++)
@@ -528,14 +537,14 @@ public sealed class Binder
         return new BoundTypeConversionExpression(expr.Node, to, expr);
     }
 
-    private FunctionSymbol? BindAccessCallExpression(CallExpression ce)
+    private FunctionSymbol? BindAccessCallExpression(CallExpression ce, out BoundAccess accessSymbol)
     {
-        var accessSymbol = BindAccess(ce.Called, expectFunc: true);
+        accessSymbol = BindAccess(ce.Called, expectFunc: true);
         switch(accessSymbol)
         {
             case BoundFuncAccess acc:
                 return acc.Func;
-            case BoundMemberAccess {Member: MemberFuncSymbol acc}:
+            case BoundMemberAccess { Member: MemberFuncSymbol acc}:
                 return acc.Function;
 
             case BoundNameAccess acc:
