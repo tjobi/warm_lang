@@ -212,15 +212,11 @@ public sealed class BoundInterpreter
         var function = call.Function;
         if(function.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(call);
-        var functionBody = _functionEnvironment.Lookup(function);
-        if(functionBody is null && function.IsMemberFunc)
-        {
-            functionBody = program.TypeMemberInformation.TypeFunctions[function.OwnerType!][function];
-        }
-        if(functionBody is null)
-        {
-            throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'");
-        }
+        var functionBody = (function.IsMemberFunc 
+                                ? program.TypeMemberInformation.TypeFunctions[function.OwnerType!][function]
+                                : _functionEnvironment.Lookup(function))
+                                ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'");
+        
         var callArgs = call.Arguments;
         var funcParams = function.Parameters;
         PushEnvironments();
