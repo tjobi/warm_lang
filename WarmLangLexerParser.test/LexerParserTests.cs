@@ -1314,4 +1314,84 @@ h"";";
 
         parsed.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
     }
+
+    [Fact]
+    public void LexerParserMemberField()
+    {
+        var input = "s.len;";
+        var expected = MakeRoot(
+            new ExprStatement(
+            new AccessExpression(
+                new MemberAccess(
+                    new NameAccess(MakeToken(TIdentifier,1,1, "s")),    
+                    MakeToken(TIdentifier, new TextLocation(1,3, length: 3), "len")
+                )
+            )
+        ));
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserMemberFunction()
+    {
+        var input = "s.Add();";
+        var expected = MakeRoot(
+            new ExprStatement(
+                new CallExpression(
+                    new MemberAccess(
+                        new NameAccess(MakeToken(TIdentifier,1,1, "s")),    
+                        MakeToken(TIdentifier, new TextLocation(1,3, length: 3), "Add")
+                    ),
+                    MakeToken(TParLeft,1,6),
+                    new List<ExpressionNode>(),
+                    MakeToken(TParRight,1,7)
+                )
+            
+        ));
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserMemberFunctionChaining()
+    {
+        var input = "s.Filter().Map();";
+        var expected = MakeRoot(
+            new ExprStatement(
+                new CallExpression(
+                    new MemberAccess(
+                        new ExprAccess(
+                            new CallExpression(
+                                new MemberAccess(
+                                    new NameAccess(MakeToken(TIdentifier,1,1, "s")),    
+                                    MakeToken(TIdentifier, new TextLocation(1,3, length: 6), "Filter")
+                                ),
+                                MakeToken(TParLeft,1,9),
+                                new List<ExpressionNode>(),
+                                MakeToken(TParRight,1,10)
+                            )
+                        ), 
+                        MakeToken(TIdentifier, new TextLocation(1,12, length:3), "Map")
+                    ),
+                    MakeToken(TParLeft,1,15),
+                    new List<ExpressionNode>(),
+                    MakeToken(TParRight,1,16)
+                )
+        ));
+
+        var parser = GetParser(GetLexer(input));
+        var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
 }
