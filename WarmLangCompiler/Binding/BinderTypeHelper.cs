@@ -56,7 +56,7 @@ public sealed class BinderTypeHelper
         if(type is ListTypeSymbol)
             type = TypeSymbol.ListBase;
         if(NotSeen(type))
-            throw new Exception($"{nameof(BinderTypeHelper)} - hasn't seen '{type}'");
+            return null;
         if(name is null) //TODO: Do we need to?
             throw new ArgumentNullException(nameof(name));
 

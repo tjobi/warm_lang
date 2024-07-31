@@ -335,16 +335,17 @@ public sealed class Binder
         var function = BindAccessCallExpression(ce, out var accessToCall);
         if(function is null)
             return new BoundErrorExpression(ce);
-
+        
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
         if(function.IsMemberFunc)
         {
-            if(accessToCall is BoundMemberAccess bma && bma.Member is MemberFuncSymbol)
+            if(accessToCall is not BoundMemberAccess bma)
+                throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}");
+            
+            if(bma.Target is not BoundPredefinedTypeAccess && bma.Member is MemberFuncSymbol)
             {
                 arguments.Add(new BoundAccessExpression(ce, bma.Target));
-            }
-            else 
-                throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}");
+            }   
         }
 
         foreach (var arg in ce.Arguments)
@@ -400,9 +401,15 @@ public sealed class Binder
                 _diag.ReportNameDoesNotExist(na.Location, na.Name);
                 return new BoundInvalidAccess();
             }
+            case AccessPredefinedType predefined: {
+                var type = predefined.Syntax.ToTypeSymbol();
+                return new BoundPredefinedTypeAccess(type);
+            }
             case MemberAccess ma:
             {
                 var boundTarget = BindAccess(ma.Target);
+                if(boundTarget.Type == TypeSymbol.Error)
+                    return new BoundInvalidAccess();
                 var boundMember = _typeHelper.FindMember(boundTarget.Type, ma.MemberToken.Name!);
                 if(boundMember is null)
                 {
