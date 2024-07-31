@@ -37,7 +37,7 @@ public sealed class Binder
         if(node is not ASTRoot root)
             throw new NotImplementedException($"Binder only allows root to be '{nameof(ASTRoot)}'");
 
-        var (bound, globalStatments, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
+        var (bound, globalVariables, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
 
         var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
         foreach(var function in _scope.GetFunctions())
@@ -61,43 +61,42 @@ public sealed class Binder
                 _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
             
             scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
-            var scriptMainBody = Lowerer.LowerBody(scriptMain, new BoundBlockStatement(bound.Node, globalStatments));
+            var scriptMainBody = bound;
             functions[scriptMain] = scriptMainBody;
         }
-    
-        var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>();
-        foreach(var stmnt in globalStatments)
-            if(stmnt is BoundVarDeclaration var)
-                globalVariables.Add(var);
 
-        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeHelper.TypeMembers, globalVariables.ToImmutable());
+        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeHelper.TypeMembers, globalVariables);
     }
 
-    private (BoundBlockStatement boundRoot, ImmutableArray<BoundStatement> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
+    private (BoundBlockStatement boundRoot, ImmutableArray<BoundVarDeclaration> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
     {
-        var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>(root.Children.Count);
-        var globals = ImmutableArray.CreateBuilder<BoundStatement>(); //NON-function delcarations
+        var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>();
+        var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>(); //NON-function delcarations
         var hasGlobalArbitraries = false;
-        foreach(var topLevelFunc in root.Children.Where(c => c is TopLevelFuncDeclaration))
+        foreach(var topLevelFunc in root.Children)
         {
-            topLevelstatments.Add(BindTopLevelStatement(topLevelFunc));
+            if(topLevelFunc is TopLevelFuncDeclaration func)
+                BindTopLevelStatement(func);
         }
         foreach(var toplevel in root.Children)
         {
-            if(toplevel is not TopLevelFuncDeclaration)
-            {
-                var bound = BindTopLevelStatement(toplevel);
-                globals.Add(bound);
-                if(toplevel is TopLevelArbitraryStament)
-                    hasGlobalArbitraries = true;
-               topLevelstatments.Add(bound);
-            }
+            if(toplevel is TopLevelFuncDeclaration)
+                continue;
+            
+            var bound = BindTopLevelStatement(toplevel);
+            topLevelstatments.Add(bound);
+
+            if(toplevel is TopLevelArbitraryStament)
+                hasGlobalArbitraries = true;
+            
+            if(bound is BoundVarDeclaration var)
+                globalVariables.Add(var);
         }
         //What if we parsed an empty file?
-        var rootNode = root.Children.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
-        var boundChildren = Lowerer.LowerProgram(new BoundBlockStatement(rootNode, topLevelstatments.MoveToImmutable()));
+        var rootNode = topLevelstatments.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
+        var boundChildren = Lowerer.LowerProgram(new BoundBlockStatement(rootNode, topLevelstatments.ToImmutable()));
         
-        return (boundChildren, globals.ToImmutable(), hasGlobalArbitraries);
+        return (boundChildren, globalVariables.ToImmutable(), hasGlobalArbitraries);
     }
 
     private BoundStatement BindTopLevelStatement(TopLevelStamentNode statement)
