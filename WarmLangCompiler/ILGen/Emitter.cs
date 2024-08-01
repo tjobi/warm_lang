@@ -189,6 +189,14 @@ public sealed class Emitter{
         if(_diag.Any())
             return; //something went wrong in constructor
         
+        foreach(var (type, memberFuncs) in program.TypeMemberInformation.TypeFunctions)
+        {
+            foreach(var func in memberFuncs)
+            {
+                EmitFunctionDeclaration(func.Key);
+            }
+        }
+
         foreach(var (func,_) in program.Functions)
         {
             EmitFunctionDeclaration(func);
@@ -206,8 +214,17 @@ public sealed class Emitter{
         {
             EmitFunctionBody(func, body);
         }
+
+        foreach(var (type, memberFuncs) in program.TypeMemberInformation.TypeFunctions)
+        {
+            foreach(var (func, body) in memberFuncs)
+            {
+                EmitFunctionBody(func, body);
+            }
+        }
         
         var main = _funcs[program.MainFunc is not null ? program.MainFunc : program.ScriptMain!];
+
         _assemblyDef.EntryPoint = main;
         _assemblyDef.Write(outfile);
     }
@@ -249,7 +266,7 @@ public sealed class Emitter{
 
         if(_debug)
         {
-            Console.WriteLine($"-- FUNCTION '{func.Name}'");
+            Console.WriteLine($"-- FUNCTION '{func}'");
             foreach(var variable in ilProcessor.Body.Variables)
             {
                 Console.Write("    ");
