@@ -144,4 +144,15 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, TextLocation.FromTo(typeLocation, funcNameToken.Location));
     }
     
+    internal static void ReportMemberFuncFirstParameterMustMatchOwner(this ErrorWarrningBag bag, TextLocation funcLocation, string name, TypeSymbol owner, TypeSymbol paramType)
+    {
+        var message = $"The first parameter of member function '{name}' must same as the owner type '{owner}' and not '{paramType}'. Did you forgot the owner?";
+        bag.Report(message, true, funcLocation);
+    }
+
+    internal static void ReportMemberFuncNoParameters(this ErrorWarrningBag bag, TextLocation funcLocation, string name, TypeSymbol owner)
+    {
+        var message = $"Member functions cannot take 0 parameters. The member function '{name}' must a parameter of type '{owner}' as its first";
+        bag.Report(message, true, funcLocation);
+    }
 }

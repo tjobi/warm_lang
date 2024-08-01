@@ -190,10 +190,18 @@ public sealed class Binder
                 var symbol = new MemberFuncSymbol(function);
                 _typeHelper.AddMember(ownerType, symbol);
                 function.SetOwnerType(ownerType); //TODO: this is quite ugly
-            } else 
-            {
+                var funcParams = function.Parameters;
+                if(funcParams.Length < 1)
+                {
+                    _diag.ReportMemberFuncNoParameters(function.Location, function.Name, ownerType);
+                }
+                else if(funcParams[0].Type != ownerType)
+                {
+                    _diag.ReportMemberFuncFirstParameterMustMatchOwner(function.Location, function.Name, ownerType, funcParams[0].Type);
+                }
+            } 
+            else 
                 _diag.ReportLocalMemberFuncDeclaration(funcDecl.NameToken, funcDecl.OwnerType.Location, ownerType);
-            }
         }
         if(!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
         {
@@ -357,14 +365,17 @@ public sealed class Binder
         if(arguments.Count != function.Parameters.Length)
         {
             _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, function.Name, function.Parameters.Length, arguments.Count);
-        }
-
-        for (int i = 0; i < arguments.Count; i++)
+        } 
+        else
         {
-            var boundArg = arguments[i];
-            var functionParameter = function.Parameters[i];
-            arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
-        }
+            for (int i = 0; i < arguments.Count; i++)
+            {
+                var boundArg = arguments[i];
+                var functionParameter = function.Parameters[i];
+                arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
+            }
+        } 
+        
         return new BoundCallExpression(ce, function, arguments.ToImmutable());
     }
 
