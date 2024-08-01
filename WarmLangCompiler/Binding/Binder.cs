@@ -69,7 +69,7 @@ public sealed class Binder
                 _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
             
             scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
-            var scriptMainBody = bound;
+            var scriptMainBody = Lowerer.LowerBody(scriptMain, bound);
             functions[scriptMain] = scriptMainBody;
         }
 
