@@ -6,11 +6,6 @@ namespace WarmLangCompiler.Binding;
 using TypeMemberDict = Dictionary<TypeSymbol, IList<MemberSymbol>>;
 using TypeMemberFuncDict = Dictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>;
 
-public record TypeMemberInformation(
-    ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>> TypeMembers, 
-    ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>> TypeFunctions
-);
-
 public sealed class BinderTypeHelper
 {
     private readonly TypeMemberDict _typeMembers;

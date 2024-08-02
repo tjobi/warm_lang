@@ -34,7 +34,7 @@ public sealed class Binder
     public BoundProgram BindProgram(ASTNode node)
     {
         if(node is not ASTRoot root)
-            throw new NotImplementedException($"Binder only allows root to be '{nameof(ASTRoot)}'");
+            throw new NotImplementedException($"{nameof(Binder)}.{nameof(BindProgram)} only allows root to be '{nameof(ASTRoot)}'");
 
         var (bound, globalVariables, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
 
@@ -80,7 +80,6 @@ public sealed class Binder
     {
         var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>();
         var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>(); //NON-function delcarations
-        var hasGlobalArbitraries = false;
         foreach(var topLevelFunc in root.Children)
         {
             if(topLevelFunc is TopLevelFuncDeclaration func)
@@ -93,18 +92,15 @@ public sealed class Binder
             
             var bound = BindTopLevelStatement(toplevel);
             topLevelstatments.Add(bound);
-
-            if(toplevel is TopLevelArbitraryStament)
-                hasGlobalArbitraries = true;
             
             if(bound is BoundVarDeclaration var)
                 globalVariables.Add(var);
         }
         //What if we parsed an empty file?
         var rootNode = topLevelstatments.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
-        var boundChildren = Lowerer.LowerProgram(new BoundBlockStatement(rootNode, topLevelstatments.ToImmutable()));
+        var boundChildren = new BoundBlockStatement(rootNode, topLevelstatments.ToImmutable());
         
-        return (boundChildren, globalVariables.ToImmutable(), hasGlobalArbitraries);
+        return (boundChildren, globalVariables.ToImmutable(), topLevelstatments.Count != globalVariables.Count);
     }
 
     private BoundStatement BindTopLevelStatement(TopLevelStamentNode statement)
@@ -567,17 +563,18 @@ public sealed class Binder
 
             case BoundNameAccess acc:
                 _diag.ReportNameIsNotAFunction(ce.Called.Location, acc.Symbol.Name);
-                return null;
+                break;
             case BoundMemberAccess bma:
                 _diag.ReportNameIsNotAFunction(ce.Called.Location, bma.Member.Name);
-                return null;
+                break;
             case BoundInvalidAccess:
-                return null;
+                break;
             
             default: 
                 //TODO: comeback for higher-order functions
                 _diag.ReportExpectedFunctionName(ce.Called.Location);
-                return null;
+                break;
         }
+        return null;
     }
 }

@@ -213,7 +213,7 @@ public sealed class BoundInterpreter
         if(function.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(call);
         var functionBody = (function.IsMemberFunc 
-                                ? program.TypeMemberInformation.TypeFunctions[function.OwnerType!][function]
+                                ? program.TypeMemberInformation.FunctionBodies[function.OwnerType!][function]
                                 : _functionEnvironment.Lookup(function))
                                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'");
         
