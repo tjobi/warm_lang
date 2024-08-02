@@ -189,7 +189,7 @@ public sealed class Emitter{
         if(_diag.Any())
             return; //something went wrong in constructor
         
-        foreach(var (func,_) in program.Functions)
+        foreach(var func in program.GetFunctionSymbols())
         {
             EmitFunctionDeclaration(func);
         }
@@ -202,12 +202,15 @@ public sealed class Emitter{
         globalsProcessor.Emit(OpCodes.Ret);
         globalsProcessor.Body.OptimizeMacros();
 
-        foreach(var (func, body) in program.Functions)
+        // TODO: program.TypeMemberInformation still holds all the type information
+        //GetFunctionSymbols just skips the need for multiple loops (for now at least)
+        foreach(var (func, body) in program.GetFunctionSymbolsAndBodies())
         {
             EmitFunctionBody(func, body);
         }
         
         var main = _funcs[program.MainFunc is not null ? program.MainFunc : program.ScriptMain!];
+
         _assemblyDef.EntryPoint = main;
         _assemblyDef.Write(outfile);
     }
@@ -249,7 +252,7 @@ public sealed class Emitter{
 
         if(_debug)
         {
-            Console.WriteLine($"-- FUNCTION '{func.Name}'");
+            Console.WriteLine($"-- FUNCTION '{func}'");
             foreach(var variable in ilProcessor.Body.Variables)
             {
                 Console.Write("    ");

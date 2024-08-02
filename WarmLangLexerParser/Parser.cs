@@ -197,40 +197,53 @@ public class Parser
     private StatementNode ParseFunctionDeclaration()
     {
         var funcKeyword = MatchKind(TFunc);
+        TypeSyntaxNode? toExtend = null;
+        if(TryPeekPossibleType(out var lengthOfType) && Peek(lengthOfType).Kind == TDot)
+        {
+            toExtend = ParseType();
+            var dot = MatchKind(TDot);
+        }
         var name = MatchKind(TIdentifier);
         var _ = MatchKind(TParLeft);
         //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
-        List<(TypeSyntaxNode,SyntaxToken)> paramNames = new(); 
-        if(Current.Kind == TParRight)
-        {
-            var parClose = NextToken();
-        } else 
-        {
-            var parseParameter = true;
-            while(parseParameter 
-                  //&& Current.Kind != TParRight
-                  && NotEndOfFile)
-            {
-                var paramType = ParseType(); 
-                var paramName = MatchKind(TIdentifier);
-                paramNames.Add( (paramType, paramName) );
-                if(Current.Kind == TComma)
-                {
-                    var comma = MatchKind(TComma);
-                } else 
-                {
-                    parseParameter = false;
-                }
-            }
-            var paramClose = MatchKind(TParRight);
-        }
+        var parameters = ParseParameterList();
         TypeSyntaxNode? returnType = null;
-        if(Current.Kind != TCurLeft)
+        if (Current.Kind != TCurLeft)
         {
             returnType = ParseType();
         }
-        var body = (BlockStatement) ParseBlockStatement();
-        return new FuncDeclaration(funcKeyword, name, paramNames, returnType, body);
+        var body = (BlockStatement)ParseBlockStatement();
+        return new FuncDeclaration(toExtend, funcKeyword, name, parameters, returnType, body);
+    }
+
+    private List<(TypeSyntaxNode, SyntaxToken)> ParseParameterList()
+    {
+        List<(TypeSyntaxNode, SyntaxToken)> paramNames = new();
+        if (Current.Kind == TParRight)
+        {
+            var parClose = NextToken();
+            return paramNames;
+        }
+        
+        var parseParameter = true;
+        while (parseParameter
+                //&& Current.Kind != TParRight
+                && NotEndOfFile)
+        {
+            var paramType = ParseType();
+            var paramName = MatchKind(TIdentifier);
+            paramNames.Add((paramType, paramName));
+            if (Current.Kind == TComma)
+            {
+                var comma = MatchKind(TComma);
+            }
+            else
+            {
+                parseParameter = false;
+            }
+        }
+        var paramClose = MatchKind(TParRight);
+        return paramNames;
     }
 
     private StatementNode ParseExpressionStatement()
@@ -490,6 +503,31 @@ public class Parser
         //TODO: User-defined types, what to do?
         // Get a reset point, try to parse identifier into identifier?
         return Current.Kind.IsPossibleType() && Current.Kind != TIdentifier;
+    }
+
+    private bool TryPeekPossibleType(out int typeLengthInTokens)
+    {
+        typeLengthInTokens = 0;
+        if(!Current.Kind.IsPossibleType())
+            return false;
+        
+        var checkpoint = currentToken;
+        NextToken();
+        typeLengthInTokens++;
+
+        while(Current.Kind == TBracketLeft)
+        {
+            NextToken();
+            if(Current.Kind != TBracketRight)
+            {
+                typeLengthInTokens = 0;
+                break;
+            }
+            NextToken();
+            typeLengthInTokens += 2;
+        }
+        currentToken = checkpoint;
+        return true;
     }
 
     private Access AccessFromExpression(ExpressionNode expr) => expr is AccessExpression ae ? ae.Access : new ExprAccess(expr); 

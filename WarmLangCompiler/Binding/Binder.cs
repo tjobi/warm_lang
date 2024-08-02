@@ -7,7 +7,6 @@ using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
-using System.Runtime.CompilerServices;
 
 public sealed class Binder
 {
@@ -35,9 +34,9 @@ public sealed class Binder
     public BoundProgram BindProgram(ASTNode node)
     {
         if(node is not ASTRoot root)
-            throw new NotImplementedException($"Binder only allows root to be '{nameof(ASTRoot)}'");
+            throw new NotImplementedException($"{nameof(Binder)}.{nameof(BindProgram)} only allows root to be '{nameof(ASTRoot)}'");
 
-        var (bound, globalStatments, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
+        var (bound, globalVariables, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
 
         var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
         foreach(var function in _scope.GetFunctions())
@@ -46,6 +45,15 @@ public sealed class Binder
                 continue;
             var boundBody = BindFunctionBody(function, _unBoundBodyOf[function]);
             functions.Add(function, boundBody);
+        }
+
+        foreach(var (type, memberFuncs) in _typeHelper.GetFunctionMembers())
+        {
+            foreach(var func in memberFuncs)
+            {
+                var boundBody = BindFunctionBody(func, _unBoundBodyOf[func]);
+                _typeHelper.BindMemberFunc(type, func, boundBody);
+            }
         }
 
         FunctionSymbol? main = null;
@@ -61,43 +69,38 @@ public sealed class Binder
                 _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
             
             scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
-            var scriptMainBody = Lowerer.LowerBody(scriptMain, new BoundBlockStatement(bound.Node, globalStatments));
+            var scriptMainBody = Lowerer.LowerBody(scriptMain, bound);
             functions[scriptMain] = scriptMainBody;
         }
-    
-        var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>();
-        foreach(var stmnt in globalStatments)
-            if(stmnt is BoundVarDeclaration var)
-                globalVariables.Add(var);
 
-        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeHelper.TypeMembers, globalVariables.ToImmutable());
+        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeHelper.ToTypeMemberInformation(), globalVariables);
     }
 
-    private (BoundBlockStatement boundRoot, ImmutableArray<BoundStatement> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
+    private (BoundBlockStatement boundRoot, ImmutableArray<BoundVarDeclaration> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
     {
-        var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>(root.Children.Count);
-        var globals = ImmutableArray.CreateBuilder<BoundStatement>(); //NON-function delcarations
-        var hasGlobalArbitraries = false;
-        foreach(var topLevelFunc in root.Children.Where(c => c is TopLevelFuncDeclaration))
+        var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>();
+        var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>(); //NON-function delcarations
+        foreach(var topLevelFunc in root.Children)
         {
-            topLevelstatments.Add(BindTopLevelStatement(topLevelFunc));
+            if(topLevelFunc is TopLevelFuncDeclaration func)
+                BindTopLevelStatement(func);
         }
         foreach(var toplevel in root.Children)
         {
-            if(toplevel is not TopLevelFuncDeclaration)
-            {
-                var bound = BindTopLevelStatement(toplevel);
-                globals.Add(bound);
-                if(toplevel is TopLevelArbitraryStament)
-                    hasGlobalArbitraries = true;
-               topLevelstatments.Add(bound);
-            }
+            if(toplevel is TopLevelFuncDeclaration)
+                continue;
+            
+            var bound = BindTopLevelStatement(toplevel);
+            topLevelstatments.Add(bound);
+            
+            if(bound is BoundVarDeclaration var)
+                globalVariables.Add(var);
         }
         //What if we parsed an empty file?
-        var rootNode = root.Children.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
-        var boundChildren = Lowerer.LowerProgram(new BoundBlockStatement(rootNode, topLevelstatments.MoveToImmutable()));
+        var rootNode = topLevelstatments.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
+        var boundChildren = new BoundBlockStatement(rootNode, topLevelstatments.ToImmutable());
         
-        return (boundChildren, globals.ToImmutable(), hasGlobalArbitraries);
+        return (boundChildren, globalVariables.ToImmutable(), topLevelstatments.Count != globalVariables.Count);
     }
 
     private BoundStatement BindTopLevelStatement(TopLevelStamentNode statement)
@@ -174,7 +177,29 @@ public sealed class Binder
         var function = isGlobalScope 
                        ? new FunctionSymbol(nameToken, parameters.ToImmutable(), returnType)
                        : new LocalFunctionSymbol(nameToken, parameters.ToImmutable(), returnType);
-        if(!_scope.TryDeclareFunction(function))
+        
+        if(funcDecl.OwnerType is not null)
+        {
+            var ownerType = funcDecl.OwnerType.ToTypeSymbol();
+            if(isGlobalScope)
+            {
+                var symbol = new MemberFuncSymbol(function);
+                _typeHelper.AddMember(ownerType, symbol);
+                function.SetOwnerType(ownerType); //TODO: this is quite ugly
+                var funcParams = function.Parameters;
+                if(funcParams.Length < 1)
+                {
+                    _diag.ReportMemberFuncNoParameters(function.Location, function.Name, ownerType);
+                }
+                else if(funcParams[0].Type != ownerType)
+                {
+                    _diag.ReportMemberFuncFirstParameterMustMatchOwner(function.Location, function.Name, ownerType, funcParams[0].Type);
+                }
+            } 
+            else 
+                _diag.ReportLocalMemberFuncDeclaration(funcDecl.NameToken, funcDecl.OwnerType.Location, ownerType);
+        }
+        if(!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
             return new BoundErrorStatement(funcDecl);
@@ -310,30 +335,43 @@ public sealed class Binder
         //We have reached a cast 'bool(25)' or 'int(true)' or 'string(2555)'
         if (ce.Arguments.Count == 1 && ce.Called is AccessPredefinedType predefined)
             return BindTypeConversion(ce.Arguments[0], predefined.Syntax.ToTypeSymbol(), allowExplicit: true);
+        
+        var function = BindAccessCallExpression(ce, out var accessToCall);
+        if(function is null)
+            return new BoundErrorExpression(ce);
+        
+        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
+        if(function.IsMemberFunc)
+        {
+            if(accessToCall is not BoundMemberAccess bma)
+                throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}");
+            
+            if(bma.Target is not BoundPredefinedTypeAccess && bma.Member is MemberFuncSymbol)
+            {
+                arguments.Add(new BoundAccessExpression(ce, bma.Target));
+            }   
+        }
 
-        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(ce.Arguments.Count);
         foreach (var arg in ce.Arguments)
         {
             var bound = BindExpression(arg);
             arguments.Add(bound);
         }
 
-        var function = BindAccessCallExpression(ce);
-        if(function is null)
-            return new BoundErrorExpression(ce);
-
-        if (arguments.Count != function.Parameters.Length)
+        if(arguments.Count != function.Parameters.Length)
         {
             _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, function.Name, function.Parameters.Length, arguments.Count);
-            return new BoundErrorExpression(ce);
-        }
-
-        for (int i = 0; i < arguments.Count; i++)
+        } 
+        else
         {
-            var boundArg = arguments[i];
-            var functionParameter = function.Parameters[i];
-            arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
-        }
+            for (int i = 0; i < arguments.Count; i++)
+            {
+                var boundArg = arguments[i];
+                var functionParameter = function.Parameters[i];
+                arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
+            }
+        } 
+        
         return new BoundCallExpression(ce, function, arguments.ToImmutable());
     }
 
@@ -370,9 +408,15 @@ public sealed class Binder
                 _diag.ReportNameDoesNotExist(na.Location, na.Name);
                 return new BoundInvalidAccess();
             }
+            case AccessPredefinedType predefined: {
+                var type = predefined.Syntax.ToTypeSymbol();
+                return new BoundPredefinedTypeAccess(type);
+            }
             case MemberAccess ma:
             {
                 var boundTarget = BindAccess(ma.Target);
+                if(boundTarget.Type == TypeSymbol.Error)
+                    return new BoundInvalidAccess();
                 var boundMember = _typeHelper.FindMember(boundTarget.Type, ma.MemberToken.Name!);
                 if(boundMember is null)
                 {
@@ -507,29 +551,30 @@ public sealed class Binder
         return new BoundTypeConversionExpression(expr.Node, to, expr);
     }
 
-    private FunctionSymbol? BindAccessCallExpression(CallExpression ce)
+    private FunctionSymbol? BindAccessCallExpression(CallExpression ce, out BoundAccess accessSymbol)
     {
-        var accessSymbol = BindAccess(ce.Called, expectFunc: true);
+        accessSymbol = BindAccess(ce.Called, expectFunc: true);
         switch(accessSymbol)
         {
             case BoundFuncAccess acc:
                 return acc.Func;
-            case BoundMemberAccess {Member: MemberFuncSymbol acc}:
+            case BoundMemberAccess { Member: MemberFuncSymbol acc}:
                 return acc.Function;
 
             case BoundNameAccess acc:
                 _diag.ReportNameIsNotAFunction(ce.Called.Location, acc.Symbol.Name);
-                return null;
+                break;
             case BoundMemberAccess bma:
                 _diag.ReportNameIsNotAFunction(ce.Called.Location, bma.Member.Name);
-                return null;
+                break;
             case BoundInvalidAccess:
-                return null;
+                break;
             
             default: 
                 //TODO: comeback for higher-order functions
                 _diag.ReportExpectedFunctionName(ce.Called.Location);
-                return null;
+                break;
         }
+        return null;
     }
 }

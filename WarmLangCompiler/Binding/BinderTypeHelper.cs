@@ -3,20 +3,30 @@ using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
 
+using TypeMemberDict = Dictionary<TypeSymbol, IList<MemberSymbol>>;
+using TypeMemberFuncDict = Dictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>;
+
 public sealed class BinderTypeHelper
 {
-    private readonly Dictionary<TypeSymbol, IList<MemberSymbol>> _typeMembers;
+    private readonly TypeMemberDict _typeMembers;
+    private readonly TypeMemberFuncDict _typeFunctions;
 
     public BinderTypeHelper()
     {
         _typeMembers = BuiltinMembers.CreateMembersForBuiltins();
+        _typeFunctions = new();
     }
 
     private bool NotSeen(TypeSymbol type) => !_typeMembers.ContainsKey(type);
 
     public bool Has(TypeSymbol type) => !NotSeen(type);
 
-    public ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>> TypeMembers => new(_typeMembers);
+    public TypeMemberInformation ToTypeMemberInformation()
+    {
+        var members = new ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>>(_typeMembers);
+        var funcs = new ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>(_typeFunctions);
+        return new TypeMemberInformation(members, funcs);
+    }
 
     public bool TryAddType(TypeSymbol type)
     {
@@ -30,7 +40,8 @@ public sealed class BinderTypeHelper
     {
         if(NotSeen(type))
             _typeMembers[type] = new List<MemberSymbol>();
-        else
+        
+        if(_typeMembers[type].Contains(member))
             throw new Exception($"{nameof(BinderTypeHelper)} - the member '{type}.{member}' is already defined!");
         _typeMembers[type].Add(member);
     }
@@ -40,7 +51,7 @@ public sealed class BinderTypeHelper
         if(type is ListTypeSymbol)
             type = TypeSymbol.ListBase;
         if(NotSeen(type))
-            throw new Exception($"{nameof(BinderTypeHelper)} - hasn't seen '{type}'");
+            return null;
         if(name is null) //TODO: Do we need to?
             throw new ArgumentNullException(nameof(name));
 
@@ -50,5 +61,30 @@ public sealed class BinderTypeHelper
                 return member;
         }
         return null;
+    }
+
+    public IEnumerable<FunctionSymbol> GetFunctionMembers(TypeSymbol type)
+    {
+        foreach(var member in _typeMembers[type])
+        {
+            if(member is MemberFuncSymbol mf)
+                yield return mf.Function;
+        }
+    }
+
+    public IEnumerable<(TypeSymbol Type, IEnumerable<FunctionSymbol> MemberFuncs)> GetFunctionMembers()
+    {
+        foreach(var typeMembers in _typeMembers)
+        {
+            var type = typeMembers.Key;
+            yield return (type, GetFunctionMembers(type));
+        }
+    }
+
+    public void BindMemberFunc(TypeSymbol type, FunctionSymbol function, BoundBlockStatement boundBody)
+    {
+        if(!_typeFunctions.ContainsKey(type))
+            _typeFunctions[type] = new();
+        _typeFunctions[type][function] = boundBody;
     }
 }
