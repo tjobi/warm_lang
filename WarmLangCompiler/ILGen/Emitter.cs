@@ -18,6 +18,8 @@ public sealed class Emitter{
     private readonly ErrorWarrningBag _diag;
     private readonly bool _debug;
     
+    private static int _localFuncId = 0;
+
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _stringConcat, _stringEqual, _stringSubscript;
     private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany, _listLength;
@@ -217,8 +219,6 @@ public sealed class Emitter{
 
     private void EmitFunctionDeclaration(FunctionSymbol func)
     {
-        if(func is LocalFunctionSymbol)
-            throw new NotImplementedException("Emitter doesn't support local functions just yet");
         var funcDefintion = new MethodDefinition(func.Name, MethodAttributes.Static | MethodAttributes.Public, CilTypeOf(func.Type));
         
         foreach(var @param in func.Parameters)
@@ -297,11 +297,16 @@ public sealed class Emitter{
             case BoundReturnStatement ret:
                 EmitReturnStatement(processor, ret);
                 break;
+            case BoundFunctionDeclaration func when func.Symbol is LocalFunctionSymbol symbol:
+                if(symbol.Body is not null) {
+                    EmitLocalFunctionDeclaration(symbol);
+                    EmitFunctionBody(symbol, symbol.Body);
+                    break;
+                }
+                throw new Exception($"{nameof(Emitter)} - has reached exception state in {nameof(EmitStatement)} - LocalFunction '{symbol}' doesn't have a body!");
             case BoundExprStatement expr:
                 EmitExprStatement(processor, expr);
                 break;
-            case BoundFunctionDeclaration func:
-                throw new NotImplementedException($"{nameof(Emitter)} doesn't allow local functions yet!");
             default: 
                 throw new NotImplementedException($"{nameof(Emitter)} doesn't know '{statement} yet'");
         }
@@ -360,6 +365,20 @@ public sealed class Emitter{
             EmitExpression(processor, ret.Expression);
         }
         processor.Emit(OpCodes.Ret);
+    }
+
+    private void EmitLocalFunctionDeclaration(LocalFunctionSymbol func)
+    {
+        var funcName = $"_local_{_localFuncId++}_{func.Name}";
+        var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(func.Type));
+        
+        foreach(var @param in func.Parameters)
+        {
+            var paramDef = new ParameterDefinition(@param.Name, ParameterAttributes.None, CilTypeOf(@param.Type));
+            funcDefintion.Parameters.Add(paramDef);
+        }
+        _funcs[func] = funcDefintion;
+        _program.Methods.Add(funcDefintion);
     }
 
     private void EmitExprStatement(ILProcessor processor, BoundExprStatement stmnt)
