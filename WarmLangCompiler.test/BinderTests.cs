@@ -35,8 +35,10 @@ public class BinderTests
         );
         
         var typeMembers = new ReadOnlyDictionary<TypeSymbol,IList<MemberSymbol>>(BuiltinMembers.CreateMembersForBuiltins());
+        var typeMethods = new ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>(new Dictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>());
+        var typeInfo = new TypeMemberInformation(typeMembers, typeMethods);
 
-        return new BoundProgram(null, scriptMain, functions, typeMembers, globals);
+        return new BoundProgram(null, scriptMain, functions, typeInfo, globals);
     }
     private static ConstExpression ConstCreater(int val) => new(val, new TextLocation(1,1));
     private static SyntaxToken MakeVariableToken(string name) => MakeToken(TIdentifier, new TextLocation(1,1, length:name.Length), name);
