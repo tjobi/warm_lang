@@ -16,5 +16,9 @@ public sealed class AssignmentExpression : ExpressionNode
         RightHandSide = rightHandSide;
         Operator = op;
     }
+
+    public AssignmentExpression(ExpressionNode expr, SyntaxToken op, ExpressionNode rightHandSide)
+    : this(expr is AccessExpression ae ? ae.Access : new ExprAccess(expr), op, rightHandSide) { }
+    
     public override string ToString() => $"(Assign {Access} = {RightHandSide})";
 }

@@ -262,8 +262,9 @@ public class Parser
         ExpressionNode left;
         var precedence = Current.Kind.GetUnaryPrecedence(); 
         //If it returns -1, it is certainly not a Unary operator, so go to else-branch and parse a normal BinaryExpression
-        if(Current.Kind.IsPrefixUnaryExpression() 
-            && precedence != -1 && precedence >= parentPrecedence)
+
+        //TODO: Precdence check unecessary?
+        if(Current.Kind.IsPrefixUnaryOperator())
         {
             var op = NextToken();
             var expr = ParseSubExpression(precedence);
@@ -272,9 +273,8 @@ public class Parser
         else 
         {
             left = ParsePrimaryExpression();
-            precedence = parentPrecedence;
         }
-        return ParseContinuedExpression(left, precedence);
+        return ParseContinuedExpression(left, parentPrecedence);
     }
 
     private ExpressionNode ParseContinuedExpression(ExpressionNode left, int parentPrecedence = 0)
@@ -285,11 +285,7 @@ public class Parser
             {
                 var op = NextToken();
                 var rhs = ParseSubExpression();
-                if(left is AccessExpression ae)
-                {
-                    return new AssignmentExpression(ae.Access, op, rhs);
-                }
-                return new AssignmentExpression(new ExprAccess(left), op, rhs);
+                return new AssignmentExpression(left, op, rhs);
             }
             default:
                 return ParseBinaryExpression(left,parentPrecedence);

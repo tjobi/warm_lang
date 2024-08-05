@@ -40,12 +40,18 @@ public static class TokenKindPrecedence
         };
     }
 
-    public static bool IsUnaryExpression(this TokenKind kind)
+    public static bool IsRightAssociative(this TokenKind kind) => kind switch 
     {
-        return IsPrefixUnaryExpression(kind) || IsPostfixUnaryExpression(kind);
+        TBang => true,
+        _ => false
+    };
+
+    public static bool IsUnaryOperator(this TokenKind kind)
+    {
+        return IsPrefixUnaryOperator(kind) || IsPostfixUnaryOperator(kind);
     }
 
-    public static bool IsPrefixUnaryExpression(this TokenKind kind)
+    public static bool IsPrefixUnaryOperator(this TokenKind kind)
     {
         return kind switch
         {
@@ -54,7 +60,7 @@ public static class TokenKindPrecedence
         };
     }
 
-    public static bool IsPostfixUnaryExpression(this TokenKind kind)
+    public static bool IsPostfixUnaryOperator(this TokenKind kind)
     {
         return kind switch 
         {

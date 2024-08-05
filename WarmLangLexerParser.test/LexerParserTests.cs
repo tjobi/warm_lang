@@ -1127,16 +1127,18 @@ x;
         var input = "function f() int {2;}";
         var expected = MakeRoot(
             new FuncDeclaration(
+                null,
                 MakeToken(TFunc,new TextLocation(1,1,length:8)),
                 MakeToken(TIdentifier,1,10, "f"),
                 new List<(TypeSyntaxNode, SyntaxToken)>(),
                 new TypeSyntaxInt(new TextLocation(1,14,1,17)),
-                new BlockStatement(MakeToken(TCurLeft,1,18),
-                new List<StatementNode>()
-                {
-                    new ExprStatement(new ConstExpression(2, new TextLocation(1,19))),
-                },
-                MakeToken(TCurRight,1,21))
+                new BlockStatement(
+                    MakeToken(TCurLeft,1,18),
+                    new List<StatementNode>()
+                    {
+                        new ExprStatement(new ConstExpression(2, new TextLocation(1,19))),
+                    },
+                    MakeToken(TCurRight,1,21))
             )
         );
 

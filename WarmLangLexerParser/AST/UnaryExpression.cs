@@ -15,7 +15,7 @@ public sealed class UnaryExpression : ExpressionNode
     }
     public override string ToString()
     {
-        if(Operator.Kind.IsPrefixUnaryExpression())
+        if(Operator.Kind.IsPrefixUnaryOperator())
         {
             return $"({Operation}{Expression})";
         }
