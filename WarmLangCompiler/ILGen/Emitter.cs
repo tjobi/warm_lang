@@ -26,9 +26,8 @@ public sealed class Emitter{
     private readonly MethodReference _objectEquals, _wlEquals, _wlToString;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
-    private readonly Dictionary<BoundLabel, Instruction> _labels;
-    private readonly Dictionary<VariableSymbol, VariableDefinition> _locals;
-    private readonly Dictionary<int, BoundLabel> _awaitingLabels;
+
+    private readonly Stack<FunctionBodyState> _bodyState;
 
     private readonly TypeDefinition _globalsType;
     private readonly Dictionary<VariableSymbol, FieldDefinition> _globals;
@@ -47,9 +46,7 @@ public sealed class Emitter{
         _diag = diag;
         _funcs = new();
         _cilTypes = new();
-        _labels = new();
-        _locals = new();
-        _awaitingLabels = new();
+        _bodyState = new();
         _globals = new();
 
         // IL -> ".assembly 'App' {}"
@@ -232,9 +229,8 @@ public sealed class Emitter{
 
     private void EmitFunctionBody(FunctionSymbol func, BoundBlockStatement body)
     {
-        _labels.Clear();
-        _locals.Clear();
-        _awaitingLabels.Clear();
+        var thisState = new FunctionBodyState();
+        _bodyState.Push(thisState);
 
         var funcDefintion = _funcs[func];
 
@@ -242,13 +238,15 @@ public sealed class Emitter{
         EmitBlockStatement(ilProcessor, body);
 
 
-        foreach(var (instrIdx, label) in _awaitingLabels)
+        foreach(var (instrIdx, label) in thisState.AwaitingLabels)
         {
             var instr = ilProcessor.Body.Instructions[instrIdx];
-            var targetInstr = _labels[label];
+            var targetInstr = thisState.Labels[label];
             instr.Operand = targetInstr;
         }
         ilProcessor.Body.OptimizeMacros();
+
+        _bodyState.Pop();
 
         if(_debug)
         {
@@ -315,7 +313,8 @@ public sealed class Emitter{
     private void EmitVariableDeclaration(ILProcessor processor, BoundVarDeclaration varDecl)
     {
         var variable = new VariableDefinition(CilTypeOf(varDecl.Type));
-        _locals[varDecl.Symbol] = variable;
+        var stateOfBody = _bodyState.Peek();
+        stateOfBody.Locals[varDecl.Symbol] = variable;
         processor.Body.Variables.Add(variable);
         
         EmitExpression(processor, varDecl.RightHandSide);
@@ -326,13 +325,14 @@ public sealed class Emitter{
     {
         EmitExpression(processor, condGoto.Condition);
         var instruction = processor.Body.Instructions.Count;
+        var bodyState = _bodyState.Peek();
         if(condGoto.FallsThroughTrueBranch)
         {
-            _awaitingLabels[instruction] = condGoto.LabelFalse;
+            bodyState.AwaitingLabels[instruction] = condGoto.LabelFalse;
             processor.Emit(OpCodes.Brfalse, processor.Create(OpCodes.Nop));
         }
         else {
-            _awaitingLabels[instruction] = condGoto.LabelTrue;
+            bodyState.AwaitingLabels[instruction] = condGoto.LabelTrue;
             processor.Emit(OpCodes.Brtrue, processor.Create(OpCodes.Nop));
         }
         
@@ -340,7 +340,9 @@ public sealed class Emitter{
 
     private void EmitGotoStatement(ILProcessor processor, BoundGotoStatement gotoo)
     {
-        _awaitingLabels[processor.Body.Instructions.Count] = gotoo.Label;
+        var bodyState = _bodyState.Peek();
+        var instrCount = processor.Body.Instructions.Count;
+        bodyState.AwaitingLabels[instrCount] = gotoo.Label;
         processor.Emit(OpCodes.Br, processor.Create(OpCodes.Nop));
     }
 
@@ -349,7 +351,7 @@ public sealed class Emitter{
         //dump a nop we can jump to?
         var nop = processor.Create(OpCodes.Nop);
         processor.Append(nop);
-        _labels[label.Label] = nop;
+        _bodyState.Peek().Labels[label.Label] = nop;
     }
 
     private void EmitBlockStatement(ILProcessor processor, BoundBlockStatement block)
@@ -773,7 +775,8 @@ public sealed class Emitter{
             processor.Emit(OpCodes.Stsfld, _globals[gs]);
             return;
         }
-        var variabledef = _locals[variable];
+        var locals = _bodyState.Peek().Locals;
+        var variabledef = locals[variable];
         processor.Emit(OpCodes.Stloc, variabledef);
     }
 
@@ -789,7 +792,8 @@ public sealed class Emitter{
                     var variable = _globals[gs];
                     processor.Emit(OpCodes.Ldsfld, variable);
                 } else {
-                    var variable = _locals[name.Symbol];
+                    var locals = _bodyState.Peek().Locals;
+                    var variable = locals[name.Symbol];
                     processor.Emit(OpCodes.Ldloc, variable);
                 }
                 break;
