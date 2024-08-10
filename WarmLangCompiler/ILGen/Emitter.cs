@@ -419,18 +419,19 @@ public sealed class Emitter{
         var funcName = $"_local_{_localFuncId++}_{func.Name}";
         var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(func.Type));
 
+        foreach(var @param in func.Parameters)
+        {
+            var paramDef = new ParameterDefinition(@param.Name, ParameterAttributes.None, CilTypeOf(@param.Type));
+            funcDefintion.Parameters.Add(paramDef);
+        }
+
         if(func.RequiresClosure)
         {   
             var closureType = BodyState.ClosureType.MakeByReferenceType();
             var closureParam = new ParameterDefinition("closure", ParameterAttributes.None, closureType);
             funcDefintion.Parameters.Add(closureParam);
         }
-        
-        foreach(var @param in func.Parameters)
-        {
-            var paramDef = new ParameterDefinition(@param.Name, ParameterAttributes.None, CilTypeOf(@param.Type));
-            funcDefintion.Parameters.Add(paramDef);
-        }
+
         _funcs[func] = funcDefintion;
         _program.Methods.Add(funcDefintion);
     }
@@ -566,16 +567,16 @@ public sealed class Emitter{
             EmitCallBuiltinExpression(processor, call);
             return;
         }
+        foreach(var arg in call.Arguments)
+        {
+            EmitExpression(processor, arg);
+        }
 
         if(call.Function is LocalFunctionSymbol f && f.RequiresClosure)
         {
             processor.Emit(OpCodes.Ldloca, BodyState.ClosureVariable);
         }
 
-        foreach(var arg in call.Arguments)
-        {
-            EmitExpression(processor, arg);
-        }
         processor.Emit(OpCodes.Call, _funcs[call.Function]);
     }
 
@@ -841,7 +842,8 @@ public sealed class Emitter{
         {
             if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
             {
-                processor.Emit(OpCodes.Ldarg_0);
+                var closureParam = _funcs[f].Parameters[^1];
+                processor.Emit(OpCodes.Ldarg, closureParam);
                 processor.Emit(OpCodes.Stfld, ParentState().GetClosureField(variable));
             } else 
             {
@@ -882,7 +884,8 @@ public sealed class Emitter{
                     {
                         if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
                         {
-                            processor.Emit(OpCodes.Ldarg_0);
+                            var closureParam = _funcs[f].Parameters[^1];
+                            processor.Emit(OpCodes.Ldarg, closureParam);
                             processor.Emit(OpCodes.Ldfld, ParentState().GetClosureField(nameSymbol));
                         } else 
                         {

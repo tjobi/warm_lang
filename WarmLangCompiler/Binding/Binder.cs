@@ -235,8 +235,7 @@ public sealed class Binder
                 _diag.ReportParameterDuplicateName(name);
             } else
             {
-                var placement = isLocal ? i + 1 : i;
-                parameters.Add(new ParameterSymbol(paramName, paramType, placement));
+                parameters.Add(new ParameterSymbol(paramName, paramType, i));
             }
         }
         return parameters.ToImmutable();
