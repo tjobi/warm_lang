@@ -12,7 +12,7 @@ public sealed class LocalFunctionSymbol : FunctionSymbol
     { }
 
     public BoundBlockStatement? Body { get; set; }
-    public List<VariableSymbol>? Closure { get; set; }
+    public List<LocalVariableSymbol>? Closure { get; set; }
 
     [MemberNotNullWhen(true, nameof(Body))]
     [MemberNotNullWhen(true, nameof(Closure))]

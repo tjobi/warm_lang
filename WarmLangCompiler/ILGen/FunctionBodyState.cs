@@ -14,9 +14,7 @@ public sealed class FunctionBodyState
     public Dictionary<int, BoundLabel> AwaitingLabels { get; }
     public FunctionSymbol Func { get; }
 
-    public TypeDefinition? ClosureType { get; private set; }
-
-    public VariableDefinition? ClosureVariable { get; private set; }
+    public ClosureState? Closure { get; private set; }
 
     public FunctionBodyState(FunctionSymbol func)
     {
@@ -27,38 +25,15 @@ public sealed class FunctionBodyState
         Func = func;
     }
 
-    public void AddClosure(TypeDefinition closureType, VariableDefinition closureVariable)
+    public void AddClosure(ClosureState closure)
     {
-        if(ClosureType is null)
-        {
-            ClosureType = closureType;
-            ClosureVariable = closureVariable;
-            return;
-        }
-        throw new Exception($"'{nameof(AddClosure)}' called twice - Can only set closuretype of a body once!");
+        if(Closure is not null) throw new Exception($"'{nameof(AddClosure)}' called twice - Can only set closuretype of a body once!");
+        Closure = closure;        
     }
 
-    public void AddClosureField(FieldDefinition @field) 
-    {
-        ClosureType?.Fields.Add(@field);
-    }
+    public void AddClosureField(FieldDefinition @field) => Closure?.AddField(@field);
 
-    public bool TryGetClosureField(VariableSymbol symbol, [NotNullWhen(true)] out FieldDefinition? @field)
-    {
-        @field = GetClosureField(symbol);
-        return @field is not null;
-    }
+    public FieldDefinition GetClosureFieldOrthrow(VariableSymbol symbol) => Closure!.GetFieldOrThrow(symbol);
 
-    public FieldDefinition? GetClosureField(VariableSymbol symbol) => GetClosureField(symbol.Name);
-    public FieldDefinition? GetClosureField(string name) 
-    {
-        if(ClosureType is null)
-            return null;
-        foreach(var @field in ClosureType.Fields)
-        {
-            if(@field.Name == name)
-                return @field;
-        }
-        return null;
-    }
+    public VariableDefinition ClosureVariable => Closure!.VariableDef;
 }

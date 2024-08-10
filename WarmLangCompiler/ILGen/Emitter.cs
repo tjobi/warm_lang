@@ -26,6 +26,7 @@ public sealed class Emitter{
     private readonly MethodReference _objectEquals, _wlEquals, _wlToString;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
+    private readonly Dictionary<FunctionSymbol, ClosureState> _funcClosure;
 
     private readonly Stack<FunctionBodyState> _bodyStateStack;
 
@@ -57,6 +58,7 @@ public sealed class Emitter{
         _cilTypes = new();
         _bodyStateStack = new();
         _globals = new();
+        _funcClosure = new();
 
         // IL -> ".assembly 'App' {}"
         var assemblyName = new AssemblyNameDefinition("App", new Version(1,0));
@@ -249,7 +251,7 @@ public sealed class Emitter{
             {
                 if(stmnt is BoundFunctionDeclaration decl && decl.Symbol is LocalFunctionSymbol lf && lf.RequiresClosure)
                 {
-                    if(thisState.ClosureType is null)
+                    if(thisState.Closure is null)
                     {
                         var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, 
                                                              CilTypeOf(CILClosureType));
@@ -259,7 +261,9 @@ public sealed class Emitter{
                         var closureVariable = new VariableDefinition(closureType);
                         ilProcessor.Body.Variables.Add(closureVariable);
                         
-                        thisState.AddClosure(closureType, closureVariable);
+                        var closure = new ClosureState(closureType, closureVariable);
+                        thisState.AddClosure(_funcClosure[func] = closure);
+
                     }
                     foreach(var c in lf.Closure)
                     {
@@ -353,8 +357,9 @@ public sealed class Emitter{
     private void EmitVariableDeclaration(ILProcessor processor, BoundVarDeclaration varDecl)
     {
         var symbol = varDecl.Symbol;
-        if(symbol.IsFree && BodyState.TryGetClosureField(symbol, out var fieldDef))
+        if(symbol is LocalVariableSymbol local && local.IsFree)
         {  
+            var fieldDef = _funcClosure[local.BelongsTo].GetFieldOrThrow(symbol);
             BodyState.SharedLocals[symbol] = fieldDef;
         }
         else 
@@ -425,9 +430,10 @@ public sealed class Emitter{
             funcDefintion.Parameters.Add(paramDef);
         }
 
+        //TODO: Add the closure parameter when it is needed instead, we may need multiple closures...
         if(func.RequiresClosure)
         {   
-            var closureType = BodyState.ClosureType.MakeByReferenceType();
+            var closureType = BodyState.Closure!.ReferenceType;
             var closureParam = new ParameterDefinition("closure", ParameterAttributes.None, closureType);
             funcDefintion.Parameters.Add(closureParam);
         }
@@ -526,7 +532,7 @@ public sealed class Emitter{
         {
             case BoundNameAccess name:
                 var instrBefore = GetLastInstruction(processor);
-                var isVariableInClosure = name.Symbol.IsFree;
+                var isVariableInClosure = name.Symbol.IsLocalVariableAndFree;
                 EmitExpression(processor,assignment.RightHandSide);
                 
                 //Very important to dup because the assignment will consume the value, but we want to leave a value on the stack.
@@ -838,22 +844,24 @@ public sealed class Emitter{
             processor.Emit(OpCodes.Stsfld, _globals[gs]);
             return;
         }
-        if(variable.IsFree)
+        if(variable is LocalVariableSymbol local && local.IsFree)
         {
             if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
             {
-                var closureParam = _funcs[f].Parameters[^1];
+                var varClosure = _funcClosure[local.BelongsTo];
+                var closureParam = varClosure.FindMatchingClosureParameter(f, _funcs[f]);
                 processor.Emit(OpCodes.Ldarg, closureParam);
-                processor.Emit(OpCodes.Stfld, ParentState().GetClosureField(variable));
+                processor.Emit(OpCodes.Stfld, varClosure.GetFieldOrThrow(variable));
             } else 
             {
-                var loadAddress = processor.Create(OpCodes.Ldloca, BodyState.ClosureVariable);
+                var closureVariable = _funcClosure[BodyState.Func];
+                var loadAddress = processor.Create(OpCodes.Ldloca, closureVariable.VariableDef);
                 if(before is not null)
                 {
                     processor.InsertAfter(before, loadAddress);
                 } 
                 else throw new Exception($"{nameof(EmitStoreLocation)} must be supplied with the instruction before to store into a closure from its origin scope \\0/");
-                processor.Emit(OpCodes.Stfld, BodyState.GetClosureField(variable));
+                processor.Emit(OpCodes.Stfld, closureVariable.GetFieldOrThrow(variable));
             }
             
             return;
@@ -880,17 +888,19 @@ public sealed class Emitter{
                     var locals = BodyState.Locals;
                     if(locals.TryGetValue(nameSymbol, out var variable))
                         processor.Emit(OpCodes.Ldloc, variable);
-                    else if(nameSymbol.IsFree)
+                    else if(nameSymbol is LocalVariableSymbol local && local.IsFree)
                     {
                         if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
                         {
-                            var closureParam = _funcs[f].Parameters[^1];
+                            var varClosure = _funcClosure[local.BelongsTo];
+                            var closureParam = varClosure.FindMatchingClosureParameter(f, _funcs[f]);
                             processor.Emit(OpCodes.Ldarg, closureParam);
-                            processor.Emit(OpCodes.Ldfld, ParentState().GetClosureField(nameSymbol));
+                            processor.Emit(OpCodes.Ldfld, varClosure.GetFieldOrThrow(nameSymbol));
                         } else 
                         {
-                            processor.Emit(OpCodes.Ldloca, BodyState.ClosureVariable);
-                            processor.Emit(OpCodes.Ldfld, BodyState.GetClosureField(nameSymbol));
+                            var closure = _funcClosure[BodyState.Func];
+                            processor.Emit(OpCodes.Ldloca, closure.VariableDef);
+                            processor.Emit(OpCodes.Ldfld, closure.GetFieldOrThrow(nameSymbol));
                         }
                     }
                     else throw new Exception($"{nameof(Emitter)}.{nameof(EmitLoadAccess)} couldn't find '{nameSymbol.Name}'");

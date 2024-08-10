@@ -16,7 +16,7 @@ public sealed class Binder
     private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
     private readonly Stack<FunctionSymbol> _functionStack;
-    private readonly Stack<List<VariableSymbol>> _closureStack;
+    private readonly Stack<List<LocalVariableSymbol>> _closureStack;
 
     public Binder(ErrorWarrningBag bag)
     {
@@ -147,7 +147,10 @@ public sealed class Binder
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type, allowimplicitListType: true);
 
-        var variable = !isGlobalScope ? new VariableSymbol(name, rightHandSide.Type) : new GlobalVariableSymbol(name, rightHandSide.Type);
+        VariableSymbol variable = isGlobalScope 
+                                ? new GlobalVariableSymbol(name, rightHandSide.Type)
+                                : new LocalVariableSymbol(name, rightHandSide.Type, _functionStack.Peek());
+
         if(!_scope.TryDeclareVariable(variable))
         {
             _diag.ReportNameAlreadyDeclared(varDecl.Identifier);
@@ -422,10 +425,12 @@ public sealed class Binder
                     if(symbol is VariableSymbol variable)
                     {
                         //Are we inside of a local function? Then remember any variables that aren't bound in scope or a parameter
-                        if(_closureStack.TryPeek(out var closure) && _scope.IsUnboundInCurrentAndGlobalScope(variable))
+                        if(_closureStack.TryPeek(out var closure) 
+                            && variable is LocalVariableSymbol local
+                            && _scope.IsUnboundInCurrentAndGlobalScope(local))
                         {
-                            variable.IsFree = true;
-                            closure.Add(variable);
+                            local.IsFree = true;
+                            closure.Add(local);
                         }
                         return new BoundNameAccess(variable);
                     }
