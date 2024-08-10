@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Binding;
 using WarmLangLexerParser;
 
@@ -11,12 +12,23 @@ public sealed class LocalFunctionSymbol : FunctionSymbol
     { }
 
     public BoundBlockStatement? Body { get; set; }
+    public List<VariableSymbol>? Closure { get; set; }
 
-    public override string ToString()
+    [MemberNotNullWhen(true, nameof(Body))]
+    [MemberNotNullWhen(true, nameof(Closure))]
+    public bool IsProper => Body is not null && Closure is not null;
+
+    [MemberNotNullWhen(true, nameof(Closure))]
+    public bool RequiresClosure => Closure is not null && Closure.Count > 0;
+
+
+
+    public override string ToString() => base.ToString();
+
+    public string ToStringWithBody()
     {
-        var baseStr = base.ToString();
         if(Body is null)
-            return baseStr;
-        return baseStr + $"{{ {Body} }}";
+            return ToString();
+        return  $"{this}{{ {Body} }}";
     }
 }

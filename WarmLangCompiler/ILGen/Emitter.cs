@@ -27,7 +27,7 @@ public sealed class Emitter{
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
 
-    private readonly Stack<FunctionBodyState> _bodyState;
+    private readonly Stack<FunctionBodyState> _bodyStateStack;
 
     private readonly TypeDefinition _globalsType;
     private readonly Dictionary<VariableSymbol, FieldDefinition> _globals;
@@ -40,13 +40,22 @@ public sealed class Emitter{
     private readonly Dictionary<TypeSymbol, TypeReference> _cilTypes;
     private TypeReference CilTypeOf(TypeSymbol type) => _cilTypes[type.AsRecognisedType()];
 
+    public FunctionBodyState BodyState => _bodyStateStack.Peek();
+    public FunctionBodyState ParentState()
+    {
+        var cur = _bodyStateStack.Pop();
+        var toRet = _bodyStateStack.Peek();
+        _bodyStateStack.Push(cur);
+        return toRet;
+    }
+
     private Emitter(ErrorWarrningBag diag, bool debug = false)
     {
         _debug = debug;
         _diag = diag;
         _funcs = new();
         _cilTypes = new();
-        _bodyState = new();
+        _bodyStateStack = new();
         _globals = new();
 
         // IL -> ".assembly 'App' {}"
@@ -70,7 +79,7 @@ public sealed class Emitter{
         }
 
         // IL -> ".class private auto ansi beforefieldinit abstract sealed Program extends [mscorlib]System.Object {"
-        var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[GetCILBaseTypeSymbol()]);
+        var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[CILBaseTypeSymbol]);
         _program = new TypeDefinition("", "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, systemObject);
         _assemblyDef.MainModule.Types.Add(_program);
 
@@ -81,7 +90,7 @@ public sealed class Emitter{
 
         // Needed for the implemenatation of __wl_tostring
         var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
-        var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(GetCILBaseTypeSymbol()));
+        var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(CILBaseTypeSymbol));
         
         var dotnetString = _mscorlib.MainModule.GetType("System.String");
         _stringConcat    = GetMethodFromTypeDefinition(dotnetString, "Concat", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
@@ -90,15 +99,15 @@ public sealed class Emitter{
 
         var dotnetArrayList = _mscorlib.MainModule.GetType("System.Collections.ArrayList");
         _listEmpty      = GetMethodFromTypeDefinition(dotnetArrayList, ".ctor", GetCilParamNames());
-        _listAdd        = GetMethodFromTypeDefinition(dotnetArrayList, "Add", GetCilParamNames(GetCILBaseTypeSymbol()));
+        _listAdd        = GetMethodFromTypeDefinition(dotnetArrayList, "Add", GetCilParamNames(CILBaseTypeSymbol));
         _listRemove     = GetMethodFromTypeDefinition(dotnetArrayList, "RemoveAt", GetCilParamNames(TypeSymbol.Int));
         _listSubscript  = GetMethodFromTypeDefinition(dotnetArrayList, "get_Item", GetCilParamNames(TypeSymbol.Int));
-        _listSet        = GetMethodFromTypeDefinition(dotnetArrayList, "set_Item", GetCilParamNames(TypeSymbol.Int, GetCILBaseTypeSymbol()));
+        _listSet        = GetMethodFromTypeDefinition(dotnetArrayList, "set_Item", GetCilParamNames(TypeSymbol.Int, CILBaseTypeSymbol));
         _listAddMany    = GetMethodFromTypeDefinition(dotnetArrayList, "AddRange", new[]{"System.Collections.ICollection"});
         _listLength     = GetMethodFromTypeDefinition(dotnetArrayList, "get_Count", GetCilParamNames());
 
         var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
-        _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(GetCILBaseTypeSymbol(), GetCILBaseTypeSymbol()));
+        _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(CILBaseTypeSymbol, CILBaseTypeSymbol));
 
         var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, toStringConvert, _objectEquals, _stringConcat);
         //functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
@@ -229,12 +238,38 @@ public sealed class Emitter{
 
     private void EmitFunctionBody(FunctionSymbol func, BoundBlockStatement body)
     {
-        var thisState = new FunctionBodyState();
-        _bodyState.Push(thisState);
-
+        var thisState = new FunctionBodyState(func);
+        _bodyStateStack.Push(thisState);
         var funcDefintion = _funcs[func];
-
         var ilProcessor = funcDefintion.Body.GetILProcessor();
+
+        if(func is not LocalFunctionSymbol)
+        {
+            foreach(var stmnt in body.Statements)
+            {
+                if(stmnt is BoundFunctionDeclaration decl && decl.Symbol is LocalFunctionSymbol lf && lf.RequiresClosure)
+                {
+                    if(thisState.ClosureType is null)
+                    {
+                        var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, 
+                                                             CilTypeOf(CILClosureType));
+
+                        _program.NestedTypes.Add(closureType);
+                        
+                        var closureVariable = new VariableDefinition(closureType);
+                        ilProcessor.Body.Variables.Add(closureVariable);
+                        
+                        thisState.AddClosure(closureType, closureVariable);
+                    }
+                    foreach(var c in lf.Closure)
+                    {
+                        var @field = new FieldDefinition(c.Name, FieldAttributes.Public, CilTypeOf(c.Type));
+                        thisState.AddClosureField(@field);
+                    }
+                }
+            }
+        }
+
         EmitBlockStatement(ilProcessor, body);
 
 
@@ -246,15 +281,20 @@ public sealed class Emitter{
         }
         ilProcessor.Body.OptimizeMacros();
 
-        _bodyState.Pop();
+        _bodyStateStack.Pop();
 
         if(_debug)
         {
             Console.WriteLine($"-- FUNCTION '{func}'");
+            foreach(var parameter in _funcs[func].Parameters)
+            {
+                Console.Write("    ");
+                Console.WriteLine($"arg: {parameter.Index} - {parameter.ParameterType}");
+            }
             foreach(var variable in ilProcessor.Body.Variables)
             {
                 Console.Write("    ");
-                Console.WriteLine(variable);
+                Console.WriteLine($"loc: {variable.Index} - {variable.VariableType}");
             }
             foreach(var instr in ilProcessor.Body.Instructions)
             {
@@ -312,27 +352,33 @@ public sealed class Emitter{
 
     private void EmitVariableDeclaration(ILProcessor processor, BoundVarDeclaration varDecl)
     {
-        var variable = new VariableDefinition(CilTypeOf(varDecl.Type));
-        var stateOfBody = _bodyState.Peek();
-        stateOfBody.Locals[varDecl.Symbol] = variable;
-        processor.Body.Variables.Add(variable);
-        
+        var symbol = varDecl.Symbol;
+        if(symbol.IsFree && BodyState.TryGetClosureField(symbol, out var fieldDef))
+        {  
+            BodyState.SharedLocals[symbol] = fieldDef;
+        }
+        else 
+        {
+            var variable = new VariableDefinition(CilTypeOf(varDecl.Type));
+            BodyState.Locals[symbol] = variable;
+            processor.Body.Variables.Add(variable);
+        }
+        var intstrBefore = GetLastInstruction(processor);
         EmitExpression(processor, varDecl.RightHandSide);
-        EmitStoreLocation(processor, varDecl.Symbol);
+        EmitStoreLocation(processor, symbol, intstrBefore);
     }
 
     private void EmitConditionalGotoStatement(ILProcessor processor, BoundConditionalGotoStatement condGoto)
     {
         EmitExpression(processor, condGoto.Condition);
         var instruction = processor.Body.Instructions.Count;
-        var bodyState = _bodyState.Peek();
         if(condGoto.FallsThroughTrueBranch)
         {
-            bodyState.AwaitingLabels[instruction] = condGoto.LabelFalse;
+            BodyState.AwaitingLabels[instruction] = condGoto.LabelFalse;
             processor.Emit(OpCodes.Brfalse, processor.Create(OpCodes.Nop));
         }
         else {
-            bodyState.AwaitingLabels[instruction] = condGoto.LabelTrue;
+            BodyState.AwaitingLabels[instruction] = condGoto.LabelTrue;
             processor.Emit(OpCodes.Brtrue, processor.Create(OpCodes.Nop));
         }
         
@@ -340,9 +386,8 @@ public sealed class Emitter{
 
     private void EmitGotoStatement(ILProcessor processor, BoundGotoStatement gotoo)
     {
-        var bodyState = _bodyState.Peek();
         var instrCount = processor.Body.Instructions.Count;
-        bodyState.AwaitingLabels[instrCount] = gotoo.Label;
+        BodyState.AwaitingLabels[instrCount] = gotoo.Label;
         processor.Emit(OpCodes.Br, processor.Create(OpCodes.Nop));
     }
 
@@ -351,7 +396,7 @@ public sealed class Emitter{
         //dump a nop we can jump to?
         var nop = processor.Create(OpCodes.Nop);
         processor.Append(nop);
-        _bodyState.Peek().Labels[label.Label] = nop;
+        BodyState.Labels[label.Label] = nop;
     }
 
     private void EmitBlockStatement(ILProcessor processor, BoundBlockStatement block)
@@ -373,6 +418,13 @@ public sealed class Emitter{
     {
         var funcName = $"_local_{_localFuncId++}_{func.Name}";
         var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(func.Type));
+
+        if(func.RequiresClosure)
+        {   
+            var closureType = BodyState.ClosureType.MakeByReferenceType();
+            var closureParam = new ParameterDefinition("closure", ParameterAttributes.None, closureType);
+            funcDefintion.Parameters.Add(closureParam);
+        }
         
         foreach(var @param in func.Parameters)
         {
@@ -472,10 +524,16 @@ public sealed class Emitter{
         switch(assignment.Access)
         {
             case BoundNameAccess name:
+                var instrBefore = GetLastInstruction(processor);
+                var isVariableInClosure = name.Symbol.IsFree;
                 EmitExpression(processor,assignment.RightHandSide);
+                
                 //Very important to dup because the assignment will consume the value, but we want to leave a value on the stack.
-                processor.Emit(OpCodes.Dup); 
-                EmitStoreLocation(processor, name.Symbol);
+                if(!isVariableInClosure) processor.Emit(OpCodes.Dup); 
+                
+                EmitStoreLocation(processor, name.Symbol, instrBefore);
+                
+                if(isVariableInClosure) EmitLoadAccess(processor, name); //must leave something to pop.
                 break;
             case BoundSubscriptAccess sa:
                 if(sa.Target.Type is ListTypeSymbol lts)
@@ -509,6 +567,11 @@ public sealed class Emitter{
             return;
         }
 
+        if(call.Function is LocalFunctionSymbol f && f.RequiresClosure)
+        {
+            processor.Emit(OpCodes.Ldloca, BodyState.ClosureVariable);
+        }
+
         foreach(var arg in call.Arguments)
         {
             EmitExpression(processor, arg);
@@ -528,7 +591,6 @@ public sealed class Emitter{
         {
             EmitExpression(processor, call.Arguments[0]);
             processor.Emit(OpCodes.Call, _builtInFunctions[call.Function]);
-            processor.Emit(OpCodes.Nop);
             return;
         }
         throw new NotImplementedException($"{nameof(Emitter)} doesn't allow builtin calls with more than 1 argument");
@@ -763,7 +825,7 @@ public sealed class Emitter{
         }   
     }
 
-    private void EmitStoreLocation(ILProcessor processor, VariableSymbol variable)
+    private void EmitStoreLocation(ILProcessor processor, VariableSymbol variable, Instruction? before = null)
     {
         if(variable is ParameterSymbol ps)
         {
@@ -775,9 +837,27 @@ public sealed class Emitter{
             processor.Emit(OpCodes.Stsfld, _globals[gs]);
             return;
         }
-        var locals = _bodyState.Peek().Locals;
-        var variabledef = locals[variable];
-        processor.Emit(OpCodes.Stloc, variabledef);
+        if(variable.IsFree)
+        {
+            if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
+            {
+                processor.Emit(OpCodes.Ldarg_0);
+                processor.Emit(OpCodes.Stfld, ParentState().GetClosureField(variable));
+            } else 
+            {
+                var loadAddress = processor.Create(OpCodes.Ldloca, BodyState.ClosureVariable);
+                if(before is not null)
+                {
+                    processor.InsertAfter(before, loadAddress);
+                } 
+                else throw new Exception($"{nameof(EmitStoreLocation)} must be supplied with the instruction before to store into a closure from its origin scope \\0/");
+                processor.Emit(OpCodes.Stfld, BodyState.GetClosureField(variable));
+            }
+            
+            return;
+        }
+        var variableDef = BodyState.Locals[variable];
+        processor.Emit(OpCodes.Stloc, variableDef);
     }
 
     private void EmitLoadAccess(ILProcessor processor, BoundAccess acc)
@@ -785,16 +865,32 @@ public sealed class Emitter{
         switch(acc)
         {
             case BoundNameAccess name:
-                if(name.Symbol is ParameterSymbol ps)
+                var nameSymbol = name.Symbol;
+                if(nameSymbol is ParameterSymbol ps)
                 {
                     processor.Emit(OpCodes.Ldarg, ps.Placement);
-                } else if(name.Symbol is GlobalVariableSymbol gs) {
+                } 
+                else if(nameSymbol is GlobalVariableSymbol gs) {
                     var variable = _globals[gs];
                     processor.Emit(OpCodes.Ldsfld, variable);
-                } else {
-                    var locals = _bodyState.Peek().Locals;
-                    var variable = locals[name.Symbol];
-                    processor.Emit(OpCodes.Ldloc, variable);
+                } 
+                else {
+                    var locals = BodyState.Locals;
+                    if(locals.TryGetValue(nameSymbol, out var variable))
+                        processor.Emit(OpCodes.Ldloc, variable);
+                    else if(nameSymbol.IsFree)
+                    {
+                        if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
+                        {
+                            processor.Emit(OpCodes.Ldarg_0);
+                            processor.Emit(OpCodes.Ldfld, ParentState().GetClosureField(nameSymbol));
+                        } else 
+                        {
+                            processor.Emit(OpCodes.Ldloca, BodyState.ClosureVariable);
+                            processor.Emit(OpCodes.Ldfld, BodyState.GetClosureField(nameSymbol));
+                        }
+                    }
+                    else throw new Exception($"{nameof(Emitter)}.{nameof(EmitLoadAccess)} couldn't find '{nameSymbol.Name}'");
                 }
                 break;
             case BoundMemberAccess mba:
@@ -850,6 +946,14 @@ public sealed class Emitter{
     {
         if(previousExprType.NeedsBoxing())
             processor.Emit(OpCodes.Box, CilTypeOf(previousExprType));
+    }
+
+    private Instruction GetLastInstruction(ILProcessor processor)
+    {
+        var instructions = processor.Body.Instructions;
+        //Insert an NOP if no other instructions exists
+        if(instructions.Count <= 0) processor.Emit(OpCodes.Nop);
+        return instructions[^1];
     }
 
 }
