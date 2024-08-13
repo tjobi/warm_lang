@@ -8,17 +8,18 @@ namespace WarmLangCompiler.ILGen;
 
 public sealed class ClosureState 
 {
-    public ClosureState(TypeDefinition closureType, VariableDefinition closureVariable)
+    public ClosureState(TypeDefinition closureType, VariableDefinition closureVariable, FunctionBodyState belongsTo)
     {
         TypeDef = closureType;
         VariableDef = closureVariable;
+        BelongsTo = belongsTo;
         ReferenceType = TypeDef.MakeByReferenceType();
     }
 
     public TypeDefinition TypeDef { get; }
 
     public VariableDefinition VariableDef { get; }
-
+    public FunctionBodyState BelongsTo { get; }
     public ByReferenceType ReferenceType { get; } 
 
     public void AddField(FieldDefinition @field) 
@@ -45,18 +46,6 @@ public sealed class ClosureState
         return null;
     }
 
-    public FieldDefinition GetFieldOrThrow(VariableSymbol symbol) => GetField(symbol.Name) ?? throw new Exception($"{nameof(ClosureState)} couldn't find '{symbol}'");
-
-    public ParameterDefinition FindMatchingClosureParameter(FunctionSymbol funcSymbol, MethodDefinition func)
-    {
-        var parameters = func.Parameters;
-        for(int i = funcSymbol.Parameters.Length; i < parameters.Count; i++)
-        {
-            var parameter = parameters[i];
-            if(parameter.ParameterType == ReferenceType || parameter.ParameterType == TypeDef)
-                return parameter;
-        }
-        throw new Exception($"Couldn't find closure '{TypeDef}' in parameters of '{funcSymbol}'");
-    }
+    public FieldDefinition GetFieldOrThrow(VariableSymbol symbol) => GetField(symbol.Name) ?? throw new Exception($"{nameof(ClosureState)} of '{TypeDef.FullName}' couldn't find '{symbol}'");
 
 }

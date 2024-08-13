@@ -217,7 +217,19 @@ public sealed class Binder
         _closureStack.Push(new());
         var boundBody = BindFunctionBody(symbol, funcDecl.Body);
         symbol.Body = boundBody;
-        symbol.Closure = _closureStack.Pop();        
+        if(symbol.Closure is null)  symbol.Closure = _closureStack.Pop();
+        else                        symbol.Closure.AddRange(_closureStack.Pop());
+
+        if(symbol.RequiresClosure)
+        {
+            foreach(var func in _functionStack)
+            {
+                if(func is not LocalFunctionSymbol local)
+                    break;
+                local.Closure ??= new();
+                local.Closure.AddRange(symbol.Closure.Where(v => v.BelongsTo != func)); //TODO: linq?
+            }
+        }  
 
         return new BoundFunctionDeclaration(funcDecl, symbol);
     }

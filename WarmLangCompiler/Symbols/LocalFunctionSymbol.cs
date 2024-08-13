@@ -8,8 +8,7 @@ namespace WarmLangCompiler.Symbols;
 public sealed class LocalFunctionSymbol : FunctionSymbol
 {
     public LocalFunctionSymbol(SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
-    : base(nameToken, parameters, type)
-    { }
+    : base(nameToken, parameters, type)  { }
 
     public BoundBlockStatement? Body { get; set; }
     public List<LocalVariableSymbol>? Closure { get; set; }
@@ -20,8 +19,6 @@ public sealed class LocalFunctionSymbol : FunctionSymbol
 
     [MemberNotNullWhen(true, nameof(Closure))]
     public bool RequiresClosure => Closure is not null && Closure.Count > 0;
-
-
 
     public override string ToString() => base.ToString();
 

@@ -245,7 +245,7 @@ public sealed class Emitter{
         var funcDefintion = _funcs[func];
         var ilProcessor = funcDefintion.Body.GetILProcessor();
 
-        if(func is not LocalFunctionSymbol)
+        if(func is not LocalFunctionSymbol local || local.Closure is {Count: > 0})
         {
             foreach(var stmnt in body.Statements)
             {
@@ -261,9 +261,8 @@ public sealed class Emitter{
                         var closureVariable = new VariableDefinition(closureType);
                         ilProcessor.Body.Variables.Add(closureVariable);
                         
-                        var closure = new ClosureState(closureType, closureVariable);
-                        thisState.AddClosure(_funcClosure[func] = closure);
-
+                        var closure = new ClosureState(closureType, closureVariable, thisState);
+                        thisState.AddClosureVariable(_funcClosure[func] = closure);
                     }
                     foreach(var c in lf.Closure)
                     {
@@ -423,23 +422,14 @@ public sealed class Emitter{
     {
         var funcName = $"_local_{_localFuncId++}_{func.Name}";
         var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(func.Type));
+        _funcs[func] = funcDefintion;
+        _program.Methods.Add(funcDefintion);
 
         foreach(var @param in func.Parameters)
         {
             var paramDef = new ParameterDefinition(@param.Name, ParameterAttributes.None, CilTypeOf(@param.Type));
             funcDefintion.Parameters.Add(paramDef);
         }
-
-        //TODO: Add the closure parameter when it is needed instead, we may need multiple closures...
-        if(func.RequiresClosure)
-        {   
-            var closureType = BodyState.Closure!.ReferenceType;
-            var closureParam = new ParameterDefinition("closure", ParameterAttributes.None, closureType);
-            funcDefintion.Parameters.Add(closureParam);
-        }
-
-        _funcs[func] = funcDefintion;
-        _program.Methods.Add(funcDefintion);
     }
 
     private void EmitExprStatement(ILProcessor processor, BoundExprStatement stmnt)
@@ -580,10 +570,32 @@ public sealed class Emitter{
 
         if(call.Function is LocalFunctionSymbol f && f.RequiresClosure)
         {
-            processor.Emit(OpCodes.Ldloca, BodyState.ClosureVariable);
+            var funcDef = _funcs[f];
+            for(int i = f.Parameters.Length; i < funcDef.Parameters.Count; i++)
+            {
+
+                var closureType = funcDef.Parameters[i].ParameterType;
+                if(!BodyState.TryGetAvailableClosureLoadInstruction(closureType, processor, out var loadClosureInstr))
+                {
+                    throw new Exception($"Couldn't find '{closureType}' when calling '{f}'");            
+                }
+                processor.Append(loadClosureInstr);
+            }
         }
 
         processor.Emit(OpCodes.Call, _funcs[call.Function]);
+    }
+
+    private void PrintBodyClosures()
+    {
+        if(BodyState.AvailableClosures is not null)
+        {
+            Console.WriteLine("Looking at " + BodyState.Func);
+            foreach(var closure in BodyState.AvailableClosures)
+            {
+                Console.WriteLine("   " + closure.Key + "  - is variable? " + (closure.Value.variable is not null).ToString());
+            }
+        }   
     }
 
     private void EmitCallBuiltinExpression(ILProcessor processor, BoundCallExpression call)
@@ -677,7 +689,6 @@ public sealed class Emitter{
                     processor.Emit(OpCodes.Callvirt, _listAdd);
                     processor.Emit(OpCodes.Pop);
                     break;
-                //TODO: Both NotEquals and Equals uses reference equality! we want the element equality.
                 case BoundBinaryOperatorKind.Equals:
                     EmitExpression(processor, binary.Right);
                     processor.Emit(OpCodes.Call, _wlEquals);
@@ -837,37 +848,25 @@ public sealed class Emitter{
         if(variable is ParameterSymbol ps)
         {
             processor.Emit(OpCodes.Starg, ps.Placement);
-            return;
-        }
-        if(variable is GlobalVariableSymbol gs)
+        } 
+        else if(variable is GlobalVariableSymbol gs)
         {
             processor.Emit(OpCodes.Stsfld, _globals[gs]);
-            return;
-        }
-        if(variable is LocalVariableSymbol local && local.IsFree)
+        } 
+        else if(variable is LocalVariableSymbol local && local.IsFree)
         {
-            if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
-            {
-                var varClosure = _funcClosure[local.BelongsTo];
-                var closureParam = varClosure.FindMatchingClosureParameter(f, _funcs[f]);
-                processor.Emit(OpCodes.Ldarg, closureParam);
-                processor.Emit(OpCodes.Stfld, varClosure.GetFieldOrThrow(variable));
-            } else 
-            {
-                var closureVariable = _funcClosure[BodyState.Func];
-                var loadAddress = processor.Create(OpCodes.Ldloca, closureVariable.VariableDef);
-                if(before is not null)
-                {
-                    processor.InsertAfter(before, loadAddress);
-                } 
-                else throw new Exception($"{nameof(EmitStoreLocation)} must be supplied with the instruction before to store into a closure from its origin scope \\0/");
-                processor.Emit(OpCodes.Stfld, closureVariable.GetFieldOrThrow(variable));
-            }
+            var (ldClosure, stfld) = GetOrCreateClosureVariableAccess(processor, local, OpCodes.Stfld);
             
-            return;
+            if(before is not null)
+                processor.InsertAfter(before, ldClosure);
+            else throw new Exception($"{nameof(EmitStoreLocation)} must be supplied with the instruction before to store into a closure from its origin scope \\0/");
+            processor.Append(stfld);
+        } 
+        else 
+        {
+            var variableDef = BodyState.Locals[variable];
+            processor.Emit(OpCodes.Stloc, variableDef);
         }
-        var variableDef = BodyState.Locals[variable];
-        processor.Emit(OpCodes.Stloc, variableDef);
     }
 
     private void EmitLoadAccess(ILProcessor processor, BoundAccess acc)
@@ -885,23 +884,15 @@ public sealed class Emitter{
                     processor.Emit(OpCodes.Ldsfld, variable);
                 } 
                 else {
-                    var locals = BodyState.Locals;
-                    if(locals.TryGetValue(nameSymbol, out var variable))
+                    if(BodyState.Locals.TryGetValue(nameSymbol, out var variable))
+                    {
                         processor.Emit(OpCodes.Ldloc, variable);
+                    }
                     else if(nameSymbol is LocalVariableSymbol local && local.IsFree)
                     {
-                        if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
-                        {
-                            var varClosure = _funcClosure[local.BelongsTo];
-                            var closureParam = varClosure.FindMatchingClosureParameter(f, _funcs[f]);
-                            processor.Emit(OpCodes.Ldarg, closureParam);
-                            processor.Emit(OpCodes.Ldfld, varClosure.GetFieldOrThrow(nameSymbol));
-                        } else 
-                        {
-                            var closure = _funcClosure[BodyState.Func];
-                            processor.Emit(OpCodes.Ldloca, closure.VariableDef);
-                            processor.Emit(OpCodes.Ldfld, closure.GetFieldOrThrow(nameSymbol));
-                        }
+                        var (closureLoad, fieldLoad) = GetOrCreateClosureVariableAccess(processor, local, OpCodes.Ldfld);
+                        processor.Append(closureLoad);
+                        processor.Append(fieldLoad);
                     }
                     else throw new Exception($"{nameof(Emitter)}.{nameof(EmitLoadAccess)} couldn't find '{nameSymbol.Name}'");
                 }
@@ -967,6 +958,49 @@ public sealed class Emitter{
         //Insert an NOP if no other instructions exists
         if(instructions.Count <= 0) processor.Emit(OpCodes.Nop);
         return instructions[^1];
+    }
+
+    private (Instruction LoadClosureInstr, Instruction fieldInstr) GetOrCreateClosureVariableAccess(ILProcessor processor, LocalVariableSymbol local, OpCode action)
+    {
+        Instruction load;
+        Instruction loadField;
+        var varClosure = _funcClosure[local.BelongsTo];
+        if(BodyState.TryGetAvailableClosureLoadInstruction(varClosure, processor, out var loadinstr))
+        {
+            load = loadinstr;
+            loadField = processor.Create(action, varClosure.GetFieldOrThrow(local));
+        }
+        else if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
+        {
+            if(!EmitterClosureHelper.TryFindMatchingClosureParameter(_funcs, f, varClosure, out var closureParam))
+            {
+                closureParam = EmitterClosureHelper.CreateMatchingClosureParameter(_funcs, f, varClosure);
+
+                //Propogate the needed closure upwards.. that is:
+                //function outer(){ 
+                //  int x = 5;
+                //  function inner1(){
+                //      function inner2() int {
+                //          return x;
+                //      }
+                //  }
+                //}
+                // only 'inner2' needs the closure, then it has to be passed through 'inner1'...
+                foreach(var bodyState in _bodyStateStack)
+                {
+                    if(bodyState == BodyState) continue;
+                    if(EmitterClosureHelper.HasReachedOwnerOrIsAlreadyKnown(bodyState, varClosure)) break;
+
+                    var parameter = EmitterClosureHelper.CreateMatchingClosureParameter(_funcs, bodyState.Func, varClosure);
+                    bodyState.AddAvailableClosure(varClosure, parameter);
+                }
+            }
+            BodyState.AddAvailableClosure(varClosure, closureParam);
+            load = processor.Create(OpCodes.Ldarg, closureParam);
+            loadField = processor.Create(action, varClosure.GetFieldOrThrow(local));
+        }
+        else throw new Exception($"{nameof(GetOrCreateClosureVariableAccess)} made it past the outer elseif - no closure '{varClosure}' and no Body.Func isn't local '{BodyState.Func}'");
+        return (load, loadField);
     }
 
 }

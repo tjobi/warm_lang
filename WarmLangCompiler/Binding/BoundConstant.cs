@@ -11,7 +11,7 @@ public class BoundConstant
         {
             return v;
         }
-        throw new Exception($"BoundConstant someone had a wrong assumption of value '{Value}'");
+        throw new Exception($"{nameof(BoundConstant)} someone had a wrong assumption of value '{Value}'");
     } 
 
     public BoundConstant(object val) 
