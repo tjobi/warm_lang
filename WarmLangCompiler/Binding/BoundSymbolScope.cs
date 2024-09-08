@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using Mono.Cecil.Cil;
 using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
