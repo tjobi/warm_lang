@@ -351,7 +351,6 @@ public sealed class Emitter{
         var instrCount = processor.Body.Instructions.Count;
         BodyState.AwaitingLabels[instrCount] = gotoo.Label;
         processor.Emit(OpCodes.Br, processor.Create(OpCodes.Nop));
-        Console.WriteLine(gotoo);
     }
 
     private void EmitLabelStatement(ILProcessor processor, BoundLabelStatement label)
