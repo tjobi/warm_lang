@@ -854,27 +854,18 @@ public sealed class Emitter{
             return;
         }
 
-        if(variable is ParameterSymbol ps)
+        switch(variable)
         {
-            processor.Emit(OpCodes.Starg, ps.Placement);
-        } 
-        else if(variable is GlobalVariableSymbol gs)
-        {
-            processor.Emit(OpCodes.Stsfld, _globals[gs]);
-        } 
-        else if(variable is LocalVariableSymbol local && BodyState.IsSharedVariable(local))
-        {
-            var (ldClosure, stfld) = GetOrCreateClosureVariableAccess(processor, local, OpCodes.Stfld);
-            
-            if(before is not null)
-                processor.InsertAfter(before, ldClosure);
-            else throw new Exception($"{nameof(EmitStoreLocation)} must be supplied with the instruction before to store into a closure from its origin scope \\0/");
-            processor.Append(stfld);
-        } 
-        else 
-        {
-            var variableDef = BodyState.Locals[variable];
-            processor.Emit(OpCodes.Stloc, variableDef);
+            case ParameterSymbol ps:
+                processor.Emit(OpCodes.Starg, ps.Placement);
+                return;
+            case GlobalVariableSymbol gs:
+                processor.Emit(OpCodes.Stsfld, _globals[gs]);
+                return;
+            case LocalVariableSymbol ls:
+                var variableDef = BodyState.Locals[variable];
+                processor.Emit(OpCodes.Stloc, variableDef);
+                return;
         }
     }
 
@@ -891,29 +882,21 @@ public sealed class Emitter{
                     processor.Append(fieldLoad);
                     return;
                 }
-
-                if(nameSymbol is ParameterSymbol ps)
+                switch(nameSymbol)
                 {
-                    processor.Emit(OpCodes.Ldarg, ps.Placement);
-                } 
-                else if(nameSymbol is GlobalVariableSymbol gs) {
-                    var variable = _globals[gs];
-                    processor.Emit(OpCodes.Ldsfld, variable);
-                } 
-                else {
-                    if(BodyState.Locals.TryGetValue(nameSymbol, out var variable))
-                    {
-                        processor.Emit(OpCodes.Ldloc, variable);
-                    }
-                    else if(nameSymbol is LocalVariableSymbol local && BodyState.IsSharedVariable(local))
-                    {
-                        var (closureLoad, fieldLoad) = GetOrCreateClosureVariableAccess(processor, local, OpCodes.Ldfld);
-                        processor.Append(closureLoad);
-                        processor.Append(fieldLoad);
-                    }
-                    else throw new Exception($"{nameof(Emitter)}.{nameof(EmitLoadAccess)} couldn't find '{nameSymbol.Name}'");
+                    case ParameterSymbol ps:
+                        processor.Emit(OpCodes.Ldarg, ps.Placement);
+                        return;
+                    case GlobalVariableSymbol gs:
+                        var variable = _globals[gs];
+                        processor.Emit(OpCodes.Ldsfld, variable);
+                        return;
+                    case LocalVariableSymbol ls when BodyState.Locals.TryGetValue(nameSymbol, out var local):
+                        processor.Emit(OpCodes.Ldloc, local);
+                        return;
+                    default:
+                        throw new Exception($"{nameof(Emitter)}.{nameof(EmitLoadAccess)} couldn't find '{nameSymbol.Name}'");
                 }
-                break;
             case BoundMemberAccess mba:
                 var access = mba.Target;
                 EmitLoadAccess(processor, access);
