@@ -247,7 +247,7 @@ public sealed class Emitter{
         _bodyStateStack.Push(thisState);
         var funcDefintion = _funcs[func];
         var ilProcessor = funcDefintion.Body.GetILProcessor();
-        Console.WriteLine("------" + func.Name + "  " +  func.SharedLocals.Count + "------\n\n");
+        
         if(thisState.SharedLocals.Count > 0) //Does the function share locals? Then add a closure
         {
             var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, CilTypeOf(CILClosureType));
@@ -268,42 +268,9 @@ public sealed class Emitter{
                     ilProcessor.Emit(OpCodes.Ldarg, p.Placement);
                     ilProcessor.Emit(OpCodes.Stfld, @field);    
                 }
-                var isParam = shared is ParameterSymbol ? "param" : "local";
-                Console.WriteLine($"SHARED: adding {isParam} {shared}");
             }
         }
         if(func is LocalFunctionSymbol l && l.Closure is {Count: >0}) sharedLocals.UnionWith(l.Closure);
-
-        // if(func is not LocalFunctionSymbol local || local.Closure is {Count: > 0})
-        // {
-        //     foreach(var stmnt in body.Statements)
-        //     {
-        //         if(stmnt is BoundFunctionDeclaration decl && decl.Symbol is LocalFunctionSymbol lf && lf.RequiresClosure)
-        //         {
-        //             if(thisState.Closure is null)
-        //             {
-        //                 var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, 
-        //                                                      CilTypeOf(CILClosureType));
-
-        //                 _program.NestedTypes.Add(closureType);
-                        
-        //                 var closureVariable = new VariableDefinition(closureType);
-        //                 ilProcessor.Body.Variables.Add(closureVariable);
-                        
-        //                 var closure = new ClosureState(closureType, closureVariable, thisState);
-        //                 thisState.AddClosureVariable(_funcClosure[func] = closure);
-        //             }
-        //             foreach(var c in lf.Closure)
-        //             {
-        //                 var @field = new FieldDefinition(c.Name, FieldAttributes.Public, CilTypeOf(c.Type));
-        //                 thisState.AddClosureField(@field);
-        //                 Console.WriteLine($"C: Adding {c}");
-        //             }
-        //         }
-        //     }
-        // }
-
-        Console.WriteLine("------" + func.Name + "------\n\n");
 
         EmitBlockStatement(ilProcessor, body);
 
@@ -889,7 +856,6 @@ public sealed class Emitter{
 
         if(variable is ParameterSymbol ps)
         {
-            Console.WriteLine($"Trying to write to {ps}");
             processor.Emit(OpCodes.Starg, ps.Placement);
         } 
         else if(variable is GlobalVariableSymbol gs)
@@ -920,7 +886,6 @@ public sealed class Emitter{
                 var nameSymbol = name.Symbol;
                 if(nameSymbol is ScopedVariableSymbol sv && BodyState.IsSharedVariable(sv))
                 {
-                    Console.WriteLine($"Loading {nameSymbol}");
                     var (closureLoad, fieldLoad) = GetOrCreateClosureVariableAccess(processor, sv, OpCodes.Ldfld);
                     processor.Append(closureLoad);
                     processor.Append(fieldLoad);
