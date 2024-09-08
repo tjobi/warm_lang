@@ -241,41 +241,19 @@ public sealed class Emitter{
     private void EmitFunctionBody(FunctionSymbol func, BoundBlockStatement body)
     {
         var sharedLocals = new HashSet<ScopedVariableSymbol>(func.SharedLocals);
-        
-        
+
+
         var thisState = new FunctionBodyState(func, sharedLocals);
         _bodyStateStack.Push(thisState);
         var funcDefintion = _funcs[func];
         var ilProcessor = funcDefintion.Body.GetILProcessor();
-        
-        if(thisState.SharedLocals.Count > 0) //Does the function share locals? Then add a closure
-        {
-            var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, CilTypeOf(CILClosureType));
-            _program.NestedTypes.Add(closureType);  
-            var closureVariable = new VariableDefinition(closureType);
-            ilProcessor.Body.Variables.Add(closureVariable);
-            
-            var closure = new ClosureState(closureType, closureVariable, thisState);
-            thisState.AddClosureVariable(_funcClosure[func] = closure);
-            
-            foreach(var shared in thisState.SharedLocals)
-            {
-                var @field = new FieldDefinition(shared.Name, FieldAttributes.Public, CilTypeOf(shared.Type));
-                thisState.AddClosureField(@field);
-                if(shared is ParameterSymbol p) 
-                {
-                    ilProcessor.Emit(OpCodes.Ldloca, closureVariable);
-                    ilProcessor.Emit(OpCodes.Ldarg, p.Placement);
-                    ilProcessor.Emit(OpCodes.Stfld, @field);    
-                }
-            }
-        }
-        if(func is LocalFunctionSymbol l && l.Closure is {Count: >0}) sharedLocals.UnionWith(l.Closure);
+
+        SetupClosureState(thisState, func, ilProcessor);
 
         EmitBlockStatement(ilProcessor, body);
 
 
-        foreach(var (instrIdx, label) in thisState.AwaitingLabels)
+        foreach (var (instrIdx, label) in thisState.AwaitingLabels)
         {
             var instr = ilProcessor.Body.Instructions[instrIdx];
             var targetInstr = thisState.Labels[label];
@@ -284,26 +262,7 @@ public sealed class Emitter{
         ilProcessor.Body.OptimizeMacros();
 
         _bodyStateStack.Pop();
-
-        if(_debug)
-        {
-            Console.WriteLine($"-- FUNCTION '{func}'");
-            foreach(var parameter in _funcs[func].Parameters)
-            {
-                Console.Write("    ");
-                Console.WriteLine($"arg: {parameter.Index} - {parameter.ParameterType}");
-            }
-            foreach(var variable in ilProcessor.Body.Variables)
-            {
-                Console.Write("    ");
-                Console.WriteLine($"loc: {variable.Index} - {variable.VariableType}");
-            }
-            foreach(var instr in ilProcessor.Body.Instructions)
-            {
-                Console.WriteLine(instr);
-            }
-            Console.WriteLine($"-- END      '{func.Name}'");
-        }
+        if(_debug) PrintFuncBody(func, ilProcessor);
     }
 
     private void EmitGlobalVariableDeclaration(ILProcessor processor, BoundVarDeclaration globalVar)
@@ -392,6 +351,7 @@ public sealed class Emitter{
         var instrCount = processor.Body.Instructions.Count;
         BodyState.AwaitingLabels[instrCount] = gotoo.Label;
         processor.Emit(OpCodes.Br, processor.Create(OpCodes.Nop));
+        Console.WriteLine(gotoo);
     }
 
     private void EmitLabelStatement(ILProcessor processor, BoundLabelStatement label)
@@ -846,7 +806,7 @@ public sealed class Emitter{
     {
         if(variable is ScopedVariableSymbol sv && BodyState.IsSharedVariable(sv))
         {
-            var (ldClosure, stfld) = GetOrCreateClosureVariableAccess(processor, sv, OpCodes.Stfld);
+            var (ldClosure, stfld) = GetClosureVariableAccess(processor, sv, OpCodes.Stfld);
             if(before is not null)
                 processor.InsertAfter(before, ldClosure);
             else throw new Exception($"{nameof(EmitStoreLocation)} must be supplied with the instruction before to store into a closure from its origin scope \\0/");
@@ -877,7 +837,7 @@ public sealed class Emitter{
                 var nameSymbol = name.Symbol;
                 if(nameSymbol is ScopedVariableSymbol sv && BodyState.IsSharedVariable(sv))
                 {
-                    var (closureLoad, fieldLoad) = GetOrCreateClosureVariableAccess(processor, sv, OpCodes.Ldfld);
+                    var (closureLoad, fieldLoad) = GetClosureVariableAccess(processor, sv, OpCodes.Ldfld);
                     processor.Append(closureLoad);
                     processor.Append(fieldLoad);
                     return;
@@ -960,47 +920,72 @@ public sealed class Emitter{
         return instructions[^1];
     }
 
-    private (Instruction LoadClosureInstr, Instruction fieldInstr) GetOrCreateClosureVariableAccess(ILProcessor processor, ScopedVariableSymbol scoped, OpCode action)
+    private (Instruction LoadClosureInstr, Instruction fieldInstr) GetClosureVariableAccess(ILProcessor processor, ScopedVariableSymbol scoped, OpCode action)
     {
-        Instruction load;
-        Instruction loadField;
         var varClosure = _funcClosure[scoped.BelongsTo!];
-        if(BodyState.TryGetAvailableClosureLoadInstruction(varClosure, processor, out var loadinstr))
-        {
-            load = loadinstr;
-            loadField = processor.Create(action, varClosure.GetFieldOrThrow(scoped));
-        }
-        else if(BodyState.Func is LocalFunctionSymbol f && f.RequiresClosure)
-        {
-            if(!EmitterClosureHelper.TryFindMatchingClosureParameter(_funcs, f, varClosure, out var closureParam))
-            {
-                closureParam = EmitterClosureHelper.CreateMatchingClosureParameter(_funcs, f, varClosure);
-
-                //Propogate the needed closure upwards.. that is:
-                //function outer(){ 
-                //  int x = 5;
-                //  function inner1(){
-                //      function inner2() int {
-                //          return x;
-                //      }
-                //  }
-                //}
-                // only 'inner2' needs the closure, then it has to be passed through 'inner1'...
-                foreach(var bodyState in _bodyStateStack)
-                {
-                    if(bodyState == BodyState) continue;
-                    if(EmitterClosureHelper.HasReachedOwnerOrIsAlreadyKnown(bodyState, varClosure)) break;
-
-                    var parameter = EmitterClosureHelper.CreateMatchingClosureParameter(_funcs, bodyState.Func, varClosure);
-                    bodyState.AddAvailableClosure(varClosure, parameter);
-                }
-            }
-            BodyState.AddAvailableClosure(varClosure, closureParam);
-            load = processor.Create(OpCodes.Ldarg, closureParam);
-            loadField = processor.Create(action, varClosure.GetFieldOrThrow(scoped));
-        }
-        else throw new Exception($"{nameof(GetOrCreateClosureVariableAccess)} made it past the outer elseif - no closure '{varClosure}' and no Body.Func isn't local '{BodyState.Func}'");
-        return (load, loadField);
+        if(!BodyState.TryGetAvailableClosureLoadInstruction(varClosure, processor, out var loadinstr))
+            throw new Exception($"{nameof(GetClosureVariableAccess)} couldn't find '{varClosure}' for '{BodyState.Func}'");
+        
+        var loadField = processor.Create(action, varClosure.GetFieldOrThrow(scoped));
+        return (loadinstr, loadField);
     }
 
+    private void SetupClosureState(FunctionBodyState stateOfFuncBody, FunctionSymbol func, ILProcessor ilProcessor)
+    {
+        if (stateOfFuncBody.SharedLocals.Count > 0) //Does the function share locals? Then add a closure
+        {
+            var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, CilTypeOf(CILClosureType));
+            _program.NestedTypes.Add(closureType);
+            var closureVariable = new VariableDefinition(closureType);
+            ilProcessor.Body.Variables.Add(closureVariable);
+
+            var closure = new ClosureState(closureType, closureVariable, stateOfFuncBody);
+            stateOfFuncBody.AddClosureVariable(_funcClosure[func] = closure);
+
+            foreach (var shared in stateOfFuncBody.SharedLocals)
+            {
+                var @field = new FieldDefinition(shared.Name, FieldAttributes.Public, CilTypeOf(shared.Type));
+                stateOfFuncBody.AddClosureField(@field);
+                if (shared is ParameterSymbol p)
+                {
+                    ilProcessor.Emit(OpCodes.Ldloca, closureVariable);
+                    ilProcessor.Emit(OpCodes.Ldarg, p.Placement);
+                    ilProcessor.Emit(OpCodes.Stfld, @field);
+                }
+            }
+        }
+        if (func is LocalFunctionSymbol l && l.Closure is { Count: > 0 })
+        {
+            stateOfFuncBody.SharedLocals.UnionWith(l.Closure);
+            foreach (var cVar in l.Closure)
+            {
+                var cVarClosure = _funcClosure[cVar.BelongsToOrThrow];
+                if (!EmitterClosureHelper.TryFindMatchingClosureParameter(_funcs, func, cVarClosure, out var paramDef))
+                {
+                    paramDef = EmitterClosureHelper.CreateMatchingClosureParameter(_funcs, func, cVarClosure);
+                }
+                stateOfFuncBody.AddAvailableClosure(cVarClosure, paramDef);
+            }
+        }
+    }
+
+    private void PrintFuncBody(FunctionSymbol func, ILProcessor ilProcessor)
+    {
+        Console.WriteLine($"-- FUNCTION '{func}'");
+        foreach (var parameter in _funcs[func].Parameters)
+        {
+            Console.Write("    ");
+            Console.WriteLine($"arg: {parameter.Index} - {parameter.ParameterType}");
+        }
+        foreach (var variable in ilProcessor.Body.Variables)
+        {
+            Console.Write("    ");
+            Console.WriteLine($"loc: {variable.Index} - {variable.VariableType}");
+        }
+        foreach (var instr in ilProcessor.Body.Instructions)
+        {
+            Console.WriteLine(instr);
+        }
+        Console.WriteLine($"-- END      '{func.Name}'");
+    }
 }

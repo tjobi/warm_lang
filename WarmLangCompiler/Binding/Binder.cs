@@ -285,10 +285,9 @@ public sealed class Binder
     private BoundStatement BindIfStatement(IfStatement ifStatement)
     {
         var condition = BindExpression(ifStatement.Condition, TypeSymbol.Bool);
-        _scope.PushScope();
+        //any scope push happens in bindStatement :)
         var trueBranch = BindStatement(ifStatement.Then);
         var falseBranch = ifStatement.Else is null ? null : BindStatement(ifStatement.Else);
-        _scope.PopScope();
         return new BoundIfStatement(ifStatement, condition, trueBranch, falseBranch);
     }
 
@@ -448,7 +447,7 @@ public sealed class Binder
                         //Are we inside of a local function? Then remember any variables that aren't bound in scope or a parameter
                         if(_closureStack.TryPeek(out var closure) 
                             && variable is ScopedVariableSymbol scopedVar
-                            && _scope.IsUnboundInCurrentAndGlobalScope(scopedVar))
+                            && scopedVar.BelongsToOrThrow != _functionStack.Peek())
                         {
                             closure.Add(scopedVar);
                         }

@@ -35,6 +35,22 @@ public static class EmitterClosureHelper
         return false;
     }
 
+    public static bool HasMatchingClosureParameter(this Dictionary<FunctionSymbol, MethodDefinition> funcs, FunctionSymbol f, ClosureState closure) 
+        => TryFindMatchingClosureParameter(funcs, f, closure, out var _);
+    
+    public static IEnumerable<TypeReference> GetAllClosureParameters(this Dictionary<FunctionSymbol, MethodDefinition> funcs, FunctionSymbol f) 
+    {
+        var methodDef = funcs[f];
+        var parameters = methodDef.Parameters;
+        if(parameters.Count >= f.Parameters.Length)
+        {
+            for(int i = f.Parameters.Length; i < parameters.Count; i++)
+            {
+                yield return parameters[i].ParameterType;
+            }
+        }
+    }
+
     public static bool TryGetAvailableClosureLoadInstruction(this FunctionBodyState state, TypeReference closure, ILProcessor processor, [NotNullWhen(true)] out Instruction? instruction)
     {
         instruction = null;
