@@ -11,22 +11,27 @@ public sealed class FunctionBodyState
 {
     public Dictionary<BoundLabel, Instruction> Labels { get; }
     public Dictionary<VariableSymbol, VariableDefinition> Locals { get; }
-    public Dictionary<VariableSymbol, FieldDefinition> SharedLocals { get; }
     public Dictionary<int, BoundLabel> AwaitingLabels { get; }
     public FunctionSymbol Func { get; }
 
     public ClosureState? Closure { get; private set; }
 
+    public ISet<ScopedVariableSymbol> SharedLocals {get;}
+
     public Dictionary<string, (VariableDefinition? variable, ParameterDefinition? parameter)>? AvailableClosures { get; private set;}
 
-    public FunctionBodyState(FunctionSymbol func)
+    public FunctionBodyState(FunctionSymbol func, ISet<ScopedVariableSymbol> sharedLocals)
     {
         Labels = new();
         Locals = new();
         AwaitingLabels = new();
-        SharedLocals = new();
         Func = func;
+        SharedLocals = sharedLocals;
     }
+
+    public bool IsSharedVariable(VariableSymbol s) => s is ScopedVariableSymbol scoped && SharedLocals.Contains(scoped);
+
+    public bool VariableOriginateOutside(ScopedVariableSymbol sv) => sv.BelongsToOrThrow != Func;
 
     public void AddClosureVariable(ClosureState closure)
     {

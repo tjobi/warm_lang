@@ -6,7 +6,7 @@ using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
 
-var DEFAULT_PROGRAM = "SyntaxTest/test.test";
+var DEFAULT_PROGRAM = "SyntaxTest/test.wl";
 
 ParsedArgs? parsedArgs = ArgsParser.ParseArgs(args, DEFAULT_PROGRAM); 
 if(parsedArgs is null)

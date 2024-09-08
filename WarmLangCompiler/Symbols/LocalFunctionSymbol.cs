@@ -11,7 +11,7 @@ public sealed class LocalFunctionSymbol : FunctionSymbol
     : base(nameToken, parameters, type)  { }
 
     public BoundBlockStatement? Body { get; set; }
-    public List<LocalVariableSymbol>? Closure { get; set; }
+    public HashSet<ScopedVariableSymbol>? Closure { get; set; }
 
     [MemberNotNullWhen(true, nameof(Body))]
     [MemberNotNullWhen(true, nameof(Closure))]

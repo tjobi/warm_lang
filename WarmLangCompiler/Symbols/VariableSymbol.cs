@@ -5,18 +5,26 @@ public abstract class VariableSymbol : EntitySymbol
     public VariableSymbol(string name, TypeSymbol type) 
     : base(name, type) { }
     public override string ToString() => $"{Type} {Name}";
-
-    public bool IsLocalVariableAndFree => this is LocalVariableSymbol local && local.IsFree; 
 }
 
-public sealed class LocalVariableSymbol : VariableSymbol
+public abstract class ScopedVariableSymbol : VariableSymbol
 {
-    public LocalVariableSymbol(string name, TypeSymbol type, FunctionSymbol belongsTo) : base(name, type)
+    public ScopedVariableSymbol(string name, TypeSymbol type)
+    : base(name, type) { }
+
+    public ScopedVariableSymbol(string name, TypeSymbol type, FunctionSymbol belongsTo)
+    : this(name, type)
     {
         BelongsTo = belongsTo;
-        IsFree = false;
     }
 
-    public bool IsFree { get; set; }
-    public FunctionSymbol BelongsTo { get; }
+    public FunctionSymbol? BelongsTo { get; set; }
+
+    public FunctionSymbol BelongsToOrThrow => BelongsTo ?? throw new Exception($"Some assumption is wrong - {this} doesn't belong to any function");
+}
+
+public sealed class LocalVariableSymbol : ScopedVariableSymbol
+{
+    public LocalVariableSymbol(string name, TypeSymbol type, FunctionSymbol belongsTo)
+    : base(name, type, belongsTo) { }
 }

@@ -1,8 +1,9 @@
 namespace WarmLangCompiler.Symbols;
 
-public class ParameterSymbol : VariableSymbol
+public class ParameterSymbol : ScopedVariableSymbol
 {
-    public ParameterSymbol(string name, TypeSymbol type, int placement) : base(name, type)
+    public ParameterSymbol(string name, TypeSymbol type, int placement)
+    : base(name, type)
     {
         Placement = placement;
     }

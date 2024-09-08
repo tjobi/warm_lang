@@ -16,7 +16,7 @@ public sealed class Binder
     private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
     private readonly Stack<FunctionSymbol> _functionStack;
-    private readonly Stack<List<LocalVariableSymbol>> _closureStack;
+    private readonly Stack<HashSet<ScopedVariableSymbol>> _closureStack;
 
     public Binder(ErrorWarrningBag bag)
     {
@@ -167,6 +167,7 @@ public sealed class Binder
         var nameToken = funcDecl.NameToken;
         var parameters = CreateParameterSymbols(funcDecl);
         var function = new FunctionSymbol(nameToken, parameters, returnType);
+        ConnectParamsBelongsTo(function);
         var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
         
         if(funcDecl.OwnerType is not null)
@@ -201,6 +202,7 @@ public sealed class Binder
         var parameters = CreateParameterSymbols(funcDecl, isLocal: true);
         var returnType = funcDecl.ReturnType.ToTypeSymbol();
         var symbol = new LocalFunctionSymbol(nameToken, parameters, returnType);
+        ConnectParamsBelongsTo(symbol);
 
         if(funcDecl.OwnerType is not null)
         {
@@ -218,16 +220,23 @@ public sealed class Binder
         var boundBody = BindFunctionBody(symbol, funcDecl.Body);
         symbol.Body = boundBody;
         if(symbol.Closure is null)  symbol.Closure = _closureStack.Pop();
-        else                        symbol.Closure.AddRange(_closureStack.Pop());
+        else                        symbol.Closure.UnionWith(_closureStack.Pop());
 
         if(symbol.RequiresClosure)
         {
             foreach(var func in _functionStack)
             {
-                if(func is not LocalFunctionSymbol local)
-                    break;
-                local.Closure ??= new();
-                local.Closure.AddRange(symbol.Closure.Where(v => v.BelongsTo != func)); //TODO: linq?
+                foreach(var variable in symbol.Closure)
+                {
+                    if(func is not LocalFunctionSymbol && func == variable.BelongsTo) func.SharedLocals.Add(variable);
+                    else if(func is LocalFunctionSymbol local) 
+                    {
+                        local.Closure ??= new();
+                        if(variable.BelongsTo == local) local.SharedLocals.Add(variable);
+                        else                            local.Closure.Add(variable);
+                    }
+                    
+                }
             }
         }  
 
@@ -438,11 +447,10 @@ public sealed class Binder
                     {
                         //Are we inside of a local function? Then remember any variables that aren't bound in scope or a parameter
                         if(_closureStack.TryPeek(out var closure) 
-                            && variable is LocalVariableSymbol local
-                            && _scope.IsUnboundInCurrentAndGlobalScope(local))
+                            && variable is ScopedVariableSymbol scopedVar
+                            && _scope.IsUnboundInCurrentAndGlobalScope(scopedVar))
                         {
-                            local.IsFree = true;
-                            closure.Add(local);
+                            closure.Add(scopedVar);
                         }
                         return new BoundNameAccess(variable);
                     }
@@ -627,5 +635,11 @@ public sealed class Binder
                 break;
         }
         return null;
+    }
+
+    private FunctionSymbol ConnectParamsBelongsTo(FunctionSymbol function)
+    {
+        foreach(var p in function.Parameters) p.BelongsTo = function;
+        return function;
     }
 }
