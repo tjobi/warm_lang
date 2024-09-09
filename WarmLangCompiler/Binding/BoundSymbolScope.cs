@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
@@ -26,17 +27,25 @@ public sealed class BoundSymbolScope
         return mostRecentScope;
     }
 
-    public bool TryLookup(string name, out EntitySymbol? type)
+    public bool TryLookup(string name, [NotNullWhen(true)] out EntitySymbol? type)
     {
+        type = null;
         for (int i = _scopeStack.Count - 1; i >= 0 ; i--)
         {
             var scope  = _scopeStack[i];
             if(scope.TryGetValue(name, out type))
                 return true;
         }
-        type = null;
         return false;
     }
+
+    public bool IsUnboundInCurrentAndGlobalScope(string name)
+    {
+        var curScope = _scopeStack[^1];
+        return !(curScope.ContainsKey(name) || GlobalScope.ContainsKey(name));
+    }
+
+    public bool IsUnboundInCurrentAndGlobalScope(Symbol symbol) => IsUnboundInCurrentAndGlobalScope(symbol.Name);
 
     public bool TryDeclareVariable(VariableSymbol variable) => TryDeclare(variable.Name, variable);
 

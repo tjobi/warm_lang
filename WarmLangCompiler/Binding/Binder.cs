@@ -14,7 +14,9 @@ public sealed class Binder
     private readonly BoundSymbolScope _scope;
     private readonly BinderTypeHelper _typeHelper;
     private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
+
     private readonly Stack<FunctionSymbol> _functionStack;
+    private readonly Stack<HashSet<ScopedVariableSymbol>> _closureStack;
 
     public Binder(ErrorWarrningBag bag)
     {
@@ -23,6 +25,7 @@ public sealed class Binder
         _functionStack = new();
         _unBoundBodyOf = new();
         _typeHelper = new();
+        _closureStack = new();
         _scope.PushScope(); //Push scope to contain builtin stuff
         foreach(var func in BuiltInFunctions.GetBuiltInFunctions())
         {
@@ -144,7 +147,10 @@ public sealed class Binder
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type, allowimplicitListType: true);
 
-        var variable = !isGlobalScope ? new VariableSymbol(name, rightHandSide.Type) : new GlobalVariableSymbol(name, rightHandSide.Type);
+        VariableSymbol variable = isGlobalScope 
+                                ? new GlobalVariableSymbol(name, rightHandSide.Type)
+                                : new LocalVariableSymbol(name, rightHandSide.Type, _functionStack.Peek());
+
         if(!_scope.TryDeclareVariable(variable))
         {
             _diag.ReportNameAlreadyDeclared(varDecl.Identifier);
@@ -155,12 +161,97 @@ public sealed class Binder
 
     private BoundStatement BindFunctionDeclaration(FuncDeclaration funcDecl, bool isGlobalScope = false)
     {
+        if(!isGlobalScope) return BindLocalFunctionDeclaration(funcDecl);
+
+        var returnType = funcDecl.ReturnType.ToTypeSymbol();
+        var nameToken = funcDecl.NameToken;
+        var parameters = CreateParameterSymbols(funcDecl);
+        var function = new FunctionSymbol(nameToken, parameters, returnType);
+        ConnectParamsBelongsTo(function);
+        var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
+        
+        if(funcDecl.OwnerType is not null)
+        {
+            var ownerType = funcDecl.OwnerType.ToTypeSymbol();
+            var symbol = new MemberFuncSymbol(function);
+            _typeHelper.AddMember(ownerType, symbol);
+            function.SetOwnerType(ownerType); //TODO: this is quite ugly
+            
+            if(parameters.Length < 1)
+            {
+                _diag.ReportMemberFuncNoParameters(function.Location, function.Name, ownerType);
+            }
+            else if(parameters[0].Type is TypeSymbol t && t != ownerType)
+            {
+                _diag.ReportMemberFuncFirstParameterMustMatchOwner(function.Location, function.Name, ownerType, t);
+            }
+        }
+        if(!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
+        {
+            _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
+            return new BoundErrorStatement(funcDecl);
+        }
+        _unBoundBodyOf[function] = funcDecl.Body;
+        
+        return boundDeclaration;
+    }
+
+    private BoundStatement BindLocalFunctionDeclaration(FuncDeclaration funcDecl)
+    {
+        var nameToken = funcDecl.NameToken;
+        var parameters = CreateParameterSymbols(funcDecl, isLocal: true);
+        var returnType = funcDecl.ReturnType.ToTypeSymbol();
+        var symbol = new LocalFunctionSymbol(nameToken, parameters, returnType);
+        ConnectParamsBelongsTo(symbol);
+
+        if(funcDecl.OwnerType is not null)
+        {
+            var ownerType = funcDecl.OwnerType;
+            _diag.ReportLocalMemberFuncDeclaration(nameToken, ownerType.Location, ownerType.ToTypeSymbol());
+        }
+
+        if(!_scope.TryDeclareFunction(symbol))
+        {
+            _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
+            return new BoundErrorStatement(funcDecl);
+        }
+        
+        _closureStack.Push(new());
+        var boundBody = BindFunctionBody(symbol, funcDecl.Body);
+        symbol.Body = boundBody;
+        if(symbol.Closure is null)  symbol.Closure = _closureStack.Pop();
+        else                        symbol.Closure.UnionWith(_closureStack.Pop());
+
+        if(symbol.RequiresClosure)
+        {
+            foreach(var func in _functionStack)
+            {
+                foreach(var variable in symbol.Closure)
+                {
+                    if(func is not LocalFunctionSymbol && func == variable.BelongsTo) func.SharedLocals.Add(variable);
+                    else if(func is LocalFunctionSymbol local) 
+                    {
+                        local.Closure ??= new();
+                        if(variable.BelongsTo == local) local.SharedLocals.Add(variable);
+                        else                            local.Closure.Add(variable);
+                    }
+                    
+                }
+            }
+        }  
+
+        return new BoundFunctionDeclaration(funcDecl, symbol);
+    }
+
+    private ImmutableArray<ParameterSymbol> CreateParameterSymbols(FuncDeclaration func, bool isLocal = false)
+    {
         var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
         var uniqueParameterNames = new HashSet<string>();
-        for (int i = 0; i < funcDecl.Params.Count; i++)
+        for (int i = 0; i < func.Params.Count; i++)
         {
-            var (type, name) = funcDecl.Params[i];
+            var (type, name) = func.Params[i];
             var paramType = type.ToTypeSymbol();
+            
             //missing names have been reported by the parser
             var paramName = name.Name ?? "NO_NAME"; 
             if(uniqueParameterNames.Contains(paramName))
@@ -171,48 +262,7 @@ public sealed class Binder
                 parameters.Add(new ParameterSymbol(paramName, paramType, i));
             }
         }
-
-        var returnType = funcDecl.ReturnType.ToTypeSymbol();
-        var nameToken = funcDecl.NameToken;
-        var function = isGlobalScope 
-                       ? new FunctionSymbol(nameToken, parameters.ToImmutable(), returnType)
-                       : new LocalFunctionSymbol(nameToken, parameters.ToImmutable(), returnType);
-        
-        if(funcDecl.OwnerType is not null)
-        {
-            var ownerType = funcDecl.OwnerType.ToTypeSymbol();
-            if(isGlobalScope)
-            {
-                var symbol = new MemberFuncSymbol(function);
-                _typeHelper.AddMember(ownerType, symbol);
-                function.SetOwnerType(ownerType); //TODO: this is quite ugly
-                var funcParams = function.Parameters;
-                if(funcParams.Length < 1)
-                {
-                    _diag.ReportMemberFuncNoParameters(function.Location, function.Name, ownerType);
-                }
-                else if(funcParams[0].Type != ownerType)
-                {
-                    _diag.ReportMemberFuncFirstParameterMustMatchOwner(function.Location, function.Name, ownerType, funcParams[0].Type);
-                }
-            } 
-            else 
-                _diag.ReportLocalMemberFuncDeclaration(funcDecl.NameToken, funcDecl.OwnerType.Location, ownerType);
-        }
-        if(!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
-        {
-            _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
-            return new BoundErrorStatement(funcDecl);
-        }
-        if(!isGlobalScope && function is LocalFunctionSymbol f)
-        {
-            var boundBody = BindFunctionBody(function, funcDecl.Body);
-            f.Body = boundBody;
-        } else 
-        {
-            _unBoundBodyOf[function] = funcDecl.Body;
-        }
-        return new BoundFunctionDeclaration(funcDecl, function);
+        return parameters.ToImmutable();
     }
 
     private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body)
@@ -235,10 +285,9 @@ public sealed class Binder
     private BoundStatement BindIfStatement(IfStatement ifStatement)
     {
         var condition = BindExpression(ifStatement.Condition, TypeSymbol.Bool);
-        _scope.PushScope();
+        //any scope push happens in bindStatement :)
         var trueBranch = BindStatement(ifStatement.Then);
         var falseBranch = ifStatement.Else is null ? null : BindStatement(ifStatement.Else);
-        _scope.PopScope();
         return new BoundIfStatement(ifStatement, condition, trueBranch, falseBranch);
     }
 
@@ -337,8 +386,8 @@ public sealed class Binder
             return BindTypeConversion(ce.Arguments[0], predefined.Syntax.ToTypeSymbol(), allowExplicit: true);
         
         var function = BindAccessCallExpression(ce, out var accessToCall);
-        if(function is null)
-            return new BoundErrorExpression(ce);
+        
+        if(function is null) return new BoundErrorExpression(ce);
         
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
         if(function.IsMemberFunc)
@@ -394,7 +443,16 @@ public sealed class Binder
                 if(_scope.TryLookup(na.Name, out var symbol) && symbol is not null)
                 {
                     if(symbol is VariableSymbol variable)
+                    {
+                        //Are we inside of a local function? Then remember any variables that aren't bound in scope or a parameter
+                        if(_closureStack.TryPeek(out var closure) 
+                            && variable is ScopedVariableSymbol scopedVar
+                            && scopedVar.BelongsToOrThrow != _functionStack.Peek())
+                        {
+                            closure.Add(scopedVar);
+                        }
                         return new BoundNameAccess(variable);
+                    }
                     if(symbol is FunctionSymbol func)
                     {
                         if(!expectFunc)
@@ -576,5 +634,11 @@ public sealed class Binder
                 break;
         }
         return null;
+    }
+
+    private FunctionSymbol ConnectParamsBelongsTo(FunctionSymbol function)
+    {
+        foreach(var p in function.Parameters) p.BelongsTo = function;
+        return function;
     }
 }

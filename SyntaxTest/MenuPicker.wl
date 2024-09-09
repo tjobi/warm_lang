@@ -1,8 +1,8 @@
 menuPicker();
 
 function menuPicker() string {
-    int menuLength = 3;     //There is no way to "get" the length fo a list, a little cringe...
     string[] choices = ["Pancake", "Wedding Cake", "Brunsviger"];
+    int menuLength = choices.len;
 
     stdWriteLine("Welcome to our dessert factory");
     stdWriteLine("Today's menu:");
@@ -20,10 +20,10 @@ function menuPicker() string {
 
     string res = "";
 
-    if isNumber(input) {
+    if input.isNumber() {
         //int choice = int(input) - 1;  //This is still very valid, int(someStr) will convert it to an int for now
         //but that ain't that much fun
-        int choice = stringToInt(input) - 1;
+        int choice = input.toInt() - 1;
         if choice >= 0 && choice < menuLength {
             res = choices[choice];
             stdWriteLine("You've chosen \"" + res + "\". Good choice!");
@@ -38,7 +38,7 @@ function menuPicker() string {
     return res;
 }
 
-function isNumber(string s) bool {
+function string.isNumber(string s) bool {
     int i = 0;
     while i < strLen(s) : i = i + 1 {
         int charAtI = s[i];
@@ -49,7 +49,7 @@ function isNumber(string s) bool {
     return true;
 }
 
-function stringToInt(string s) int {
+function string.toInt(string s) int {
     int i = strLen(s) - 1;
     int res = 0;
     int tenth = 1;

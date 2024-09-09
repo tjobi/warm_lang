@@ -10,12 +10,12 @@ public class FunctionSymbol : EntitySymbol
     public FunctionSymbol(SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
     :this(nameToken.Name!, parameters, type, nameToken.Location) { }
 
-
     internal FunctionSymbol(string name, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type, TextLocation location) 
     : base(name, type)
     {
         Parameters = parameters;
         Location = location;
+        SharedLocals = new HashSet<ScopedVariableSymbol>();
     }
 
     public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
@@ -25,11 +25,12 @@ public class FunctionSymbol : EntitySymbol
     }
 
     public ImmutableArray<ParameterSymbol> Parameters { get; }
-
     public TextLocation Location { get; }
     public TypeSymbol? OwnerType { get; private set; }
-
     public bool IsMemberFunc => OwnerType is not null;
+
+    //Locals that are shared with any nested functions - could be parameters or local variables
+    public ISet<ScopedVariableSymbol> SharedLocals { get; set; }
 
     public void SetOwnerType(TypeSymbol type) 
     {

@@ -43,7 +43,7 @@ public class WLRuntimeFunctionHelper
     {
         var wlEqualsDef = new MethodDefinition("__wl_equals", MethodAttributes.Public | MethodAttributes.Static, _cilTypeOf(TypeSymbol.Bool));
         _program.Methods.Add(wlEqualsDef);
-        var dotnetObject = _cilTypeOf(EmitterTypeSymbolHelpers.GetCILBaseTypeSymbol());
+        var dotnetObject = _cilTypeOf(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
         var arg1 = new ParameterDefinition("arg1", ParameterAttributes.None, dotnetObject);
         var arg2 = new ParameterDefinition("arg2", ParameterAttributes.None, dotnetObject);
         wlEqualsDef.Parameters.Add(arg1);
@@ -202,7 +202,7 @@ public class WLRuntimeFunctionHelper
     {
         var wlToString = new MethodDefinition("__wl_tostring", MethodAttributes.Public | MethodAttributes.Static, _cilTypeOf(TypeSymbol.String));
         _program.Methods.Add(wlToString);
-        var dotnetObject = _cilTypeOf(EmitterTypeSymbolHelpers.GetCILBaseTypeSymbol());
+        var dotnetObject = _cilTypeOf(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
         var arg = new ParameterDefinition("arg", ParameterAttributes.None, dotnetObject);
         wlToString.Parameters.Add(arg);
 

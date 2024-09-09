@@ -61,7 +61,7 @@ public class BinderTests
         var vardecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"), ConstCreater(5));
         var input = MakeRoot(vardecl);    
         var expected = CreateBoundProgram(
-            new BoundVarDeclaration(vardecl, new VariableSymbol("x", TypeSymbol.Int), new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int))
+            new BoundVarDeclaration(vardecl, new GlobalVariableSymbol("x", TypeSymbol.Int), new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int))
         );
 
         var boundProgram = _binder.BindProgram(input);
@@ -87,7 +87,7 @@ public class BinderTests
         var varDecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"),rhs);
         var input = MakeRoot(varDecl);
         var expected = CreateBoundProgram(
-            new BoundVarDeclaration(varDecl,new VariableSymbol("x", TypeSymbol.Int),
+            new BoundVarDeclaration(varDecl,new GlobalVariableSymbol("x", TypeSymbol.Int),
                 new BoundListExpression(
                     rhs,
                     TypeSymbol.IntList,
@@ -111,7 +111,7 @@ public class BinderTests
         var varDecl = new VarDeclaration(_syntaxIntList,MakeVariableToken("x"),rhs);
         var input = MakeRoot(varDecl);
         var expected = CreateBoundProgram(
-            new BoundVarDeclaration(varDecl,new VariableSymbol("x", TypeSymbol.IntList),
+            new BoundVarDeclaration(varDecl,new GlobalVariableSymbol("x", TypeSymbol.IntList),
                     new BoundTypeConversionExpression(rhs, TypeSymbol.IntList,
                         new BoundListExpression(
                             rhs,
