@@ -1,4 +1,4 @@
-﻿using WarmLangCompiler;
+﻿using WarmLangCompiler.Utils;
 using WarmLangCompiler.Binding;
 using WarmLangCompiler.ILGen;
 using WarmLangCompiler.Interpreter;
@@ -25,7 +25,6 @@ var outfile = pArgs.OutPath ?? Path.Combine(Directory.GetCurrentDirectory(), "ou
 if(Path.GetExtension(outfile) != ".dll")
 {
     outfile = Path.ChangeExtension(outfile, ".dll");
-    Console.WriteLine("Changed extension of out to '.dll'");
 }
 
 var diagnostics = new ErrorWarrningBag();
@@ -90,6 +89,7 @@ if(pArgs.Evaluate)
 
 File.WriteAllText(outfile, string.Empty);
 Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
+DefaultRuntimeConfig.Write(outfile);
 foreach(var err in diagnostics)
 {
     Console.WriteLine(err);
