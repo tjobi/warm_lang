@@ -49,7 +49,14 @@ public sealed class BinderTypeHelper
     public MemberSymbol? FindMember(TypeSymbol type, string name)
     {
         if(type is ListTypeSymbol)
-            type = TypeSymbol.ListBase;
+        {
+            //type = TypeSymbol.ListBase;
+            if(_typeMembers.TryGetValue(TypeSymbol.ListBase, out var listBuiltins))
+            {
+                foreach(var bultinMember in listBuiltins) 
+                    if(bultinMember.Name == name) return bultinMember;
+            }
+        }
         if(NotSeen(type))
             return null;
         if(name is null) //TODO: Do we need to?
