@@ -1,4 +1,4 @@
-namespace WarmLangCompiler;
+namespace WarmLangCompiler.Utils;
 
 public record struct ParsedArgs(
     string Program, 
