@@ -129,6 +129,7 @@ public sealed class BoundInterpreter
             BoundAccessExpression acc => EvaluateAccessExpression(acc),
             BoundConstantExpression konst => EvaluateConstantExpression(konst),
             BoundListExpression lst => EvaluateListExpression(lst),
+            BoundStructInitExpression bse => EvaluateStructInitExpression(bse),
             _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{expr.GetType().Name}' yet"),
         };
     }
@@ -296,6 +297,23 @@ public sealed class BoundInterpreter
                 }
                 throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
             } 
+            case BoundMemberAccess bma:
+            {
+                //TODO: Readonly fields? - for now we assume only readonly are builtins!
+                if(bma.Member.IsBuiltin) throw new Exception($"{nameof(EvaluateAssignmentExpression)} tried to assign into a built-in {bma.Member}");
+                BoundAccess accTarget = bma.Target;
+                for(; accTarget is BoundTargetedAccess bta; accTarget = bta.Target);
+                var valTarget = GetValueFromAccess(accTarget);
+                
+                if(valTarget is not StructValue strct) throw new NotImplementedException($"{nameof(EvaluateAssignmentExpression)} doesn't know how to deal how to deal with member access on value {valTarget.GetType().Name}");
+                
+                var fieldName = bma.Member.Name;
+                if(!strct.TryGetField(fieldName, out var _))
+                    throw new Exception($"{nameof(EvaluateAssignmentExpression)} tried to assign into non-existent field '{fieldName}' on '{accTarget}'");
+                
+                var newVal = EvaluateExpression(assign.RightHandSide);
+                res = strct[fieldName] = newVal;
+            } break;
             default:
                 throw new NotImplementedException($"Assignment into access of type '{assign.Access.GetType().Name}' is not known");
         }
@@ -317,19 +335,23 @@ public sealed class BoundInterpreter
             case BoundMemberAccess bma:
             {
                 BoundAccess accTarget = bma.Target;
-                while(accTarget.HasNested)
-                {
-                    if(accTarget is BoundSubscriptAccess sa) accTarget = sa.Target;
-                    else if(accTarget is BoundMemberAccess ma) accTarget = ma.Target;
-                }
+                for(; accTarget is BoundTargetedAccess bta; accTarget = bta.Target);
                 var valTarget = GetValueFromAccess(accTarget);
-                
-                return valTarget switch
+
+                if(valTarget is not StructValue sTarget) 
                 {
-                    StrValue str => new IntValue(str.Value.Length),
-                    ListValue lst => new IntValue(lst.Length),
-                    _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{bma.Target.Type}.{bma.Member}'")
-                };
+                    //TODO: This should look for the field we are accessing not just assume it's the length!
+                    return valTarget switch
+                    {
+                        StrValue str => new IntValue(str.Value.Length),
+                        ListValue lst => new IntValue(lst.Length),
+                        _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{bma.Target.Type}.{bma.Member}'")
+                    };
+                } 
+
+                if(!sTarget.TryGetField(bma.Member.Name, out var fieldValue))
+                    throw new Exception($"{nameof(BoundInterpreter)} couldn't find '{bma.Member}' on {accTarget.Type}");
+                return fieldValue;
             }
             case BoundSubscriptAccess sa:
                 {
@@ -389,6 +411,31 @@ public sealed class BoundInterpreter
             values.Add(evaluatedResult);
         }
         return values;
+    }
+
+    private Value EvaluateStructInitExpression(BoundStructInitExpression bse)
+    {
+        var membersOfStruct = program.TypeMemberInformation.Members[bse.Type];
+        var strct = new StructValue(bse.Type);
+        foreach(var initedMember in bse.InitializedMembers)
+        {
+            var fieldName = initedMember.MemberSymbol.Name; 
+            strct[fieldName] = EvaluateExpression(initedMember.Rhs);
+        }
+        foreach(var m in membersOfStruct)
+        {
+            if(strct.IsFieldInitialized(m.Name)) continue;
+            strct[m.Name] = GetDefault(m.Type);
+        }
+        return strct;
+    }
+
+    private Value GetDefault(TypeSymbol symbol)
+    {
+        if(symbol == TypeSymbol.Bool) return BoolValue.False;
+        if(symbol == TypeSymbol.Int) return IntValue.ZERO;
+        if(symbol == TypeSymbol.Void) return Value.Void;
+        return Value.Null;
     }
 
     private void PushEnvironments()

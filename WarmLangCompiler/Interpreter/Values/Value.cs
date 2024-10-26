@@ -3,6 +3,7 @@ namespace WarmLangCompiler.Interpreter.Values;
 public abstract record class Value
 {
     public static readonly Value Void = new VoidValue();
+    public static readonly Value Null = new NullValue();
     private protected Value() { }
     public abstract override string ToString();
 
@@ -13,5 +14,12 @@ public abstract record class Value
         public override string StdWriteString() => ToString();
 
         public override string ToString() => "void";
+    }
+
+    public sealed record NullValue : Value
+    {
+        public override string StdWriteString() => ToString();
+
+        public override string ToString() => "null";
     }
 }

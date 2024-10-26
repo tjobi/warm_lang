@@ -11,5 +11,5 @@ public sealed class BoundStructInitExpression : BoundExpression
         InitializedMembers = initializedMembers;
     }
 
-    public ImmutableArray<(MemberSymbol, BoundExpression)> InitializedMembers { get; }
+    public ImmutableArray<(MemberSymbol MemberSymbol, BoundExpression Rhs)> InitializedMembers { get; }
 }

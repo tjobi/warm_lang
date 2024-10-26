@@ -10,11 +10,19 @@ public abstract class BoundAccess
     }
 
     public TypeSymbol Type { get; }
-
-    public virtual bool HasNested => false;
 }
 
 public sealed class BoundInvalidAccess : BoundAccess 
 {
     public BoundInvalidAccess(): base(TypeSymbol.Error) { }
+}
+
+public abstract class BoundTargetedAccess : BoundAccess
+{
+    protected BoundTargetedAccess(BoundAccess target, TypeSymbol type) : base(type)
+    {
+        Target = target;
+    }
+
+    public BoundAccess Target { get; }
 }
