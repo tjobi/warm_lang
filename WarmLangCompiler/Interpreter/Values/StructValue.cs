@@ -35,7 +35,7 @@ public sealed record StructValue : Value
 
     public override string StdWriteString()
     {
-        var sb = new StringBuilder().Append(Name).Append(" {");
+        var sb = new StringBuilder().Append(Name).Append(" { ");
         foreach(var f in Fields) sb.Append(f.Key).Append(" = ").Append(f.Value.StdWriteString()).Append(' ');
         return sb.Append('}').ToString();
     }
