@@ -2,6 +2,7 @@ using WarmLangCompiler.Binding;
 using WarmLangCompiler.Binding.Lower;
 using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangCompiler.Interpreter.Values;
+using WarmLangCompiler.Interpreter.Exceptions;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser;
 
@@ -34,8 +35,15 @@ public sealed class BoundInterpreter
 
     public static Value Run(BoundProgram program)
     {
-        var runner = new BoundInterpreter(program);
-        return runner.Run();
+        try 
+        {
+            var  runner = new BoundInterpreter(program);
+            return runner.Run();
+        } 
+        catch (WarmLangException e)
+        {
+            return new ErrValue(e.Message);
+        }
     }
 
     public Value Run() => EvaluateStatement(_functionEnvironment.Lookup(_entryPoint)!);
@@ -300,6 +308,7 @@ public sealed class BoundInterpreter
             case BoundMemberAccess bma:
             {
                 var target = GetValueFromAccess(bma.Target);
+                if(target == Value.Null) throw new WarmLangNullReferenceException(assign.Location, $"Cannot access '{bma.Member}' of null");
                 
                 if(bma.Member.IsReadOnly) 
                     throw new Exception($"{nameof(EvaluateAssignmentExpression)} tried to assign into a readonly member '{bma.Target.Type}.{bma.Member}'");
@@ -334,7 +343,7 @@ public sealed class BoundInterpreter
                 {
                     BoundAccess accessTarget = sa.Target;
                     for (; accessTarget is BoundSubscriptAccess saa; accessTarget = saa.Target) ;
-                    Value target = GetValueFromAccess(accessTarget);
+                    Value target = GetValueFromAccess(accessTarget, acc.Location);
                     IntValue idx = EvaluateExpression(sa.Index) as IntValue ?? throw new Exception($"{nameof(BoundInterpreter)} cannot use '{sa.Index.Type}' as subscript");
                     if (target is ListValue lst)
                     {
@@ -359,7 +368,7 @@ public sealed class BoundInterpreter
         throw new NotImplementedException($"Access of type '{acc.Access.GetType().Name}' is not known");
     }
 
-    private Value GetValueFromAccess(BoundAccess accessTarget)
+    private Value GetValueFromAccess(BoundAccess accessTarget, TextLocation? loc = null)
     {
         switch(accessTarget)
         {
@@ -369,6 +378,7 @@ public sealed class BoundInterpreter
                 return EvaluateExpression(ea.Expression);
             case BoundMemberAccess bma when bma is {Member: MemberFieldSymbol symbol}:
                 var valTarget = GetValueFromAccess(bma.Target);
+                if(valTarget == Value.Null) throw new WarmLangNullReferenceException(loc!,$"Cannot access '{symbol}' of null");
                 if(symbol.IsBuiltin)
                 {
                     //TODO: This should look for the field we are accessing not just assume it's the length!
@@ -432,15 +442,10 @@ public sealed class BoundInterpreter
         if(symbol == TypeSymbol.Bool) return BoolValue.DEFAULT;
         if(symbol == TypeSymbol.Int) return IntValue.DEFAULT;
         if(symbol == TypeSymbol.Void) return Value.Void;
-        if(symbol is ListTypeSymbol) return ListValue.GET_DEFAULT();
+        //TODO: should we really instantiate the list? or should it default to null?
+        if(symbol is ListTypeSymbol) return ListValue.GET_DEFAULT(); 
 
-        //TODO: Some better way of telling - right now we assume we're doing a struct type
-        var strct = new StructValue(symbol);
-        foreach(var member in program.TypeMemberInformation.Members[symbol])
-        {
-            strct.AddField(member.Name, GetDefault(member.Type));
-        }
-        return strct;
+        return Value.Null;
     }
 
     private void PushEnvironments()
