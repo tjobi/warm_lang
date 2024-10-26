@@ -2,6 +2,7 @@ namespace WarmLangCompiler.Interpreter.Values;
 
 public sealed record class StrValue : Value
 {
+    public static readonly StrValue DEFAULT = new(string.Empty);
     public string Value { get; }
 
     public StrValue(string val)

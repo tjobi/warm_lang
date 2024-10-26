@@ -9,4 +9,6 @@ public sealed class BoundMemberAccess : BoundTargetedAccess
         Member = member;
     }
     public MemberSymbol Member { get; }
+
+    public override string ToString() => $"(MemberAccess {Target}.{Member})";
 }

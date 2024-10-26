@@ -10,11 +10,15 @@ public abstract class BoundAccess
     }
 
     public TypeSymbol Type { get; }
+
+    public abstract override string ToString();
 }
 
 public sealed class BoundInvalidAccess : BoundAccess 
 {
     public BoundInvalidAccess(): base(TypeSymbol.Error) { }
+
+    public override string ToString() => "InvalidAccess";
 }
 
 public abstract class BoundTargetedAccess : BoundAccess

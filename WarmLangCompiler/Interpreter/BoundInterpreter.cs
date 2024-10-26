@@ -299,20 +299,14 @@ public sealed class BoundInterpreter
             } 
             case BoundMemberAccess bma:
             {
-                //TODO: Readonly fields? - for now we assume only readonly are builtins!
-                if(bma.Member.IsBuiltin) throw new Exception($"{nameof(EvaluateAssignmentExpression)} tried to assign into a built-in {bma.Member}");
-                BoundAccess accTarget = bma.Target;
-                for(; accTarget is BoundTargetedAccess bta; accTarget = bta.Target);
-                var valTarget = GetValueFromAccess(accTarget);
+                var target = GetValueFromAccess(bma.Target);
                 
-                if(valTarget is not StructValue strct) throw new NotImplementedException($"{nameof(EvaluateAssignmentExpression)} doesn't know how to deal how to deal with member access on value {valTarget.GetType().Name}");
+                if(bma.Member.IsReadOnly) 
+                    throw new Exception($"{nameof(EvaluateAssignmentExpression)} tried to assign into a readonly member '{bma.Target.Type}.{bma.Member}'");
+                if(target is not StructValue structVal) 
+                    throw new NotImplementedException($"{nameof(BoundInterpreter)}.{nameof(EvaluateAssignmentExpression)} doesn't know assignment of '{bma.Target.Type}.{bma.Member}'");
                 
-                var fieldName = bma.Member.Name;
-                if(!strct.TryGetField(fieldName, out var _))
-                    throw new Exception($"{nameof(EvaluateAssignmentExpression)} tried to assign into non-existent field '{fieldName}' on '{accTarget}'");
-                
-                var newVal = EvaluateExpression(assign.RightHandSide);
-                res = strct[fieldName] = newVal;
+                res = structVal[bma.Member.Name] = EvaluateExpression(assign.RightHandSide);
             } break;
             default:
                 throw new NotImplementedException($"Assignment into access of type '{assign.Access.GetType().Name}' is not known");
@@ -334,24 +328,7 @@ public sealed class BoundInterpreter
             }
             case BoundMemberAccess bma:
             {
-                BoundAccess accTarget = bma.Target;
-                for(; accTarget is BoundTargetedAccess bta; accTarget = bta.Target);
-                var valTarget = GetValueFromAccess(accTarget);
-
-                if(valTarget is not StructValue sTarget) 
-                {
-                    //TODO: This should look for the field we are accessing not just assume it's the length!
-                    return valTarget switch
-                    {
-                        StrValue str => new IntValue(str.Value.Length),
-                        ListValue lst => new IntValue(lst.Length),
-                        _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{bma.Target.Type}.{bma.Member}'")
-                    };
-                } 
-
-                if(!sTarget.TryGetField(bma.Member.Name, out var fieldValue))
-                    throw new Exception($"{nameof(BoundInterpreter)} couldn't find '{bma.Member}' on {accTarget.Type}");
-                return fieldValue;
+                return GetValueFromAccess(acc.Access);
             }
             case BoundSubscriptAccess sa:
                 {
@@ -384,12 +361,31 @@ public sealed class BoundInterpreter
 
     private Value GetValueFromAccess(BoundAccess accessTarget)
     {
-        return accessTarget switch
+        switch(accessTarget)
         {
-            BoundNameAccess na => _variableEnvironment.Lookup(na.Symbol),
-            BoundExprAccess ea => EvaluateExpression(ea.Expression),
-            _ => throw new Exception($"{nameof(BoundInterpreter)} access expression - your code didn't work bro"),
-        };
+            case BoundNameAccess name:
+                return _variableEnvironment.Lookup(name.Symbol);
+            case BoundExprAccess ea: 
+                return EvaluateExpression(ea.Expression);
+            case BoundMemberAccess bma when bma is {Member: MemberFieldSymbol symbol}:
+                var valTarget = GetValueFromAccess(bma.Target);
+                if(symbol.IsBuiltin)
+                {
+                    //TODO: This should look for the field we are accessing not just assume it's the length!
+                    return valTarget switch
+                    {
+                        StrValue str => new IntValue(str.Value.Length),
+                        ListValue lst => new IntValue(lst.Length),
+                        _ => throw new NotImplementedException($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} doesn't know '{bma.Target.Type}.{bma.Member}'")
+                    };
+                }
+                if(valTarget is not StructValue sTarget) throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} Assumption that 'symbol.IsBuiltin' is adequate is wrong - time to fix TODO");
+                if(!sTarget.TryGetField(bma.Member.Name, out var fieldValue))
+                    throw new Exception($"{nameof(BoundInterpreter)} couldn't find '{bma.Member}' on {bma.Target.Type}");
+                return fieldValue;
+            default:
+                throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} doesn't know how to handle {accessTarget}");
+        }
     }
 
     private Value EvaluateConstantExpression(BoundConstantExpression konst)
@@ -433,10 +429,18 @@ public sealed class BoundInterpreter
 
     private Value GetDefault(TypeSymbol symbol)
     {
-        if(symbol == TypeSymbol.Bool) return BoolValue.False;
-        if(symbol == TypeSymbol.Int) return IntValue.ZERO;
+        if(symbol == TypeSymbol.Bool) return BoolValue.DEFAULT;
+        if(symbol == TypeSymbol.Int) return IntValue.DEFAULT;
         if(symbol == TypeSymbol.Void) return Value.Void;
-        return Value.Null;
+        if(symbol is ListTypeSymbol) return ListValue.GET_DEFAULT();
+
+        //TODO: Some better way of telling - right now we assume we're doing a struct type
+        var strct = new StructValue(symbol);
+        foreach(var member in program.TypeMemberInformation.Members[symbol])
+        {
+            strct.AddField(member.Name, GetDefault(member.Type));
+        }
+        return strct;
     }
 
     private void PushEnvironments()

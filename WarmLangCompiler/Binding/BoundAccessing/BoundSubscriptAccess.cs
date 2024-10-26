@@ -7,4 +7,6 @@ public sealed class BoundSubscriptAccess : BoundTargetedAccess
         Index = index;
     }
     public BoundExpression Index { get; }
+
+    public override string ToString() => $"(SubscriptAccess {Target}[{Index}])";
 }

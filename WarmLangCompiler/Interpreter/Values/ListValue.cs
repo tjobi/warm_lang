@@ -2,6 +2,8 @@ namespace WarmLangCompiler.Interpreter.Values;
 using System.Text;
 public sealed record class ListValue : Value
 {
+    public static ListValue GET_DEFAULT() => new(new List<Value>());
+
     public List<Value> Elements { get; }
 
     public ListValue(IList<Value> elements)

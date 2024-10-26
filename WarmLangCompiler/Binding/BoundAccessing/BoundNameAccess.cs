@@ -10,4 +10,6 @@ public sealed class BoundNameAccess : BoundAccess
     }
 
     public VariableSymbol Symbol { get; }
+
+    public override string ToString() => $"(NameAccess {Symbol})";
 }
