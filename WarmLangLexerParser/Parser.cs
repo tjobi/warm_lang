@@ -127,7 +127,7 @@ public class Parser
             TWhile => ParseWhileStatement(),
             TReturn => ParseReturnStatement(),
             TFunc =>  ParseFunctionDeclaration(),
-            _ when IsStartOfVariableDeclaration() => ParseVariableDeclaration(),
+            _ when IsStartOfVariableDeclaration(out var type) => ParseVariableDeclaration(type),
             _ => ParseExpressionStatement()
         };
     }
@@ -210,9 +210,9 @@ public class Parser
         return new BlockStatement(open, statements, close);
     }
 
-    private StatementNode ParseVariableDeclaration()
+    private StatementNode ParseVariableDeclaration(TypeSyntaxNode type)
     {
-        var type = ParseType();
+        //var type = ParseType();
         var name = MatchKind(TIdentifier);
         var equal = NextToken(); // throw away the '='
         var rhs = ParseExpression(); //Parse the right hand side of a "int x = rhs"
@@ -530,7 +530,7 @@ public class Parser
         }
         var typeToken = NextToken();
         type = TypeSyntaxNode.FromSyntaxToken(typeToken);
-        while(Current.Kind == TBracketLeft)
+        while(NotEndOfFile && Current.Kind == TBracketLeft)
         {
             var bracketOpen = NextToken();
             if(Current.Kind != TBracketRight)
@@ -545,18 +545,20 @@ public class Parser
         return true;
     }
 
-    private bool IsStartOfVariableDeclaration()
+    private bool IsStartOfVariableDeclaration([NotNullWhen(true)] out TypeSyntaxNode? type)
     {
-        //TODO: User-defined types, what to do?
-        // Get a reset point, try to parse identifier into identifier?
-        if(Current.Kind != TIdentifier && Current.Kind.IsPossibleType()) return true;
-
+        type = null;
         var checkpoint = currentToken;
-        var ident1 = NextToken();
-        var ident2 = NextToken();
-        currentToken = checkpoint;
-
-        return ident1.Kind == TIdentifier && ident2.Kind == TIdentifier;
+        if(!TryParseType(out var typ)) return false;
+        
+        // If we have parsed a type, then we expect an identifer follow by an equals?
+        if(Current.Kind != TIdentifier || Peek(1).Kind != TEqual) 
+        {
+            currentToken = checkpoint;
+            return false;
+        }
+        type = typ;
+        return true;
     }
 
     private bool TryPeekPossibleType(out int typeLengthInTokens)
