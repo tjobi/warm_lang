@@ -424,6 +424,7 @@ public sealed class BoundInterpreter
         }
         foreach(var m in membersOfStruct)
         {
+            if(m is MemberFuncSymbol) continue;
             if(strct.IsFieldInitialized(m.Name)) continue;
             strct[m.Name] = GetDefault(m.Type);
         }
