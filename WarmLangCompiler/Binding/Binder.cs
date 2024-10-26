@@ -83,21 +83,38 @@ public sealed class Binder
     {
         var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>();
         var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>(); //NON-function delcarations
-        foreach(var topLevelFunc in root.Children)
+
+
+        foreach(var typeDecl in root.GetChildrenOf<TopLevelTypeDeclaration>())
         {
-            if(topLevelFunc is TopLevelFuncDeclaration func)
-                BindTopLevelStatement(func);
+            var typeSymbol = typeDecl.Type.ToTypeSymbol();
+            _typeHelper.TryAddType(typeSymbol);
+            foreach(var member in typeDecl.Members)
+            {
+                var memberSymbol = new MemberFieldSymbol(member.Name, member.Type.ToTypeSymbol());
+                _typeHelper.AddMember(typeSymbol, memberSymbol);
+            }       
+        }
+        foreach(var func in root.GetChildrenOf<TopLevelFuncDeclaration>())
+        {
+            BindTopLevelStatement(func);
         }
         foreach(var toplevel in root.Children)
         {
-            if(toplevel is TopLevelFuncDeclaration)
-                continue;
-            
-            var bound = BindTopLevelStatement(toplevel);
-            topLevelstatments.Add(bound);
-            
-            if(bound is BoundVarDeclaration var)
-                globalVariables.Add(var);
+            switch(toplevel)
+            {
+                case TopLevelTypeDeclaration:
+                case TopLevelFuncDeclaration:
+                    continue;
+                case TopLevelStamentNode top: //ArbitraryStatementNode and VarDeclaration
+                    var bound = BindTopLevelStatement(top);
+                    topLevelstatments.Add(bound);
+                    
+                    if(bound is BoundVarDeclaration var)
+                        globalVariables.Add(var);
+                    break;
+                default: throw new NotImplementedException($"{nameof(Binder)} does not yet allow {toplevel.GetType().Name}");
+            }
         }
         //What if we parsed an empty file?
         var rootNode = topLevelstatments.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
@@ -356,8 +373,9 @@ public sealed class Binder
             ListInitExpression le => BindListInitExpression(le, allowimplicitListType),
             ConstExpression ce => BindConstantExpression(ce),
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
+            StructInitExpression se => BindStructInitExpression(se),
             ErrorExpressionNode => new BoundErrorExpression(expression),
-            _ => throw new NotImplementedException($"Bind expression failed on ({expression.Location})-'{expression}'")
+            _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
     }
 
@@ -580,6 +598,34 @@ public sealed class Binder
             _ => throw new NotImplementedException($"'{nameof(BindConstantExpression)}' doesn't know about '{ce.Value}'"),
         };
         return new BoundConstantExpression(ce, type);
+    }
+
+    private BoundExpression BindStructInitExpression(StructInitExpression se)
+    {
+        if(!_typeHelper.TryGetTypeSymbol(se.Name, out var type))
+        {
+            _diag.ReportTypeNotFound(se.NameToken);
+            type = TypeSymbol.Error;
+        }
+        var members = ImmutableArray.CreateBuilder<(MemberSymbol, BoundExpression)>(se.Members.Count);
+        foreach(var (mNameToken, mExpr) in se.Members)
+        {
+            var mName = mNameToken.Name!;
+            BoundExpression bound;
+            if(_typeHelper.TryFindMember(type, mName, out var memberSymbol))
+            {
+                bound = BindExpression(mExpr);
+                bound = BindTypeConversion(bound, memberSymbol.Type);
+            }
+            else
+            {
+                bound = new BoundErrorExpression(mExpr);
+                memberSymbol = ErrorMemberSymbol.Instance;
+                _diag.ReportTypeHasNoSuchMember(type, mNameToken);
+            };
+            members.Add( (memberSymbol, bound) );
+        }
+        return new BoundStructInitExpression(se, type, members.MoveToImmutable());
     }
 
     private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowExplicit = false, bool allowimplicitListType = false)

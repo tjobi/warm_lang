@@ -35,6 +35,10 @@ public static class BinderTypeSyntaxExtensions
                     return TypeSymbol.IntList;
                 return ResolveNestedTypeSyntax(type);
             }
+            case TypeSyntaxUserDefined u:
+                if(!TypeSymbol.DefinedTypes.TryGetValue(u.Name, out var res)) 
+                    TypeSymbol.DefinedTypes[u.Name] = res = new TypeSymbol(u.Name);
+                return res;
             default:
                 throw new NotImplementedException($"BinderTypeExntensions doesn't know {type}");
         }

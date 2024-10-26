@@ -66,10 +66,10 @@ public class Parser
 
     private ASTRoot ParseEntry()
     {
-        var statements = new List<TopLevelStamentNode>();
+        var statements = new List<TopLevelNode>();
         while(NotEndOfFile)
         {
-            var statement = ParseTopLevelStatment(); 
+            var statement = ParseTopLevelNode(); 
             statements.Add(statement);
         }
         TextLocation location;
@@ -80,15 +80,42 @@ public class Parser
         return new ASTRoot(statements, location);
     }
 
-    private TopLevelStamentNode ParseTopLevelStatment()
+    private TopLevelNode ParseTopLevelNode()
     {
-        var statement = ParseStatement();
-        return statement switch
+        switch(Current.Kind)
         {
-            VarDeclaration var => new TopLevelVarDeclaration(var),
-            FuncDeclaration var => new TopLevelFuncDeclaration(var),
-            _ => new TopLevelArbitraryStament(statement),
-        };
+            case TType:
+                return ParseTypeDeclaration();
+            default:
+                var statement = ParseStatement();
+                return statement switch
+                {
+                    VarDeclaration var => new TopLevelVarDeclaration(var),
+                    FuncDeclaration var => new TopLevelFuncDeclaration(var),
+                    _ => new TopLevelArbitraryStament(statement),
+                };
+        }
+    }
+
+    private TopLevelTypeDeclaration ParseTypeDeclaration()
+    {
+        var typeToken = NextToken();
+        var nameToken = MatchKind(TIdentifier);
+        MatchKind(TEqual);
+
+        if(Current.Kind != TCurLeft) throw new NotImplementedException("Parser doesn't yet support alias!"); //TODO: ALIAS
+        
+        var members = new List<MemberDeclaration>();
+        MatchKind(TCurLeft);
+        while(NotEndOfFile && Current.Kind != TCurRight)
+        {
+            var type = ParseType();
+            var name = MatchKind(TIdentifier);
+            members.Add(new(type, name));
+            var semicolon = MatchKind(TSemiColon);  
+        }
+        MatchKind(TCurRight);
+        return new TopLevelTypeDeclaration(nameToken, members);
     }
 
     private StatementNode ParseStatement()
@@ -316,10 +343,12 @@ public class Parser
             case TStringLiteral:
             case TTrue:
             case TFalse:
-            case TConst: {
+            case TConst: 
+            {
                 res = ParseConstExpression();
             } break;
-            case TParLeft: {
+            case TParLeft:
+            {
                 res = ParseParenthesesExpression();
             } break;
             case TBracketLeft:
@@ -327,18 +356,23 @@ public class Parser
                 res = ParseListInitializtionExpression();
             }
             break;
-            case TBool or TInt or TString: {
-                var typeToken = ParseType();//NextToken();
+            case TBool or TInt or TString: 
+            {
+                var typeToken = ParseType();
                 res = new AccessExpression(new AccessPredefinedType(typeToken));
-                //res = ParseCallExpression(new AccessPredefinedType(typeToken)); 
             } break;
-            case TIdentifier: {
+            case TIdentifier: 
+            {
                 var nameToken = NextToken();
                 res = new AccessExpression(new NameAccess(nameToken));
             } break;
-            default: {
+            case TNew:
+            {
+                res = ParseStructInitializer();
+            } break;
+            default: 
+            {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
-                //var nextToken = Current;
                 _diag.ReportInvalidExpression(nextToken);
                 return new ErrorExpressionNode(nextToken);
             }
@@ -353,8 +387,6 @@ public class Parser
         {
             switch(Current.Kind)
             {
-                //TODO: Enable again, once we allow functions as types
-                //So we can do something like myFuncList[2](parameter1, parameter2);
                 case TParLeft:
                 {
                     res = ParseCallExpression(res);  
@@ -455,6 +487,25 @@ public class Parser
         return new CallExpression(called, openPar, args, closePar);
     }
 
+    private ExpressionNode ParseStructInitializer()
+    {
+        MatchKind(TNew);
+        var nameToken = MatchKind(TIdentifier);
+        var curLeft = MatchKind(TCurLeft);
+        var values = new List<(SyntaxToken, ExpressionNode)>();
+        var isReading = Current.Kind != TCurRight;
+        while(NotEndOfFile && isReading)
+        {
+            var lhs = MatchKind(TIdentifier);
+            MatchKind(TEqual);
+            var rhs = ParseExpression();
+            values.Add((lhs,rhs));
+            isReading = Current.Kind == TComma && NextToken().Kind == TComma; 
+        }
+        var curRight = MatchKind(TCurRight);
+        return new StructInitExpression(nameToken, curLeft, values, curRight);
+    }
+
     private TypeSyntaxNode ParseType()
     {
         var type = MatchKinds(TokenKindExtension.GetPossibleTypeKinds());
@@ -498,7 +549,14 @@ public class Parser
     {
         //TODO: User-defined types, what to do?
         // Get a reset point, try to parse identifier into identifier?
-        return Current.Kind.IsPossibleType() && Current.Kind != TIdentifier;
+        if(Current.Kind != TIdentifier && Current.Kind.IsPossibleType()) return true;
+
+        var checkpoint = currentToken;
+        var ident1 = NextToken();
+        var ident2 = NextToken();
+        currentToken = checkpoint;
+
+        return ident1.Kind == TIdentifier && ident2.Kind == TIdentifier;
     }
 
     private bool TryPeekPossibleType(out int typeLengthInTokens)

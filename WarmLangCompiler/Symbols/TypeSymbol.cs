@@ -12,6 +12,8 @@ public class TypeSymbol : Symbol
 
     public static readonly TypeSymbol ListBase = new("only-for-use-by-compiler");
 
+    public static readonly Dictionary<string, TypeSymbol> DefinedTypes = new();
+
     public TypeSymbol(string name) : base(name) { }
 
     public override string ToString() => Name;

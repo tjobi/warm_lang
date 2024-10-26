@@ -4,15 +4,22 @@ namespace WarmLangLexerParser.AST;
 
 public sealed class ASTRoot : ASTNode
 {
-    public ASTRoot(List<TopLevelStamentNode> children, TextLocation location) : base(location)
+    public ASTRoot(List<TopLevelNode> children, TextLocation location) : base(location)
     {
         Children = children;
     }
 
-    public ASTRoot(List<TopLevelStamentNode> children)
+    public ASTRoot(List<TopLevelNode> children)
     :this(children, children.Count > 0 ? TextLocation.FromTo(children[0].Location, children[^1].Location) : TextLocation.EmptyFile) { }
 
-    public List<TopLevelStamentNode> Children { get; }
+    public List<TopLevelNode> Children { get; }
+
+    public IEnumerable<T> GetChildrenOf<T>() 
+    where T : TopLevelNode
+    {
+        foreach(var child in Children) 
+            if(child is T t) yield return t;
+    }
 
     public override string ToString()
     {

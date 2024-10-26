@@ -310,6 +310,8 @@ public class Lexer
             "true" => TTrue,
             "bool" => TBool,
             "string" => TString,
+            "type" => TType,
+            "new" => TNew,
             _ => TIdentifier,
         };
         var location = new TextLocation(startLine, startColumn, Line, Column);

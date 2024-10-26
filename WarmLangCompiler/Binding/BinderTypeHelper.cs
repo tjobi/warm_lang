@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
@@ -36,6 +37,14 @@ public sealed class BinderTypeHelper
         return true;
     }
 
+    public bool TryGetTypeSymbol(string name, [NotNullWhen(true)] out TypeSymbol? res)
+    {
+        res = null;
+        var tmp = new TypeSymbol(name);
+        if(_typeMembers.ContainsKey(tmp)) res = tmp;
+        return res is not null;
+    }
+
     public void AddMember(TypeSymbol type, MemberSymbol member)
     {
         if(NotSeen(type))
@@ -65,6 +74,10 @@ public sealed class BinderTypeHelper
         }
         return null;
     }
+
+    public bool TryFindMember(TypeSymbol type, string name, [NotNullWhen(true)] out MemberSymbol? res)
+        => (res = FindMember(type, name)) is not null;
+    
 
     public IEnumerable<FunctionSymbol> GetFunctionMembers(TypeSymbol type)
     {
