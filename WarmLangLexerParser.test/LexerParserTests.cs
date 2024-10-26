@@ -43,7 +43,7 @@ public class LexerParserTests
 
     private static ASTRoot MakeRoot(params StatementNode[] topLevelStatements)
     {
-        var children = topLevelStatements.Select(s => (TopLevelStamentNode) (s switch {
+        var children = topLevelStatements.Select(s => (TopLevelNode) (s switch {
                                                 VarDeclaration var => new TopLevelVarDeclaration(var),
                                                 FuncDeclaration func => new TopLevelFuncDeclaration(func),
                                                 _ => new TopLevelArbitraryStament(s)

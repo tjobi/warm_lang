@@ -45,7 +45,7 @@ public class BinderTests
 
     private static ASTRoot MakeRoot(params StatementNode[] statements)
     {
-        var children = statements.Select(s => (TopLevelStamentNode) (s switch {
+        var children = statements.Select(s => (TopLevelNode) (s switch {
                                                 VarDeclaration var => new TopLevelVarDeclaration(var),
                                                 FuncDeclaration func => new TopLevelFuncDeclaration(func),
                                                 _ => new TopLevelArbitraryStament(s)
