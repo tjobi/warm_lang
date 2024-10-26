@@ -248,7 +248,7 @@ public sealed class BoundInterpreter
         if(function == BuiltInFunctions.StdWriteC)
         {
             var evalRes = (IntValue) EvaluateExpression(call.Arguments[0]);
-            Console.WriteLine((char)evalRes.Value);
+            Console.Write((char)evalRes.Value);
             return Value.Void;
         }
         if(function == BuiltInFunctions.StdClear)
