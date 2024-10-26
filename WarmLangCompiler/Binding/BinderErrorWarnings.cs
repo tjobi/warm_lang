@@ -167,4 +167,10 @@ internal static class BinderErrorWarnings
         var message = $"The type '{type}' contains no definition for '{member.Name}' (are you sure it is spelt right?)";
         bag.Report(message, true, member.Location);
     }
+
+    internal static void ReportCannotAssignToReadonlyMember(this ErrorWarrningBag bag, TypeSymbol type, string memberName, TextLocation location)
+    {
+        var message = $"Cannot assign to field '{type}.{memberName}' -- it is readonly";
+        bag.Report(message, true, location);
+    }
 }

@@ -393,6 +393,11 @@ public sealed class Binder
             if(targetType == TypeSymbol.String)
                 _diag.ReportSubscriptTargetIsReadOnly(targetType, assignment.Access.Location);
         }
+        if(boundAccess is BoundMemberAccess bma && bma.Member.IsReadOnly)
+        {
+            //TODO: Should we create error state instead?
+            _diag.ReportCannotAssignToReadonlyMember(bma.Target.Type, bma.Member.Name, assignment.Access.Location);
+        }
         var boundRightHandSide = BindTypeConversion(assignment.RightHandSide, boundAccess.Type);
         return new BoundAssignmentExpression(assignment, boundAccess, boundRightHandSide);
     }

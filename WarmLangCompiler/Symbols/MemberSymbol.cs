@@ -2,10 +2,14 @@ namespace WarmLangCompiler.Symbols;
 
 public abstract class MemberSymbol : EntitySymbol
 {
-    protected MemberSymbol(TypeSymbol type, string name, bool isBuiltin = false) : base(name, type)
+    protected MemberSymbol(TypeSymbol type, string name, bool isReadOnly = false, bool isBuiltin = false)
+    : base(name, type)
     {
+        IsReadOnly = isReadOnly;
         IsBuiltin = isBuiltin;
     }
+
+    public bool IsReadOnly { get; }
     public bool IsBuiltin { get; }
 }
 
@@ -19,14 +23,16 @@ public sealed class ErrorMemberSymbol : MemberSymbol
 
 public sealed class MemberFieldSymbol : MemberSymbol
 {
-    public MemberFieldSymbol(string name, TypeSymbol type,  bool isBuiltin = false) : base(type, name, isBuiltin) { }
+    public MemberFieldSymbol(string name, TypeSymbol type, bool isReadOnly = false, bool isBuiltin = false)
+    : base(type, name, isReadOnly, isBuiltin) { }
 
     public override string ToString() => $"field({Type} {Name})";
 }
 
 public sealed class MemberFuncSymbol : MemberSymbol
 {
-    public MemberFuncSymbol(FunctionSymbol function) : base(function.Type, function.Name, function.IsBuiltInFunction())
+    public MemberFuncSymbol(FunctionSymbol function)
+    : base(function.Type, function.Name, isReadOnly:true, function.IsBuiltInFunction())
     {
         Function = function;
     }

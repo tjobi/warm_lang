@@ -14,11 +14,11 @@ public static class BuiltinMembers
 
     private static IEnumerable<MemberSymbol> StringMembers()
     {
-        yield return new MemberFieldSymbol("len", TypeSymbol.Int, true);
+        yield return new MemberFieldSymbol("len", TypeSymbol.Int, isReadOnly:true, isBuiltin: true);
     }
 
     private static IEnumerable<MemberSymbol> ListMembers()
     {
-        yield return new MemberFieldSymbol("len", TypeSymbol.Int, true);
+        yield return new MemberFieldSymbol("len", TypeSymbol.Int, isReadOnly:true, isBuiltin: true);
     }
 }
