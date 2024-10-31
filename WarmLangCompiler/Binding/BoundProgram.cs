@@ -6,7 +6,8 @@ namespace WarmLangCompiler.Binding;
 
 public record TypeMemberInformation(
     ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>> Members, 
-    ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>> FunctionBodies
+    ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>> FunctionBodies,
+    ReadOnlyCollection<TypeSymbol> DeclaredTypes
 );
 
 public sealed class BoundProgram
@@ -29,6 +30,12 @@ public sealed class BoundProgram
     public bool IsValid => MainFunc is not null || ScriptMain is not null;
 
     public BoundBlockStatement Entry => IsValid ? Functions[MainFunc ?? ScriptMain!] : throw new Exception("INVALID BOUND PROGRAM");
+
+    public IEnumerable<(TypeSymbol Type, IList<MemberSymbol> Members)> GetDeclaredTypes()
+    {
+        foreach(var t in TypeMemberInformation.DeclaredTypes)
+            yield return (t, TypeMemberInformation.Members[t]);
+    }
 
     public IEnumerable<FunctionSymbol> GetFunctionSymbols()
     {

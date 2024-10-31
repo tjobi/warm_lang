@@ -12,10 +12,13 @@ public sealed class BinderTypeHelper
     private readonly TypeMemberDict _typeMembers;
     private readonly TypeMemberFuncDict _typeFunctions;
 
+    private readonly List<TypeSymbol> _declaredTypes;
+
     public BinderTypeHelper()
     {
         _typeMembers = BuiltinMembers.CreateMembersForBuiltins();
         _typeFunctions = new();
+        _declaredTypes = new();
     }
 
     private bool NotSeen(TypeSymbol type) => !_typeMembers.ContainsKey(type);
@@ -26,7 +29,7 @@ public sealed class BinderTypeHelper
     {
         var members = new ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>>(_typeMembers);
         var funcs = new ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>(_typeFunctions);
-        return new TypeMemberInformation(members, funcs);
+        return new TypeMemberInformation(members, funcs, _declaredTypes.AsReadOnly());
     }
 
     public bool TryAddType(TypeSymbol type)
@@ -34,6 +37,7 @@ public sealed class BinderTypeHelper
         if(Has(type))
             return false;
         _typeMembers[type] = new List<MemberSymbol>();
+        _declaredTypes.Add(type);
         return true;
     }
 
