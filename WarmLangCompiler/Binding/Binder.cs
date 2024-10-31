@@ -139,6 +139,7 @@ public sealed class Binder
             WhileStatement wile => BindWhileStatement(wile),
             ReturnStatement ret => BindReturnStatement(ret),
             ExprStatement expr => BindExprStatement(expr),
+            ErrorStatement error => new BoundStatementExpression(error),
             _ => throw new NotImplementedException($"Bind statement for {statement}"),
         };
     }
@@ -374,7 +375,7 @@ public sealed class Binder
             ConstExpression ce => BindConstantExpression(ce),
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
             StructInitExpression se => BindStructInitExpression(se),
-            ErrorExpressionNode => new BoundErrorExpression(expression),
+            ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
     }

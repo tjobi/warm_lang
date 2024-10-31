@@ -106,7 +106,7 @@ public class Parser
         if(Current.Kind != TCurLeft) throw new NotImplementedException("Parser doesn't yet support alias!"); //TODO: ALIAS
         
         var members = new List<MemberDeclaration>();
-        MatchKind(TCurLeft);
+        var curlOpen = MatchKind(TCurLeft);
         while(NotEndOfFile && Current.Kind != TCurRight)
         {
             var type = ParseType();
@@ -114,8 +114,8 @@ public class Parser
             members.Add(new(type, name));
             var semicolon = MatchKind(TSemiColon);  
         }
-        MatchKind(TCurRight);
-        return new TopLevelTypeDeclaration(nameToken, members);
+        var curlClose = MatchKind(TCurRight);
+        return new TopLevelTypeDeclaration(typeToken, nameToken, curlOpen, members, curlClose);
     }
 
     private StatementNode ParseStatement()
@@ -128,6 +128,7 @@ public class Parser
             TReturn => ParseReturnStatement(),
             TFunc =>  ParseFunctionDeclaration(),
             _ when IsStartOfVariableDeclaration(out var type) => ParseVariableDeclaration(type),
+            TType => ParseStatementError(),
             _ => ParseExpressionStatement()
         };
     }
@@ -273,6 +274,16 @@ public class Parser
         return paramNames;
     }
 
+    private StatementNode ParseStatementError()
+    {
+        //TODO: Other types of statement errors?
+        //TODO: Is this really the way we want to deal with this? Is there a more elegant route of letting the binder?
+        var errorToken = Current;
+        var typeDecl = ParseTypeDeclaration();
+        _diag.ReportKeywordOnlyAllowedInTopScope(errorToken.Kind, typeDecl.Location);
+        return new ErrorStatement(typeDecl.Location);
+    }
+
     private StatementNode ParseExpressionStatement()
     {
         //Lifts an expression to a statement, x + 5;
@@ -374,7 +385,7 @@ public class Parser
             {
                 var nextToken = Current.Kind == TEOF ? Current : NextToken();
                 _diag.ReportInvalidExpression(nextToken);
-                return new ErrorExpressionNode(nextToken);
+                return new ErrorExpression(nextToken);
             }
         }
         return ParsePostfixExpression(res);
@@ -551,7 +562,6 @@ public class Parser
         var checkpoint = currentToken;
         if(!TryParseType(out var typ)) return false;
         
-        // If we have parsed a type, then we expect an identifer follow by an equals?
         if(Current.Kind != TIdentifier || Peek(1).Kind != TEqual) 
         {
             currentToken = checkpoint;

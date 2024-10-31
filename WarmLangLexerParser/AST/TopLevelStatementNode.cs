@@ -23,7 +23,10 @@ public abstract class TopLevelStamentNode : TopLevelNode
 
 public sealed class TopLevelTypeDeclaration : TopLevelNode
 {
-    public TopLevelTypeDeclaration(SyntaxToken nameToken, IList<MemberDeclaration> members) : base(nameToken.Location)
+    public TopLevelTypeDeclaration(SyntaxToken typeKeyword, SyntaxToken nameToken, 
+                                   SyntaxToken curlOpen, IList<MemberDeclaration> members, 
+                                   SyntaxToken curlClose)
+    : base(TextLocation.FromTo(typeKeyword, curlClose))
     {
         if(!TypeSyntaxNode.TryGetAsUserDefined(nameToken, out var type)) 
             throw new Exception($"{nameof(TopLevelTypeDeclaration)}: Tried to create a type with a non-identifier token");

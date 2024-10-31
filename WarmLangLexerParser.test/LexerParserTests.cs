@@ -979,7 +979,7 @@ x;
                 new BinaryExpression(
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,1,"x"))),
                     MakeToken(TPlus,1,2),
-                    new ErrorExpressionNode(MakeToken(TSemiColon,1,3))
+                    new ErrorExpression(MakeToken(TSemiColon,1,3))
                 )
             )
         );

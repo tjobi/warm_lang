@@ -94,4 +94,10 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         var message = "Newline in constant";
         Report(message, true, textLocation);
     }
+
+    public void ReportKeywordOnlyAllowedInTopScope(TokenKind keyword, TextLocation location) 
+    {
+        var message = $"The keyword '{keyword.AsString()}' may only appear in the top level";
+        Report(message, true, location);
+    }
 }
