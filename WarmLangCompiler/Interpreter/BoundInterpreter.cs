@@ -288,30 +288,23 @@ public sealed class BoundInterpreter
             } break;
             case BoundSubscriptAccess sa:
             {
-                BoundAccess accessTarget = sa.Target;
-                for(; accessTarget is BoundSubscriptAccess saa; accessTarget = saa.Target);
-                var target = GetValueFromAccess(accessTarget);
-                var index = EvaluateExpression(sa.Index);
+                var target = GetValueFromAccess(sa.Target);
+                var idx = EvaluateExpressionToValueOrThrow<IntValue>(sa.Index, "subscript");
                 res = EvaluateExpression(assign.RightHandSide);
-
-                if(target is ListValue lst && index is IntValue idx)
-                {
-                    if(idx < lst.Elements.Count && idx >= 0)
-                    {
-                        lst[idx] = res;
-                        break;
-                    } else 
-                        throw new Exception("Index was out of range. Must be non-negative and less than size of collection");
-                }
-                throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
+                
+                if (target is not MutableCollectionValue mc)
+                    throw new Exception($"{nameof(BoundInterpreter)}.{nameof(EvaluateAssignmentExpression)} Tried assigning to subscript of read-only type '{sa.Target.Type}'");
+                
+                EnsureIdxWithinBounds(idx, 0, mc.Length);
+                return mc.SetAt(idx, res);
             } 
             case BoundMemberAccess bma:
             {
                 var target = GetValueFromAccess(bma.Target);
-                if(target == Value.Null) throw new WarmLangNullReferenceException(assign.Location, $"Cannot access '{bma.Member}' of null");
+                EnsureNotNullValue(target, assign.Location, "Cannot assign to null");
                 
                 if(bma.Member.IsReadOnly) 
-                    throw new Exception($"{nameof(EvaluateAssignmentExpression)} tried to assign into a readonly member '{bma.Target.Type}.{bma.Member}'");
+                    throw new Exception($"{nameof(BoundInterpreter)}.{nameof(EvaluateAssignmentExpression)} tried to assign into a readonly member '{bma.Target.Type}.{bma.Member}'");
                 if(target is not StructValue structVal) 
                     throw new NotImplementedException($"{nameof(BoundInterpreter)}.{nameof(EvaluateAssignmentExpression)} doesn't know assignment of '{bma.Target.Type}.{bma.Member}'");
                 
@@ -325,51 +318,19 @@ public sealed class BoundInterpreter
 
     private Value EvaluateAccessExpression(BoundAccessExpression acc)
     {
-        switch(acc.Access)
+        return acc.Access switch
         {
-            case BoundNameAccess nameAccess:
-            {
-                return _variableEnvironment.Lookup(nameAccess.Symbol);
-            }
-            case BoundExprAccess ae: 
-            {
-                return EvaluateExpression(ae.Expression);
-            }
-            case BoundMemberAccess bma:
-            {
-                return GetValueFromAccess(acc.Access);
-            }
-            case BoundSubscriptAccess sa:
-                {
-                    BoundAccess accessTarget = sa.Target;
-                    for (; accessTarget is BoundSubscriptAccess saa; accessTarget = saa.Target) ;
-                    Value target = GetValueFromAccess(accessTarget, acc.Location);
-                    IntValue idx = EvaluateExpression(sa.Index) as IntValue ?? throw new Exception($"{nameof(BoundInterpreter)} cannot use '{sa.Index.Type}' as subscript");
-                    if (target is ListValue lst)
-                    {
-                        if (idx >= lst.Length || idx < 0)
-                            throw new Exception($"Index was out of range. Must be non-negative and less than size of collection");
-
-                        if (idx < lst.Length && idx >= 0)
-                            return lst[idx];
-                    }
-                    else if (target is StrValue str)
-                    {
-                        if (idx >= str.Value.Length || idx < 0)
-                            throw new Exception($"Index was out of range. Must be non-negative and less than size of collection");
-
-                        if (idx < str.Value.Length && idx >= 0)
-                            return new IntValue(str.Value[idx]);
-                    }
-                    //nothing good came out of this!
-                    throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
-                }
-        }
-        throw new NotImplementedException($"Access of type '{acc.Access.GetType().Name}' is not known");
+            BoundNameAccess nameAccess  => _variableEnvironment.Lookup(nameAccess.Symbol),
+            BoundExprAccess ae          => EvaluateExpression(ae.Expression),
+            BoundMemberAccess           => GetValueFromAccess(acc.Access),
+            BoundSubscriptAccess        => GetValueFromAccess(acc.Access),
+            _ => throw new NotImplementedException($"Access of type '{acc.Access.GetType().Name}' is not known"),
+        };
     }
 
     private Value GetValueFromAccess(BoundAccess accessTarget, TextLocation? loc = null)
     {
+        Value target;
         switch(accessTarget)
         {
             case BoundNameAccess name:
@@ -377,22 +338,34 @@ public sealed class BoundInterpreter
             case BoundExprAccess ea: 
                 return EvaluateExpression(ea.Expression);
             case BoundMemberAccess bma when bma is {Member: MemberFieldSymbol symbol}:
-                var valTarget = GetValueFromAccess(bma.Target);
-                if(valTarget == Value.Null) throw new WarmLangNullReferenceException(loc!,$"Cannot access '{symbol}' of null");
+                target = GetValueFromAccess(bma.Target);
+                EnsureNotNullValue(target, loc!, $"Cannot access '{symbol}' of null");
                 if(symbol.IsBuiltin)
                 {
                     //TODO: This should look for the field we are accessing not just assume it's the length!
-                    return valTarget switch
+                    return target switch
                     {
                         StrValue str => new IntValue(str.Value.Length),
                         ListValue lst => new IntValue(lst.Length),
                         _ => throw new NotImplementedException($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} doesn't know '{bma.Target.Type}.{bma.Member}'")
                     };
                 }
-                if(valTarget is not StructValue sTarget) throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} Assumption that 'symbol.IsBuiltin' is adequate is wrong - time to fix TODO");
+                if(target is not StructValue sTarget) throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} Assumption that 'symbol.IsBuiltin' is adequate is wrong - time to fix TODO");
                 if(!sTarget.TryGetField(bma.Member.Name, out var fieldValue))
                     throw new Exception($"{nameof(BoundInterpreter)} couldn't find '{bma.Member}' on {bma.Target.Type}");
                 return fieldValue;
+            case BoundSubscriptAccess sa:
+            {
+                target = GetValueFromAccess(sa.Target);
+                EnsureNotNullValue(target, loc!);
+                var idx = EvaluateExpressionToValueOrThrow<IntValue>(sa.Index, "subscript");
+                if (target is CollectionValue sv)
+                {
+                    EnsureIdxWithinBounds(idx, 0, sv.Length);
+                    return sv.GetAt(idx);
+                }
+                throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
+            }
             default:
                 throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} doesn't know how to handle {accessTarget}");
         }
@@ -458,5 +431,28 @@ public sealed class BoundInterpreter
     {
         _variableEnvironment.Pop();
         _functionEnvironment.Pop();
+    }
+
+    private static void EnsureNotNullValue(Value v, TextLocation loc, string msg = "Cannot access null")
+    {
+        if(v == Value.Void) throw new WarmLangNullReferenceException(loc, msg);
+    }
+
+    private static void EnsureIdxWithinBounds(int idx, int lowerBound, int upperBound, string? msg = null)
+    {
+        if (idx >= upperBound || idx < lowerBound)
+        {
+            msg ??= "Index was out of range. Must be non-negative and less than size of collection";
+            throw new WarmLangOutOfBoundsException(msg);
+        }
+    }
+
+    private T EvaluateExpressionToValueOrThrow<T>(BoundExpression expr, string expected)
+    where T : Value
+    {
+        var res = EvaluateExpression(expr);
+        if(res is not T t)
+            throw new Exception($"{nameof(BoundInterpreter)} cannot use '{expr.Type}' as {expected}");
+        return t;
     }
 }
