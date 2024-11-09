@@ -36,7 +36,8 @@ public class BinderTests
         
         var typeMembers = new ReadOnlyDictionary<TypeSymbol,IList<MemberSymbol>>(BuiltinMembers.CreateMembersForBuiltins());
         var typeMethods = new ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>(new Dictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>());
-        var typeInfo = new TypeMemberInformation(typeMembers, typeMethods);
+        var declaredTypes = new List<TypeSymbol>().AsReadOnly();
+        var typeInfo = new TypeMemberInformation(typeMembers, typeMethods, declaredTypes);
 
         return new BoundProgram(null, scriptMain, functions, typeInfo, globals);
     }

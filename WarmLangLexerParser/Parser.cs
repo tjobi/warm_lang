@@ -501,7 +501,7 @@ public class Parser
     private ExpressionNode ParseStructInitializer()
     {
         MatchKind(TNew);
-        var nameToken = MatchKind(TIdentifier);
+        var nameToken = NextToken();//MatchKind(TIdentifier);
         var curLeft = MatchKind(TCurLeft);
         var values = new List<(SyntaxToken, ExpressionNode)>();
         var isReading = Current.Kind != TCurRight;

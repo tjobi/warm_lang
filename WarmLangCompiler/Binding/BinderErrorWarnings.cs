@@ -162,6 +162,12 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, typeNameToken.Location);
     }
 
+    internal static void ReportCannotInstantiateBuiltinWithNew(this ErrorWarrningBag bag, SyntaxToken guiltyToken)
+    {
+        var message = $"The type '{guiltyToken.Kind.ToTypeSymbol()}' cannot be instantiated with new, it is a built-in";
+        bag.Report(message, true, guiltyToken.Location);
+    }
+
     internal static void ReportTypeHasNoSuchMember(this ErrorWarrningBag bag, TypeSymbol type, SyntaxToken member)
     {
         var message = $"The type '{type}' contains no definition for '{member.Name}' (are you sure it is spelt right?)";

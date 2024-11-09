@@ -608,7 +608,14 @@ public sealed class Binder
 
     private BoundExpression BindStructInitExpression(StructInitExpression se)
     {
-        if(!_typeHelper.TryGetTypeSymbol(se.Name, out var type))
+        if(se.NameToken.Kind.ToTypeSymbol() is not null)
+        {
+            //The "name" part of struct init is not an identifier, for example: "new int {...};"
+            //TODO: Do we want to allow "int x = new int{5};"?
+            _diag.ReportCannotInstantiateBuiltinWithNew(se.NameToken);
+            return new BoundErrorExpression(se);
+        }
+        if(!_typeHelper.TryGetTypeSymbol(se.Name!, out var type))
         {
             _diag.ReportTypeNotFound(se.NameToken);
             type = TypeSymbol.Error;
