@@ -20,12 +20,18 @@ internal static class BinderErrorWarnings
 
     internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
     {
-        var message = $"A variable or function named '{name}' is already defined in this scope";
+        var message = $"A variable, function, or type named '{name}' is already defined in this scope";
         bag.Report(message, true, location);
     }
 
     internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, SyntaxToken token)
     => ReportNameAlreadyDeclared(bag,token.Location, token.Name!);
+
+    internal static void ReportTypeAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
+    {
+        var message = $"A type named '{name}' is already defined";
+        bag.Report(message, true, location);
+    }
 
     internal static void ReportNameDoesNotExist(this ErrorWarrningBag bag, TextLocation location, string name)
     {

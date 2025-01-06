@@ -6,12 +6,14 @@ namespace WarmLangCompiler.Binding;
 public sealed class BoundSymbolScope
 {
     private readonly List<Dictionary<string,EntitySymbol>> _scopeStack;
-    
+    private readonly BinderTypeHelper _typeHelper;
+
     public Dictionary<string, EntitySymbol> GlobalScope => _scopeStack[0];
 
-    public BoundSymbolScope()
+    public BoundSymbolScope(BinderTypeHelper typeHelper)
     {
         _scopeStack = new();
+        _typeHelper = typeHelper;
     }
 
     public void PushScope()
@@ -51,15 +53,14 @@ public sealed class BoundSymbolScope
 
     public bool TryDeclareFunction(FunctionSymbol function) => TryDeclare(function.Name, function);
 
+    //TODO: Should this instead return the reason it failed? it is a function, variable, type...
     public bool TryDeclare(string name, EntitySymbol type)
     {
         if(type is GlobalVariableSymbol)
             return TryDeclareGlobal(name, type);
+        if(AnyScopeContainsOrIsAType(name)) return false;
+
         var mostRecentScope = _scopeStack[^1];
-        if(mostRecentScope.ContainsKey(name))
-        {
-            return false;
-        }
         mostRecentScope.Add(name, type);
         return true;
     }
@@ -70,6 +71,16 @@ public sealed class BoundSymbolScope
             return false;
         GlobalScope.Add(name, type);
         return true;
+    }
+
+    private bool AnyScopeContainsOrIsAType(string name) 
+    {
+        if(_typeHelper.ContainsTypeWithNameOf(name)) return true;
+
+        foreach(var scope in _scopeStack)
+            if(scope.ContainsKey(name)) return true;
+        
+        return false;
     }
 
     public IList<FunctionSymbol> GetFunctions() => GetSymbol<FunctionSymbol>();

@@ -52,10 +52,9 @@ public sealed class Conversion
         }
 
         //Everything is explicitly convertible to a string - Could even remove the checks for Int and Bool above 
-        if(from != WLString && to == WLString)
+        if(from != WLString && from != Error && to == WLString)
             return Explicit;
 
-        //There is no conversion
         return None;
     }
 

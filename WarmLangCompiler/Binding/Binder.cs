@@ -21,10 +21,10 @@ public sealed class Binder
     public Binder(ErrorWarrningBag bag)
     {
         _diag = bag;
-        _scope = new BoundSymbolScope();
+        _typeHelper = new();
+        _scope = new BoundSymbolScope(_typeHelper);
         _functionStack = new();
         _unBoundBodyOf = new();
-        _typeHelper = new();
         _closureStack = new();
         _scope.PushScope(); //Push scope to contain builtin stuff
         foreach(var func in BuiltInFunctions.GetBuiltInFunctions())
@@ -88,7 +88,12 @@ public sealed class Binder
         foreach(var typeDecl in root.GetChildrenOf<TopLevelTypeDeclaration>())
         {
             var typeSymbol = typeDecl.Type.ToTypeSymbol();
-            _typeHelper.TryAddType(typeSymbol);
+            if(!_typeHelper.TryAddType(typeSymbol))
+            {
+                var troubleMkr = typeDecl.Type;
+                _diag.ReportTypeAlreadyDeclared(troubleMkr.Location, troubleMkr.Name);
+                continue;
+            }
             foreach(var member in typeDecl.Members)
             {
                 var memberSymbol = new MemberFieldSymbol(member.Name, member.Type.ToTypeSymbol());
@@ -185,7 +190,7 @@ public sealed class Binder
         var nameToken = funcDecl.NameToken;
         var parameters = CreateParameterSymbols(funcDecl);
         var function = new FunctionSymbol(nameToken, parameters, returnType);
-        ConnectParamsBelongsTo(function);
+        
         var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
         
         if(funcDecl.OwnerType is not null)
@@ -204,6 +209,7 @@ public sealed class Binder
                 _diag.ReportMemberFuncFirstParameterMustMatchOwner(function.Location, function.Name, ownerType, t);
             }
         }
+
         if(!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
@@ -217,10 +223,9 @@ public sealed class Binder
     private BoundStatement BindLocalFunctionDeclaration(FuncDeclaration funcDecl)
     {
         var nameToken = funcDecl.NameToken;
-        var parameters = CreateParameterSymbols(funcDecl, isLocal: true);
+        var parameters = CreateParameterSymbols(funcDecl);
         var returnType = funcDecl.ReturnType.ToTypeSymbol();
         var symbol = new LocalFunctionSymbol(nameToken, parameters, returnType);
-        ConnectParamsBelongsTo(symbol);
 
         if(funcDecl.OwnerType is not null)
         {
@@ -261,7 +266,7 @@ public sealed class Binder
         return new BoundFunctionDeclaration(funcDecl, symbol);
     }
 
-    private ImmutableArray<ParameterSymbol> CreateParameterSymbols(FuncDeclaration func, bool isLocal = false)
+    private ImmutableArray<ParameterSymbol> CreateParameterSymbols(FuncDeclaration func)
     {
         var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
         var uniqueParameterNames = new HashSet<string>();
@@ -419,7 +424,7 @@ public sealed class Binder
             if(accessToCall is not BoundMemberAccess bma)
                 throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}");
             
-            if(bma.Target is not BoundPredefinedTypeAccess && bma.Member is MemberFuncSymbol)
+            if(bma.Target is not BoundTypeAccess && bma.Member is MemberFuncSymbol)
             {
                 arguments.Add(new BoundAccessExpression(ce, bma.Target));
             }   
@@ -487,6 +492,9 @@ public sealed class Binder
                         return new BoundFuncAccess(func);
                     }
                 }
+                if(_typeHelper.TryGetTypeSymbol(na.Name, out var type))
+                    return new BoundTypeAccess(type);
+                
                 _diag.ReportNameDoesNotExist(na.Location, na.Name);
                 return new BoundInvalidAccess();
             }
@@ -497,7 +505,7 @@ public sealed class Binder
             case MemberAccess ma:
             {
                 var boundTarget = BindAccess(ma.Target);
-                if(boundTarget.Type == TypeSymbol.Error)
+                if(boundTarget.Type == TypeSymbol.Error || ma.MemberToken.Name is null)
                     return new BoundInvalidAccess();
                 var boundMember = _typeHelper.FindMember(boundTarget.Type, ma.MemberToken.Name!);
                 if(boundMember is null)
@@ -693,11 +701,5 @@ public sealed class Binder
                 break;
         }
         return null;
-    }
-
-    private FunctionSymbol ConnectParamsBelongsTo(FunctionSymbol function)
-    {
-        foreach(var p in function.Parameters) p.BelongsTo = function;
-        return function;
     }
 }
