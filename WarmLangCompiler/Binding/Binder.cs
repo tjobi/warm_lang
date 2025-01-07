@@ -11,7 +11,7 @@ using WarmLangLexerParser.ErrorReporting;
 public sealed class Binder
 {
     private readonly ErrorWarrningBag _diag;
-    private readonly BoundSymbolScope _scope;
+    private readonly SymbolEnvironment _scope;
     private readonly BinderTypeHelper _typeHelper;
     private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
@@ -22,7 +22,7 @@ public sealed class Binder
     {
         _diag = bag;
         _typeHelper = new();
-        _scope = new BoundSymbolScope(_typeHelper);
+        _scope = new(_typeHelper);
         _functionStack = new();
         _unBoundBodyOf = new();
         _closureStack = new();

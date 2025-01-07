@@ -3,17 +3,17 @@ using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
 
-public sealed class BoundSymbolScope
+public sealed class SymbolEnvironment
 {
     private readonly List<Dictionary<string,EntitySymbol>> _scopeStack;
-    private readonly BinderTypeHelper _typeHelper;
+    private readonly BinderTypeHelper _typeManager;
 
     public Dictionary<string, EntitySymbol> GlobalScope => _scopeStack[0];
 
-    public BoundSymbolScope(BinderTypeHelper typeHelper)
+    public SymbolEnvironment(BinderTypeHelper typeHelper)
     {
         _scopeStack = new();
-        _typeHelper = typeHelper;
+        _typeManager = typeHelper;
     }
 
     public void PushScope()
@@ -75,7 +75,7 @@ public sealed class BoundSymbolScope
 
     private bool AnyScopeContainsOrIsAType(string name) 
     {
-        if(_typeHelper.ContainsTypeWithNameOf(name)) return true;
+        if(_typeManager.ContainsTypeWithNameOf(name)) return true;
 
         foreach(var scope in _scopeStack)
             if(scope.ContainsKey(name)) return true;
