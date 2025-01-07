@@ -6,10 +6,10 @@ namespace WarmLangCompiler.Interpreter.Values;
 
 using FieldDict = Dictionary<string, Value>;
 
-public sealed record StructValue : Value
+public sealed record ObjectValue : Value
 {
-    public StructValue(TypeSymbol type) : this(type, new()) { }
-    public StructValue(TypeSymbol type, FieldDict fields)
+    public ObjectValue(TypeSymbol type) : this(type, new()) { }
+    public ObjectValue(TypeSymbol type, FieldDict fields)
     {
         Name = type.Name;
         Fields = fields;

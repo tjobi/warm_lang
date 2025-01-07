@@ -379,7 +379,7 @@ public sealed class Binder
             ListInitExpression le => BindListInitExpression(le, allowimplicitListType),
             ConstExpression ce => BindConstantExpression(ce),
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
-            StructInitExpression se => BindStructInitExpression(se),
+            ObjectInitExpression se => BindObjectInitExpression(se),
             ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
@@ -614,7 +614,7 @@ public sealed class Binder
         return new BoundConstantExpression(ce, type);
     }
 
-    private BoundExpression BindStructInitExpression(StructInitExpression se)
+    private BoundExpression BindObjectInitExpression(ObjectInitExpression se)
     {
         if(se.NameToken.Kind.ToTypeSymbol() is not null)
         {
@@ -646,7 +646,7 @@ public sealed class Binder
             };
             members.Add( (memberSymbol, bound) );
         }
-        return new BoundStructInitExpression(se, type, members.MoveToImmutable());
+        return new BoundObjectInitExpression(se, type, members.MoveToImmutable());
     }
 
     private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowExplicit = false, bool allowimplicitListType = false)

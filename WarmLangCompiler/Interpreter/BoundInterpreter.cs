@@ -137,7 +137,7 @@ public sealed class BoundInterpreter
             BoundAccessExpression acc => EvaluateAccessExpression(acc),
             BoundConstantExpression konst => EvaluateConstantExpression(konst),
             BoundListExpression lst => EvaluateListExpression(lst),
-            BoundStructInitExpression bse => EvaluateStructInitExpression(bse),
+            BoundObjectInitExpression bse => EvaluateObjectInitExpression(bse),
             _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{expr.GetType().Name}' yet"),
         };
     }
@@ -305,10 +305,10 @@ public sealed class BoundInterpreter
                 
                 if(bma.Member.IsReadOnly) 
                     throw new Exception($"{nameof(BoundInterpreter)}.{nameof(EvaluateAssignmentExpression)} tried to assign into a readonly member '{bma.Target.Type}.{bma.Member}'");
-                if(target is not StructValue structVal) 
+                if(target is not ObjectValue objVal) 
                     throw new NotImplementedException($"{nameof(BoundInterpreter)}.{nameof(EvaluateAssignmentExpression)} doesn't know assignment of '{bma.Target.Type}.{bma.Member}'");
                 
-                res = structVal[bma.Member.Name] = EvaluateExpression(assign.RightHandSide);
+                res = objVal[bma.Member.Name] = EvaluateExpression(assign.RightHandSide);
             } break;
             default:
                 throw new NotImplementedException($"Assignment into access of type '{assign.Access.GetType().Name}' is not known");
@@ -350,7 +350,7 @@ public sealed class BoundInterpreter
                         _ => throw new NotImplementedException($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} doesn't know '{bma.Target.Type}.{bma.Member}'")
                     };
                 }
-                if(target is not StructValue sTarget) throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} Assumption that 'symbol.IsBuiltin' is adequate is wrong - time to fix TODO");
+                if(target is not ObjectValue sTarget) throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} Assumption that 'symbol.IsBuiltin' is adequate is wrong - time to fix TODO");
                 if(!sTarget.TryGetField(bma.Member.Name, out var fieldValue))
                     throw new Exception($"{nameof(BoundInterpreter)} couldn't find '{bma.Member}' on {bma.Target.Type}");
                 return fieldValue;
@@ -392,10 +392,10 @@ public sealed class BoundInterpreter
         return values;
     }
 
-    private Value EvaluateStructInitExpression(BoundStructInitExpression bse)
+    private Value EvaluateObjectInitExpression(BoundObjectInitExpression bse)
     {
         var membersOfStruct = program.TypeMemberInformation.Members[bse.Type];
-        var strct = new StructValue(bse.Type);
+        var strct = new ObjectValue(bse.Type);
         foreach(var initedMember in bse.InitializedMembers)
         {
             var fieldName = initedMember.MemberSymbol.Name; 

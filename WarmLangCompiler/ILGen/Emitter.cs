@@ -451,8 +451,8 @@ public sealed class Emitter{
             case BoundListExpression listInit:
                 EmitListExpression(processor, listInit);
                 break;
-            case BoundStructInitExpression structInit:
-                EmitStructExpression(processor, structInit);
+            case BoundObjectInitExpression structInit:
+                EmitObjectExpression(processor, structInit);
                 break;
             case BoundAssignmentExpression assignment:
                 EmitAssignmentExpression(processor, assignment);
@@ -521,7 +521,7 @@ public sealed class Emitter{
         }
     }
 
-    private void EmitStructExpression(ILProcessor processor, BoundStructInitExpression init)
+    private void EmitObjectExpression(ILProcessor processor, BoundObjectInitExpression init)
     {
         if (!_typeInfoOf.TryGetValue(init.Type, out var typeInfo))
             throw new Exception($"{nameof(Emitter)} - Something went wrong, there was no type information for '{init.Type}'");

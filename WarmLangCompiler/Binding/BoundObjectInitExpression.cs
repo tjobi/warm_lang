@@ -4,9 +4,9 @@ using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Binding;
 
-public sealed class BoundStructInitExpression : BoundExpression
+public sealed class BoundObjectInitExpression : BoundExpression
 {
-    public BoundStructInitExpression(ExpressionNode node, TypeSymbol type, ImmutableArray<(MemberSymbol, BoundExpression)> initializedMembers) : base(node, type)
+    public BoundObjectInitExpression(ExpressionNode node, TypeSymbol type, ImmutableArray<(MemberSymbol, BoundExpression)> initializedMembers) : base(node, type)
     {
         InitializedMembers = initializedMembers;
     }

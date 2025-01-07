@@ -379,7 +379,7 @@ public class Parser
             } break;
             case TNew:
             {
-                res = ParseStructInitializer();
+                res = ParseObjectInitializer();
             } break;
             default: 
             {
@@ -498,7 +498,7 @@ public class Parser
         return new CallExpression(called, openPar, args, closePar);
     }
 
-    private ExpressionNode ParseStructInitializer()
+    private ExpressionNode ParseObjectInitializer()
     {
         MatchKind(TNew);
         var nameToken = NextToken();//MatchKind(TIdentifier);
@@ -514,7 +514,7 @@ public class Parser
             isReading = Current.Kind == TComma && NextToken().Kind == TComma; 
         }
         var curRight = MatchKind(TCurRight);
-        return new StructInitExpression(nameToken, curLeft, values, curRight);
+        return new ObjectInitExpression(nameToken, curLeft, values, curRight);
     }
 
     private TypeSyntaxNode ParseType()
