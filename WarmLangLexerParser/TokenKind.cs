@@ -22,7 +22,7 @@ public enum TokenKind
     TReturn,
     TTrue, TFalse,
     TVar,//var x = 5, the keyword 'var'
-    TType, TNew,
+    TType, TNew, TNull,
 
     //"Kind of construct?"
     TConst, TInt, TBool, TString, TStringLiteral,
