@@ -7,6 +7,10 @@ function newMyType(int id) MyType { return new MyType{ID = id}; }
 //TODO: Something like this should be provided for every type created ... would be nice
 function MyType.toString(MyType self) string { return "MyType{" + string(self.ID) + "}"; }
 
+function MyType.equals(MyType self, MyType other) bool {
+    return self.ID == other.ID;
+}
+
 // Non-generic, it can only hold entries of MyType
 type LinkedListNode = {
     MyType data;
@@ -34,7 +38,7 @@ function LinkedList.contains(LinkedList self, MyType e) bool {
     LinkedListNode cur = self.head;
 
     while cur != null : cur = cur.next {
-        if cur.data.ID == e.ID {
+        if e.equals(cur.data) {
             return true;
         }
     }
