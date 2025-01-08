@@ -57,6 +57,13 @@ public sealed class BoundBinaryOperator
             (TBangEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) 
                 when lts1.InnerType == lts2.InnerType => new(op, NotEquals, left, right, Bool),
             
+            //Operators on null
+            (TEqualEqual, _,_) 
+                when left == Null && !right.IsValueType
+                 || right == Null && !left.IsValueType => new(op, BoundBinaryOperatorKind.Equals, Bool),
+            (TBangEqual, _,_) 
+                when left == Null && !right.IsValueType
+                 || right == Null && !left.IsValueType => new(op, NotEquals, Bool),
             //No operator matches
             _ => null, 
         };
@@ -70,7 +77,7 @@ public sealed class BoundBinaryOperator
         new(TSlash, Division, Int),
         new(TDoubleStar, Power, Int),
         //Equaility and relation on ints
-        new(TLessThan, LessThan,Int, Int, Bool),
+        new(TLessThan, LessThan, Int, Int, Bool),
         new(TLessThanEqual, LessThanEqual, Int, Int, Bool),
         new(TGreaterThan, GreaterThan, Int, Int, Bool),
         new(TGreaterThanEqual, GreaterThanEqual, Int, Int, Bool),
@@ -81,7 +88,7 @@ public sealed class BoundBinaryOperator
         new(TEqualEqual, BoundBinaryOperatorKind.Equals, Bool),
         new(TBangEqual, NotEquals, Bool),
         new(TSeqAND, LogicAND, Bool),
-        new(TSeqOR, LogicaOR, Bool),
+        new(TSeqOR, LogicOR, Bool),
 
         //builtin for string 
         new(TPlus, StringConcat, TypeSymbol.String),

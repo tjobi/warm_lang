@@ -358,6 +358,11 @@ public class Parser
             {
                 res = ParseConstExpression();
             } break;
+            case TNull:
+            {
+                var nullToken = NextToken();
+                res = new NullExpression(nullToken);
+            } break;
             case TParLeft:
             {
                 res = ParseParenthesesExpression();

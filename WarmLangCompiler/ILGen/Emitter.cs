@@ -223,7 +223,7 @@ public sealed class Emitter{
         globalsProcessor.Emit(OpCodes.Ret);
         globalsProcessor.Body.OptimizeMacros();
 
-        // TODO: program.TypeMemberInformation still holds all the type information
+        //program.TypeMemberInformation still holds all the type information
         //GetFunctionSymbols just skips the need for multiple loops (for now at least)
         foreach(var (func, body) in program.GetFunctionSymbolsAndBodies())
         {
@@ -472,6 +472,9 @@ public sealed class Emitter{
             case BoundConstantExpression bound:
                 EmitConstantExpression(processor,bound);
                 break;
+            case BoundNullExpression:
+                processor.Emit(OpCodes.Ldnull);
+                break;
             default: 
                 throw new NotImplementedException($"{nameof(Emitter)} doesn't know '{expr} yet'");
         }
@@ -504,6 +507,8 @@ public sealed class Emitter{
 
         if(conv.Type is ListTypeSymbol)
             return;
+        
+        if(conv.Expression.Type == TypeSymbol.Null) return; //null is implicit
         
         throw new NotImplementedException($"{nameof(EmitTypeConvesionExpression)} didn't know how to handle conversion '{conv.Type}' to '{conv.Expression.Type}'");
     }
@@ -697,7 +702,7 @@ public sealed class Emitter{
     {
         var leftType = binary.Left.Type;
         var rightType = binary.Right.Type;
-        if(binary.Operator.Kind == LogicAND || binary.Operator.Kind == LogicaOR)
+        if(binary.Operator.Kind == LogicAND || binary.Operator.Kind == LogicOR)
         {
             EmitLogicalAndOR(processor, binary);
             return;

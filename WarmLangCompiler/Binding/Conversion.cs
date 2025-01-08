@@ -29,6 +29,9 @@ public sealed class Conversion
 
     public static Conversion GetConversion(TypeSymbol from, TypeSymbol to)
     {
+        //Any CLI reference type is nullable - for now
+        if(from == Null && !to.IsValueType) return Implicit;
+
         if(from == to)
             return Identity;
         

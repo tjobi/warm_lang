@@ -130,14 +130,15 @@ public sealed class BoundInterpreter
         return expr switch
         {
             BoundTypeConversionExpression conv => EvaluateTypeConversionExpression(conv),
-            BoundUnaryExpression unaOp => EvaluateUnaryExpression(unaOp),
-            BoundBinaryExpression binOp => EvaluateBinaryExpression(binOp),
-            BoundCallExpression call => EvaluateCallExpression(call),
-            BoundAssignmentExpression assign => EvaluateAssignmentExpression(assign),
-            BoundAccessExpression acc => EvaluateAccessExpression(acc),
+            BoundUnaryExpression unaOp    => EvaluateUnaryExpression(unaOp),
+            BoundBinaryExpression binOp   => EvaluateBinaryExpression(binOp),
+            BoundCallExpression call      => EvaluateCallExpression(call),
+            BoundAssignmentExpression asn => EvaluateAssignmentExpression(asn),
+            BoundAccessExpression acc     => EvaluateAccessExpression(acc),
             BoundConstantExpression konst => EvaluateConstantExpression(konst),
-            BoundListExpression lst => EvaluateListExpression(lst),
+            BoundListExpression lst       => EvaluateListExpression(lst),
             BoundObjectInitExpression bse => EvaluateObjectInitExpression(bse),
+            BoundNullExpression _         => EvaluateNullExpression(),
             _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{expr.GetType().Name}' yet"),
         };
     }
@@ -160,6 +161,9 @@ public sealed class BoundInterpreter
         //Convert [] when used in variable declaration
         if(conv.Type is ListTypeSymbol)
             return value;
+        if(conv.Expression.Type == TypeSymbol.Null)
+            return Value.Null;
+
         throw new Exception($"{nameof(BoundInterpreter)} doesn't know conversion from '{value}' to '{conv.Type}'");
     }
 
@@ -185,7 +189,7 @@ public sealed class BoundInterpreter
         //Early returns of '&&' '||', right should could be an a assignment :O
         if(op.Kind == BoundBinaryOperatorKind.LogicAND && left is BoolValue bv && bv == false)
             return BoolValue.False;
-        if(op.Kind == BoundBinaryOperatorKind.LogicaOR && left is BoolValue bvv && bvv == true)
+        if(op.Kind == BoundBinaryOperatorKind.LogicOR && left is BoolValue bvv && bvv == true)
             return BoolValue.True;
         
         var right = EvaluateExpression(binOp.Right);
@@ -322,8 +326,8 @@ public sealed class BoundInterpreter
         {
             BoundNameAccess nameAccess  => _variableEnvironment.Lookup(nameAccess.Symbol),
             BoundExprAccess ae          => EvaluateExpression(ae.Expression),
-            BoundMemberAccess           => GetValueFromAccess(acc.Access),
-            BoundSubscriptAccess        => GetValueFromAccess(acc.Access),
+            BoundMemberAccess
+            or BoundSubscriptAccess           => GetValueFromAccess(acc.Access, acc.Location),
             _ => throw new NotImplementedException($"Access of type '{acc.Access.GetType().Name}' is not known"),
         };
     }
@@ -339,7 +343,7 @@ public sealed class BoundInterpreter
                 return EvaluateExpression(ea.Expression);
             case BoundMemberAccess bma when bma is {Member: MemberFieldSymbol symbol}:
                 target = GetValueFromAccess(bma.Target);
-                EnsureNotNullValue(target, loc!, $"Cannot access '{symbol}' of null");
+                EnsureNotNullValue(target, loc, $"Cannot access '{symbol}' of null");
                 if(symbol.IsBuiltin)
                 {
                     //TODO: This should look for the field we are accessing not just assume it's the length!
@@ -357,7 +361,7 @@ public sealed class BoundInterpreter
             case BoundSubscriptAccess sa:
             {
                 target = GetValueFromAccess(sa.Target);
-                EnsureNotNullValue(target, loc!);
+                EnsureNotNullValue(target, loc);
                 var idx = EvaluateExpressionToValueOrThrow<IntValue>(sa.Index, "subscript");
                 if (target is CollectionValue sv)
                 {
@@ -410,6 +414,8 @@ public sealed class BoundInterpreter
         return strct;
     }
 
+    private static Value EvaluateNullExpression() => Value.Null;
+
     private Value GetDefault(TypeSymbol symbol)
     {
         if(symbol == TypeSymbol.Bool) return BoolValue.DEFAULT;
@@ -433,9 +439,9 @@ public sealed class BoundInterpreter
         _functionEnvironment.Pop();
     }
 
-    private static void EnsureNotNullValue(Value v, TextLocation loc, string msg = "Cannot access null")
+    private static void EnsureNotNullValue(Value v, TextLocation? loc, string msg = "Cannot access null")
     {
-        if(v == Value.Void) throw new WarmLangNullReferenceException(loc, msg);
+        if(v == Value.Void || v==Value.Null) throw new WarmLangNullReferenceException(loc, msg);
     }
 
     private static void EnsureIdxWithinBounds(int idx, int lowerBound, int upperBound, string? msg = null)

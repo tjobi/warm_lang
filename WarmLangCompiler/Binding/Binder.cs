@@ -380,6 +380,7 @@ public sealed class Binder
             ConstExpression ce => BindConstantExpression(ce),
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
             ObjectInitExpression se => BindObjectInitExpression(se),
+            NullExpression @null => BindNullExpression(@null),
             ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
@@ -648,6 +649,9 @@ public sealed class Binder
         }
         return new BoundObjectInitExpression(se, type, members.MoveToImmutable());
     }
+
+    private static BoundExpression BindNullExpression(NullExpression @null) 
+        => new BoundNullExpression(@null);
 
     private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowExplicit = false, bool allowimplicitListType = false)
     {
