@@ -41,8 +41,10 @@ public sealed class Emitter{
     private TypeDefinition _program;
     private AssemblyDefinition _mscorlib;
 
+    private readonly CilTypeManager _cilTypeManager;
+    private readonly ListMethodHelper _listMethods;
     private readonly Dictionary<TypeSymbol, TypeReference> _cilTypes;
-    private TypeReference CilTypeOf(TypeSymbol type) => _cilTypes[type.AsRecognisedType()];
+    private TypeReference CilTypeOf(TypeSymbol type) => _cilTypeManager.GetType(type);//_cilTypes[type.AsRecognisedType()];
 
     public FunctionBodyState BodyState => _bodyStateStack.Peek();
     public FunctionBodyState ParentState()
@@ -70,6 +72,8 @@ public sealed class Emitter{
         
         // IL -> ".assembly extern mscorlib {}"
         _mscorlib = ReadMscorlib();
+        _cilTypeManager = new(_mscorlib, _assemblyDef);
+        _listMethods = _cilTypeManager.ListHelper;
         
         foreach(var type in BuiltInTypes())
         {
@@ -78,7 +82,9 @@ public sealed class Emitter{
                 var t = module.GetType(type.ToCilName());
                 if(t is not null)
                 {
-                    _cilTypes[type] = _assemblyDef.MainModule.ImportReference(t);
+                    var typeRef = _assemblyDef.MainModule.ImportReference(t);
+                    _cilTypes[type] = typeRef;
+                    _cilTypeManager.Add(type, typeRef);
                     break;
                 }
             }
@@ -256,6 +262,7 @@ public sealed class Emitter{
         ctor.Body.OptimizeMacros();
 
         _cilTypes[type] = typeDef;
+        _cilTypeManager.Add(type, typeDef);
         var memberFields = new Dictionary<MemberSymbol, FieldReference>();
         foreach(var member in members)
         {
@@ -515,14 +522,14 @@ public sealed class Emitter{
 
     private void EmitListExpression(ILProcessor processor, BoundListExpression listInit)
     {
-        processor.Emit(OpCodes.Newobj, _listEmpty);
+        var ctor = _listMethods.Empty(listInit.Type);
+        var add = _listMethods.Add(listInit.Type);
+        processor.Emit(OpCodes.Newobj, ctor);
         foreach(var expr in listInit.Expressions)
         {
             processor.Emit(OpCodes.Dup);
             EmitExpression(processor, expr);
-            EmitBoxIfNeeded(processor, expr.Type);
-            processor.Emit(OpCodes.Callvirt, _listAdd);
-            processor.Emit(OpCodes.Pop);  // System.Int32 ArrayList::Add(System.Object)  
+            processor.Emit(OpCodes.Callvirt, add);
         }
     }
 
@@ -571,8 +578,7 @@ public sealed class Emitter{
                     EmitExpression(processor, assignment.RightHandSide);
                     processor.Emit(OpCodes.Stloc, tmpVar);
                     processor.Emit(OpCodes.Ldloc, tmpVar);
-                    EmitBoxIfNeeded(processor, assignment.RightHandSide.Type);
-                    processor.Emit(OpCodes.Callvirt, _listSet);
+                    processor.Emit(OpCodes.Callvirt, _listMethods.Update(lts));
                     processor.Emit(OpCodes.Ldloc, tmpVar);
                     return;
                 }
@@ -676,20 +682,23 @@ public sealed class Emitter{
                 var tmpVar = new VariableDefinition(type);
                 processor.Body.Variables.Add(tmpVar);
 
+                var length = _listMethods.Length(unary.Left.Type);
+                var remove = _listMethods.Remove(unary.Left.Type);
+                var subscr = _listMethods.Subscript(unary.Left.Type);
+
                 processor.Emit(OpCodes.Dup);                            //Duplicate to be consumed by _listsubcript
                 processor.Emit(OpCodes.Dup);                            //Duplicate, consumed by _listLength
-                processor.Emit(OpCodes.Callvirt, _listLength);          
+                processor.Emit(OpCodes.Callvirt, length);          
                 processor.Emit(OpCodes.Ldc_I4_1);
                 processor.Emit(OpCodes.Sub);
-                processor.Emit(OpCodes.Callvirt, _listSubscript);
-                processor.Emit(OpCodes.Unbox_Any, type);                //Prepare return value from unary expression
+                processor.Emit(OpCodes.Callvirt, subscr);
                 processor.Emit(OpCodes.Stloc, tmpVar);                  //store away value, so we can remove the end
                 
                 processor.Emit(OpCodes.Dup);                            //Duplicate to be consumed by _listLength
-                processor.Emit(OpCodes.Callvirt, _listLength);
+                processor.Emit(OpCodes.Callvirt, length);
                 processor.Emit(OpCodes.Ldc_I4_1);
                 processor.Emit(OpCodes.Sub);          
-                processor.Emit(OpCodes.Callvirt, _listRemove);          //consumed the original list pointer and returns void
+                processor.Emit(OpCodes.Callvirt, remove);          //consumed the original list pointer and returns void
 
                 processor.Emit(OpCodes.Ldloc, tmpVar);                  //leave value of removed on top of stack. 
                 break;
@@ -712,24 +721,24 @@ public sealed class Emitter{
         {
             if(binary.Operator.Kind != ListConcat)
                 EmitExpression(processor, binary.Left);
-            
+
             switch(binary.Operator.Kind)
             {
                 case ListConcat: 
-                    processor.Emit(OpCodes.Newobj, _listEmpty);
+                    var ctor = _listMethods.Empty(leftType);
+                    var addMany = _listMethods.AddMany(leftType);
+                    processor.Emit(OpCodes.Newobj, ctor);
                     processor.Emit(OpCodes.Dup);
                     processor.Emit(OpCodes.Dup);
                     EmitExpression(processor, binary.Left);
-                    processor.Emit(OpCodes.Callvirt, _listAddMany);
+                    processor.Emit(OpCodes.Callvirt, addMany);
                     EmitExpression(processor, binary.Right);
-                    processor.Emit(OpCodes.Callvirt, _listAddMany);
+                    processor.Emit(OpCodes.Callvirt, addMany);
                     break;
                 case ListAdd:
                     processor.Emit(OpCodes.Dup);
                     EmitExpression(processor, binary.Right);
-                    EmitBoxIfNeeded(processor, binary.Right.Type);
-                    processor.Emit(OpCodes.Callvirt, _listAdd);
-                    processor.Emit(OpCodes.Pop);
+                    processor.Emit(OpCodes.Callvirt, _listMethods.Add(leftType));
                     break;
                 case BoundBinaryOperatorKind.Equals:
                     EmitExpression(processor, binary.Right);
@@ -962,8 +971,7 @@ public sealed class Emitter{
                         processor.Emit(OpCodes.Callvirt, _stringSubscript);
                     else if(sa.Target.Type is ListTypeSymbol lts)
                     {
-                        processor.Emit(OpCodes.Callvirt, _listSubscript);
-                        processor.Emit(OpCodes.Unbox_Any, CilTypeOf(lts.InnerType));
+                        processor.Emit(OpCodes.Callvirt, _listMethods.Subscript(lts));
                     }
                     return;
                 }
@@ -986,7 +994,7 @@ public sealed class Emitter{
             }
             else if(type is ListTypeSymbol)
             {
-                processor.Emit(OpCodes.Callvirt, _listLength);
+                processor.Emit(OpCodes.Callvirt, _listMethods.Length(type));
                 return;
             }
         }

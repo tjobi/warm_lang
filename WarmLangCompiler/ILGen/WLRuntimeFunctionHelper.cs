@@ -61,7 +61,7 @@ public class WLRuntimeFunctionHelper
         //if(arg1 is string && arg2 is string)
         //  return string.op_equals(arg1,arg2);
         //return arg1 == arg2;
-        var listTypeRef = _cilTypeOf(new ListTypeSymbol(TypeSymbol.Void));  // TODO: list<void> it just needs to be any list!
+        var listTypeRef = _cilTypeOf(EmitterTypeSymbolHelpers.CILArrayList);  // TODO: list<void> it just needs to be any list!
 
         processor.Emit(OpCodes.Ldarg, arg1);
         processor.Emit(OpCodes.Isinst, listTypeRef);  
@@ -216,7 +216,7 @@ public class WLRuntimeFunctionHelper
         //if(arg is List)
         var outString = new VariableDefinition(_cilTypeOf(TypeSymbol.String));
         body.Variables.Add(outString);
-        var listTypeRef = _cilTypeOf(new ListTypeSymbol(TypeSymbol.Void));
+        var listTypeRef = _cilTypeOf(EmitterTypeSymbolHelpers.CILArrayList);
 
         processor.Emit(OpCodes.Ldarg, arg);
         processor.Emit(OpCodes.Isinst, listTypeRef);

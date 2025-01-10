@@ -21,8 +21,11 @@ public static class EmitterTypeSymbolHelpers
     public static TypeSymbol CILBaseTypeSymbol => _cilBaseType;
     public static TypeSymbol CILClosureType => _closureType;
 
-    public static string[] GetCilParamNames() => Array.Empty<string>();
+    public static TypeSymbol CILArrayList => _list;
 
+    private static readonly string[] EMPTY_CIL_PARAM_NAMES = Array.Empty<string>();
+    public static string[] GetCilParamNames() => EMPTY_CIL_PARAM_NAMES;
+    
     public static string[] GetCilParamNames(params TypeSymbol[] types)
     {
         var res = new string[types.Length];
