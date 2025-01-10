@@ -2,17 +2,26 @@ namespace WarmLangCompiler.Symbols;
 
 public class TypeSymbol : Symbol
 {
-    public static readonly TypeSymbol Int = new("int");
-    public static readonly TypeSymbol Bool = new("bool");
+    public static readonly TypeSymbol Int = new("int", isValueType:true);
+    public static readonly TypeSymbol Bool = new("bool", isValueType:true);
     public static readonly TypeSymbol String = new("string");
     public static readonly TypeSymbol Void = new("void");
+    public static readonly TypeSymbol Null = new("null");
     public static readonly TypeSymbol EmptyList = new("unspecified empty list");
     public static readonly TypeSymbol IntList = new ListTypeSymbol("list<int>", Int); //TODO: how to generic?
     public static readonly TypeSymbol Error = new("err");
 
     public static readonly TypeSymbol ListBase = new("only-for-use-by-compiler");
 
-    public TypeSymbol(string name) : base(name) { }
+    public static readonly Dictionary<string, TypeSymbol> DefinedTypes = new();
+
+    public bool IsValueType { get; }
+
+    public TypeSymbol(string name, bool isValueType = false) 
+    : base(name)
+    {
+        IsValueType = isValueType;
+    }
 
     public override string ToString() => Name;
 

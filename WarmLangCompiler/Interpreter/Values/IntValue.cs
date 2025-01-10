@@ -3,6 +3,7 @@ namespace WarmLangCompiler.Interpreter.Values;
 
 public sealed record class IntValue : Value
 {
+    public static readonly IntValue DEFAULT = new(0);
     public int Value { get; }
 
     public IntValue(int val)

@@ -2,15 +2,13 @@ using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding.BoundAccessing;
 
-public sealed class BoundMemberAccess : BoundAccess
+public sealed class BoundMemberAccess : BoundTargetedAccess
 {
-    public BoundMemberAccess(BoundAccess target, MemberSymbol member) : base(member.Type)
+    public BoundMemberAccess(BoundAccess target, MemberSymbol member) : base(target, member.Type)
     {
-        Target = target;
         Member = member;
     }
-
-    public BoundAccess Target { get; }
     public MemberSymbol Member { get; }
-    public override bool HasNested => true;
+
+    public override string ToString() => $"(MemberAccess {Target}.{Member})";
 }

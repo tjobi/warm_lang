@@ -1,4 +1,6 @@
 namespace WarmLangLexerParser.AST.TypeSyntax;
+
+using System.Diagnostics.CodeAnalysis;
 using static WarmLangLexerParser.TokenKind;
 
 public abstract class TypeSyntaxNode : ASTNode
@@ -21,5 +23,13 @@ public abstract class TypeSyntaxNode : ASTNode
             //fine to throw an exception here, means we need to implement another case 
             _ => throw new NotImplementedException($"{nameof(TypeSyntaxNode)} doesn't recognize {token.Kind} yet")
         };
+    }
+
+    public static bool TryGetAsUserDefined(SyntaxToken token, [NotNullWhen(true)] out TypeSyntaxUserDefined? res)
+    {
+        res = null;
+        if(token.Kind == TIdentifier && token.Kind.IsPossibleType())
+            res = new TypeSyntaxUserDefined(token);
+        return res is not null;
     }
 }

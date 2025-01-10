@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
@@ -11,10 +12,13 @@ public sealed class BinderTypeHelper
     private readonly TypeMemberDict _typeMembers;
     private readonly TypeMemberFuncDict _typeFunctions;
 
+    private readonly ISet<TypeSymbol> _declaredTypes;
+
     public BinderTypeHelper()
     {
         _typeMembers = BuiltinMembers.CreateMembersForBuiltins();
         _typeFunctions = new();
+        _declaredTypes = new HashSet<TypeSymbol>();
     }
 
     private bool NotSeen(TypeSymbol type) => !_typeMembers.ContainsKey(type);
@@ -25,7 +29,7 @@ public sealed class BinderTypeHelper
     {
         var members = new ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>>(_typeMembers);
         var funcs = new ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>(_typeFunctions);
-        return new TypeMemberInformation(members, funcs);
+        return new TypeMemberInformation(members, funcs, _declaredTypes.ToList().AsReadOnly());
     }
 
     public bool TryAddType(TypeSymbol type)
@@ -33,7 +37,16 @@ public sealed class BinderTypeHelper
         if(Has(type))
             return false;
         _typeMembers[type] = new List<MemberSymbol>();
+        _declaredTypes.Add(type);
         return true;
+    }
+
+    public bool TryGetTypeSymbol(string name, [NotNullWhen(true)] out TypeSymbol? res)
+    {
+        res = null;
+        var tmp = new TypeSymbol(name);
+        if(_typeMembers.ContainsKey(tmp)) res = tmp;
+        return res is not null;
     }
 
     public void AddMember(TypeSymbol type, MemberSymbol member)
@@ -66,6 +79,10 @@ public sealed class BinderTypeHelper
         return null;
     }
 
+    public bool TryFindMember(TypeSymbol type, string name, [NotNullWhen(true)] out MemberSymbol? res)
+        => (res = FindMember(type, name)) is not null;
+    
+
     public IEnumerable<FunctionSymbol> GetFunctionMembers(TypeSymbol type)
     {
         foreach(var member in _typeMembers[type])
@@ -90,4 +107,6 @@ public sealed class BinderTypeHelper
             _typeFunctions[type] = new();
         _typeFunctions[type][function] = boundBody;
     }
+
+    public bool ContainsTypeWithNameOf(string name) => Has(new TypeSymbol(name));
 }

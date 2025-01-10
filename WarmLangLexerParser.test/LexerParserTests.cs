@@ -43,7 +43,7 @@ public class LexerParserTests
 
     private static ASTRoot MakeRoot(params StatementNode[] topLevelStatements)
     {
-        var children = topLevelStatements.Select(s => (TopLevelStamentNode) (s switch {
+        var children = topLevelStatements.Select(s => (TopLevelNode) (s switch {
                                                 VarDeclaration var => new TopLevelVarDeclaration(var),
                                                 FuncDeclaration func => new TopLevelFuncDeclaration(func),
                                                 _ => new TopLevelArbitraryStament(s)
@@ -979,7 +979,7 @@ x;
                 new BinaryExpression(
                     new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,1,"x"))),
                     MakeToken(TPlus,1,2),
-                    new ErrorExpressionNode(MakeToken(TSemiColon,1,3))
+                    new ErrorExpression(MakeToken(TSemiColon,1,3))
                 )
             )
         );

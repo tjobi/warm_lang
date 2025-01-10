@@ -5,6 +5,7 @@ public sealed record class BoolValue : Value
     public static readonly BoolValue True = new(true);
 
     public static readonly BoolValue False = new(false);
+    public static readonly BoolValue DEFAULT = False;
 
     public bool Value { get; }
 

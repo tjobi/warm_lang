@@ -4,10 +4,9 @@ public enum BoundBinaryOperatorKind
 {
     Addition, Subtraction, Division, Multiplication, Power,
     Equals, NotEquals, LessThan, LessThanEqual, GreaterThan, GreaterThanEqual,
-    LogicAND, LogicaOR, 
+    LogicAND, LogicOR, 
     
     StringConcat, 
-    ListConcat, ListAdd,  
+    ListConcat, ListAdd,
     
-     
 }

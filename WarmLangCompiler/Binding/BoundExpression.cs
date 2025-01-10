@@ -19,3 +19,9 @@ public abstract class BoundExpression
 
     public override string ToString() => Node.ToString();
 }
+
+
+public sealed class BoundNullExpression : BoundExpression
+{
+    public  BoundNullExpression(ExpressionNode node) : base(node, TypeSymbol.Null) {}
+}

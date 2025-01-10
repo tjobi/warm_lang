@@ -1,7 +1,9 @@
 namespace WarmLangCompiler.Interpreter.Values;
 using System.Text;
-public sealed record class ListValue : Value
+public sealed record class ListValue : MutableCollectionValue
 {
+    public static ListValue GET_DEFAULT() => new(new List<Value>());
+
     public List<Value> Elements { get; }
 
     public ListValue(IList<Value> elements)
@@ -14,19 +16,12 @@ public sealed record class ListValue : Value
         Elements = new List<Value>(initCapacity);
     }
 
-    public int Length => Elements.Count;
+    public override int Length => Elements.Count;
 
     public Value this[int idx]
     {
-        get
-        {
-            return Elements[idx];
-        }
-
-        set
-        {
-            Elements[idx] = value;
-        }
+        get => Elements[idx];
+        set => Elements[idx] = value;
     }
 
     public ListValue Add(Value v)
@@ -96,4 +91,7 @@ public sealed record class ListValue : Value
         }
         return sb.Append(']').ToString();
     }
+
+    public override Value SetAt(int i, Value v) => this[i] = v;
+    public override Value GetAt(int i) => this[i];
 }

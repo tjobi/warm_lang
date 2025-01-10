@@ -8,4 +8,6 @@ public sealed class BoundExprAccess : BoundAccess
     }
 
     public BoundExpression Expression { get; }
+
+    public override string ToString() => $"(Access {Expression})";
 }

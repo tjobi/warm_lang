@@ -10,12 +10,15 @@ public class FunctionSymbol : EntitySymbol
     public FunctionSymbol(SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
     :this(nameToken.Name!, parameters, type, nameToken.Location) { }
 
-    internal FunctionSymbol(string name, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type, TextLocation location) 
+    internal FunctionSymbol(string name, ImmutableArray<ParameterSymbol> parameters, 
+                            TypeSymbol type, TextLocation location, bool connectParams = true) 
     : base(name, type)
     {
         Parameters = parameters;
         Location = location;
         SharedLocals = new HashSet<ScopedVariableSymbol>();
+        if(connectParams) foreach(var p in parameters) p.BelongsTo = this;
+        //^^ TODO: object publication - could see a function symbol where the parameters aren't all updated. 
     }
 
     public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)

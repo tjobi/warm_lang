@@ -12,6 +12,7 @@ using System.Collections.Immutable;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
+using System.Collections.Generic;
 
 public sealed class Emitter{
 
@@ -23,15 +24,17 @@ public sealed class Emitter{
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _stringConcat, _stringEqual, _stringSubscript;
     private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany, _listLength;
-    private readonly MethodReference _objectEquals, _wlEquals, _wlToString;
+    private readonly MethodReference _objectEquals, _objectCtor, _wlEquals, _wlToString;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
     private readonly Dictionary<FunctionSymbol, ClosureState> _funcClosure;
-
     private readonly Stack<FunctionBodyState> _bodyStateStack;
 
+    private static readonly string WARM_LANG_NAMESPACE = "";
     private readonly TypeDefinition _globalsType;
     private readonly Dictionary<VariableSymbol, FieldDefinition> _globals;
+
+    private readonly Dictionary<TypeSymbol, WLTypeInformation> _typeInfoOf; 
 
     //mono.cecil stuff?
     private AssemblyDefinition _assemblyDef;
@@ -59,6 +62,7 @@ public sealed class Emitter{
         _bodyStateStack = new();
         _globals = new();
         _funcClosure = new();
+        _typeInfoOf = new();
 
         // IL -> ".assembly 'App' {}"
         var assemblyName = new AssemblyNameDefinition("App", new Version(1,0));
@@ -82,7 +86,7 @@ public sealed class Emitter{
 
         // IL -> ".class private auto ansi beforefieldinit abstract sealed Program extends [mscorlib]System.Object {"
         var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[CILBaseTypeSymbol]);
-        _program = new TypeDefinition("", "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, systemObject);
+        _program = new TypeDefinition(WARM_LANG_NAMESPACE, "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, systemObject);
         _assemblyDef.MainModule.Types.Add(_program);
 
         _globalsType = CreateGlobalsType(systemObject);
@@ -110,6 +114,7 @@ public sealed class Emitter{
 
         var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
         _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(CILBaseTypeSymbol, CILBaseTypeSymbol));
+        _objectCtor   = GetMethodFromTypeDefinition(dotnetObject, ".ctor", GetCilParamNames());
 
         var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, toStringConvert, _objectEquals, _stringConcat);
         //functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
@@ -176,7 +181,8 @@ public sealed class Emitter{
    
     private TypeDefinition CreateGlobalsType(TypeReference systemObject)
     {
-        var globalsType = new TypeDefinition("", "GLOBALS", TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit 
+        var globalsType = new TypeDefinition(WARM_LANG_NAMESPACE, "GLOBALS",
+                                                            TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit 
                                                             | TypeAttributes.Public  | TypeAttributes.Abstract 
                                                             | TypeAttributes.Sealed, systemObject);
         var globalConstructor = new MethodDefinition(".cctor", MethodAttributes.Private | MethodAttributes.HideBySig
@@ -199,6 +205,11 @@ public sealed class Emitter{
         if(_diag.Any())
             return; //something went wrong in constructor
         
+        foreach(var (type, members) in program.GetDeclaredTypes())
+        {
+            EmitTypeDeclaration(type, members);
+        }
+
         foreach(var func in program.GetFunctionSymbols())
         {
             EmitFunctionDeclaration(func);
@@ -212,7 +223,7 @@ public sealed class Emitter{
         globalsProcessor.Emit(OpCodes.Ret);
         globalsProcessor.Body.OptimizeMacros();
 
-        // TODO: program.TypeMemberInformation still holds all the type information
+        //program.TypeMemberInformation still holds all the type information
         //GetFunctionSymbols just skips the need for multiple loops (for now at least)
         foreach(var (func, body) in program.GetFunctionSymbolsAndBodies())
         {
@@ -223,6 +234,39 @@ public sealed class Emitter{
 
         _assemblyDef.EntryPoint = main;
         _assemblyDef.Write(outfile);
+    }
+
+    private void EmitTypeDeclaration(TypeSymbol type, IList<MemberSymbol> members)
+    {
+        var TYPE_ATTRIBUTES = TypeAttributes.Public | TypeAttributes.AnsiClass 
+                              | TypeAttributes.Sealed | TypeAttributes.AutoLayout
+                              | TypeAttributes.BeforeFieldInit;
+        var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, _cilTypes[CILBaseTypeSymbol]);
+        _assemblyDef.MainModule.Types.Add(typeDef);
+
+        //TODO: Must constructor call Dotnet.Object.ctor()?
+        var CONSTRUCTOR_ATTRIBUTES = MethodAttributes.Public | MethodAttributes.HideBySig
+                                     | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName;
+        var ctor = new MethodDefinition(".ctor", CONSTRUCTOR_ATTRIBUTES, CilTypeOf(TypeSymbol.Void));
+        typeDef.Methods.Add(ctor);
+        var bp = ctor.Body.GetILProcessor();
+        bp.Emit(OpCodes.Ldarg_0);
+        bp.Emit(OpCodes.Call, _objectCtor);
+        bp.Emit(OpCodes.Ret);
+        ctor.Body.OptimizeMacros();
+
+        _cilTypes[type] = typeDef;
+        var memberFields = new Dictionary<MemberSymbol, FieldReference>();
+        foreach(var member in members)
+        {
+            //TODO: Revisit when member functions can be declared on the type declaration
+            if(member is not MemberFieldSymbol f) continue;
+            var FIELD_ATTRIBUTES = FieldAttributes.Public;
+            var fieldDef = new FieldDefinition(f.Name, FIELD_ATTRIBUTES, CilTypeOf(member.Type));
+            memberFields[member] = fieldDef;
+            typeDef.Fields.Add(fieldDef);
+        }
+        _typeInfoOf[type] = new WLTypeInformation(type, typeDef, ctor, memberFields);
     }
 
     private void EmitFunctionDeclaration(FunctionSymbol func)
@@ -407,6 +451,9 @@ public sealed class Emitter{
             case BoundListExpression listInit:
                 EmitListExpression(processor, listInit);
                 break;
+            case BoundObjectInitExpression structInit:
+                EmitObjectExpression(processor, structInit);
+                break;
             case BoundAssignmentExpression assignment:
                 EmitAssignmentExpression(processor, assignment);
                 break;
@@ -424,6 +471,9 @@ public sealed class Emitter{
                 break;
             case BoundConstantExpression bound:
                 EmitConstantExpression(processor,bound);
+                break;
+            case BoundNullExpression:
+                processor.Emit(OpCodes.Ldnull);
                 break;
             default: 
                 throw new NotImplementedException($"{nameof(Emitter)} doesn't know '{expr} yet'");
@@ -458,6 +508,8 @@ public sealed class Emitter{
         if(conv.Type is ListTypeSymbol)
             return;
         
+        if(conv.Expression.Type == TypeSymbol.Null) return; //null is implicit
+        
         throw new NotImplementedException($"{nameof(EmitTypeConvesionExpression)} didn't know how to handle conversion '{conv.Type}' to '{conv.Expression.Type}'");
     }
 
@@ -474,8 +526,24 @@ public sealed class Emitter{
         }
     }
 
+    private void EmitObjectExpression(ILProcessor processor, BoundObjectInitExpression init)
+    {
+        if (!_typeInfoOf.TryGetValue(init.Type, out var typeInfo))
+            throw new Exception($"{nameof(Emitter)} - Something went wrong, there was no type information for '{init.Type}'");
+        
+        processor.Emit(OpCodes.Newobj, typeInfo.Constructor);
+        foreach(var (mSymbol, expr) in init.InitializedMembers)
+        {
+            processor.Emit(OpCodes.Dup);
+            EmitExpression(processor, expr);
+            processor.Emit(OpCodes.Stfld, typeInfo.SymbolToField[mSymbol]);
+        }
+
+    }
+
     private void EmitAssignmentExpression(ILProcessor processor, BoundAssignmentExpression assignment)
     {
+        VariableDefinition tmpVar;
         switch(assignment.Access)
         {
             case BoundNameAccess name:
@@ -496,7 +564,7 @@ public sealed class Emitter{
                     var rhsType = CilTypeOf(assignment.RightHandSide.Type);
                     //introduces a local variable, because 'System.Void ArrayList::set_Item(int32,object)' eats the right-hand-side
                     //And we cannot emit the right hand side again, since it may mutate other state...
-                    var tmpVar = new VariableDefinition(rhsType);
+                    tmpVar = new VariableDefinition(rhsType);
                     processor.Body.Variables.Add(tmpVar);
                     EmitLoadAccess(processor, sa.Target);
                     EmitExpression(processor, sa.Index);
@@ -509,6 +577,22 @@ public sealed class Emitter{
                     return;
                 }
                 throw new NotImplementedException($"{nameof(EmitAssignmentExpression)} doesn't allow assignments into type '{assignment.Access.Type}'");
+            case BoundMemberAccess bma and {Member: MemberFieldSymbol fSymbol}:
+                var typeInfo = _typeInfoOf[bma.Target.Type];
+                var fieldRef = typeInfo.SymbolToField[fSymbol];
+                //TODO: can we avoid the temporary variable, or is it possible to reuse them?
+                tmpVar = new VariableDefinition(CilTypeOf(assignment.RightHandSide.Type));
+                processor.Body.Variables.Add(tmpVar);
+
+                EmitLoadAccess(processor, bma.Target);
+                EmitExpression(processor, assignment.RightHandSide);
+                processor.Emit(OpCodes.Dup);
+                processor.Emit(OpCodes.Stloc, tmpVar);
+                processor.Emit(OpCodes.Stfld, fieldRef);
+                processor.Emit(OpCodes.Ldloc, tmpVar);
+                break;
+            default:
+                throw new NotImplementedException($"{nameof(EmitAssignmentExpression)} - doesn't know how to do {assignment.Access}");
         }
     }
 
@@ -618,7 +702,7 @@ public sealed class Emitter{
     {
         var leftType = binary.Left.Type;
         var rightType = binary.Right.Type;
-        if(binary.Operator.Kind == LogicAND || binary.Operator.Kind == LogicaOR)
+        if(binary.Operator.Kind == LogicAND || binary.Operator.Kind == LogicOR)
         {
             EmitLogicalAndOR(processor, binary);
             return;
@@ -864,7 +948,11 @@ public sealed class Emitter{
                     EmitBuiltinTypeMember(processor, access.Type, mba.Member);
                     return;
                 }
-                throw new NotImplementedException($"{nameof(Emitter)} doesn't know how to emit '{access.Type}.{mba.Member}' yet");
+                if(!_typeInfoOf[access.Type].SymbolToField.TryGetValue(mba.Member, out var @field))
+                    throw new Exception($"{nameof(Emitter)} - Something went wrong, could not find field definition for '{access.Type}.{mba.Member}'");
+                processor.Emit(OpCodes.Ldfld, @field);
+                return;
+                //throw new NotImplementedException($"{nameof(Emitter)} doesn't know how to emit '{access.Type}.{mba.Member}' yet");
             case BoundSubscriptAccess sa:
                 if(sa.Target.Type == TypeSymbol.String || sa.Target.Type is ListTypeSymbol)
                 {

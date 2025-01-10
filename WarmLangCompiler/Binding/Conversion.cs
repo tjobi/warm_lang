@@ -11,6 +11,7 @@ public sealed class Conversion
     public static readonly Conversion Explicit = new (true, true, false);
     public static readonly Conversion Identity = new(true, false, true);
 
+    public static readonly TypeSymbol WLString = TypeSymbol.String; 
 
     public Conversion(bool exists, bool isExplicit, bool isIdentity)
     {
@@ -28,32 +29,35 @@ public sealed class Conversion
 
     public static Conversion GetConversion(TypeSymbol from, TypeSymbol to)
     {
+        //Any CLI reference type is nullable - for now
+        if(from == Null && !to.IsValueType) return Implicit;
+
         if(from == to)
             return Identity;
         
         if(from == Int)
-            if(to == TypeSymbol.String || to == Bool)
+            if(to == WLString || to == Bool)
                 return Explicit;
         
         if(from == Bool)
-            if(to == TypeSymbol.String || to == Int)
+            if(to == WLString || to == Int)
                 return Explicit;
 
-        if(from == TypeSymbol.String)
+        if(from == WLString)
         {
             if(to == Int)
                 return Explicit;
         }
-
-        if(from is ListTypeSymbol && to == TypeSymbol.String)
-            return Explicit;
 
         if(from.ResolveDeelpyNestedType() == EmptyList && to is ListTypeSymbol)
         {
             return Implicit;
         }
 
-        //There is no conversion
+        //Everything is explicitly convertible to a string - Could even remove the checks for Int and Bool above 
+        if(from != WLString && from != Error && to == WLString)
+            return Explicit;
+
         return None;
     }
 

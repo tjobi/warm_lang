@@ -1,14 +1,12 @@
 namespace WarmLangCompiler.Binding.BoundAccessing;
 
-public sealed class BoundSubscriptAccess : BoundAccess
+public sealed class BoundSubscriptAccess : BoundTargetedAccess
 {
-    public BoundSubscriptAccess(BoundAccess target, BoundExpression index) : base(target.Type.NestedTypeOrThis())
+    public BoundSubscriptAccess(BoundAccess target, BoundExpression index) : base(target, target.Type.NestedTypeOrThis())
     {
-        Target = target;
         Index = index;
     }
-
-    public BoundAccess Target { get; }
     public BoundExpression Index { get; }
-    public override bool HasNested => true;
+
+    public override string ToString() => $"(SubscriptAccess {Target}[{Index}])";
 }

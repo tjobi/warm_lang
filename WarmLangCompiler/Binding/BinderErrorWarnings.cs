@@ -20,12 +20,18 @@ internal static class BinderErrorWarnings
 
     internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
     {
-        var message = $"A variable or function named '{name}' is already defined in this scope";
+        var message = $"A variable, function, or type named '{name}' is already defined in this scope";
         bag.Report(message, true, location);
     }
 
     internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, SyntaxToken token)
     => ReportNameAlreadyDeclared(bag,token.Location, token.Name!);
+
+    internal static void ReportTypeAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
+    {
+        var message = $"A type named '{name}' is already defined";
+        bag.Report(message, true, location);
+    }
 
     internal static void ReportNameDoesNotExist(this ErrorWarrningBag bag, TextLocation location, string name)
     {
@@ -154,5 +160,29 @@ internal static class BinderErrorWarnings
     {
         var message = $"Member functions cannot take 0 parameters. The member function '{name}' must a parameter of type '{owner}' as its first";
         bag.Report(message, true, funcLocation);
+    }
+
+    internal static void ReportTypeNotFound(this ErrorWarrningBag bag, SyntaxToken typeNameToken)
+    {
+        var message = $"The type '{typeNameToken.Name}' could not be found (are you sure it is spelt right?)";
+        bag.Report(message, true, typeNameToken.Location);
+    }
+
+    internal static void ReportCannotInstantiateBuiltinWithNew(this ErrorWarrningBag bag, SyntaxToken guiltyToken)
+    {
+        var message = $"The type '{guiltyToken.Kind.ToTypeSymbol()}' cannot be instantiated with new, it is a built-in";
+        bag.Report(message, true, guiltyToken.Location);
+    }
+
+    internal static void ReportTypeHasNoSuchMember(this ErrorWarrningBag bag, TypeSymbol type, SyntaxToken member)
+    {
+        var message = $"The type '{type}' contains no definition for '{member.Name}' (are you sure it is spelt right?)";
+        bag.Report(message, true, member.Location);
+    }
+
+    internal static void ReportCannotAssignToReadonlyMember(this ErrorWarrningBag bag, TypeSymbol type, string memberName, TextLocation location)
+    {
+        var message = $"Cannot assign to field '{type}.{memberName}' -- it is readonly";
+        bag.Report(message, true, location);
     }
 }
