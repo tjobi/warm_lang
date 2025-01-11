@@ -7,11 +7,13 @@ public sealed class CilTypeManager
 {
     private readonly Dictionary<TypeSymbol, TypeReference> toCILType;
 
+    private record CachedSignature(TypeSymbol Type, string Name, int Arity);
     private readonly Dictionary<CachedSignature, MethodReference> methodCache;
+    
     private readonly TypeReference genericList;
     private readonly AssemblyDefinition mscorlib, assemblyDef;
 
-    public ListMethodHelper ListHelper {get;}
+    public ListMethodHelper ListHelper { get; }
 
     public CilTypeManager(AssemblyDefinition mscorlib, AssemblyDefinition programAssembly)
     {
@@ -88,45 +90,8 @@ public sealed class CilTypeManager
         return methodCache[signature] = specializedMethod;
     }
 
-    public MethodReference GetConstructor(TypeSymbol type) => GetSpecializedMethod(type, ".ctor", 0);
-
-    /*
-        var genericList = _mscorlib.MainModule.GetType("System.Collections.Generic.List`1");
-        var genericRef =  _assemblyDef.MainModule.ImportReference(genericList);
-        var intRef = genericRef.MakeGenericInstanceType(CilTypeOf(TypeSymbol.Int));
-        var genericCtr = GetMethodFromTypeDefinition(genericList, ".ctor", GetCilParamNames());
-        var intCtor = new MethodReference(genericCtr.Name, genericCtr.ReturnType, intRef){HasThis = genericCtr.HasThis};
-
-        var genericAdd = genericRef.Resolve().Methods.First(m => m.Name == "Add" && m.Parameters.Count == 1);
-        var intAdd = new MethodReference(genericAdd.Name, genericAdd.ReturnType, intRef){HasThis = genericAdd.HasThis};
-        intAdd.Parameters.Add(genericAdd.Parameters[0]);
-
-
-        var l = new VariableDefinition(intRef);
-        main.Body.Variables.Add(l);
-        foreach(var i in main.Body.Variables)
-        {
-            Console.WriteLine(i.VariableType);
-        }
-
-        var p = main.Body.GetILProcessor();
-        p.RemoveAt(main.Body.Instructions.Count-1);
-        p.Emit(OpCodes.Newobj, intCtor);
-        p.Emit(OpCodes.Stloc, l);
-
-        p.Emit(OpCodes.Ldloc, l);
-        p.Emit(OpCodes.Ldc_I4_1);
-        p.Emit(OpCodes.Call, intAdd);
-        // p.Emit(OpCodes.Pop);
-        p.Emit(OpCodes.Ret);
-        main.Body.Optimize();
-
-        foreach(var i in main.Body.Instructions)
-        {
-            Console.WriteLine(i);
-        }
-    */
-    private record CachedSignature(TypeSymbol Type, string Name, int Arity);
+    public MethodReference GetConstructor(TypeSymbol type, int arity = 0) 
+        => GetSpecializedMethod(type, ".ctor", arity);
 }
 public class ListMethodHelper
 {
@@ -136,7 +101,6 @@ public class ListMethodHelper
     {
         this.manager = manager;
     }
-
 
     private ListTypeSymbol EnsureList(TypeSymbol t)
     {

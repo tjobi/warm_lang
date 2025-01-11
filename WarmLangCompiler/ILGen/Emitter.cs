@@ -43,8 +43,7 @@ public sealed class Emitter{
 
     private readonly CilTypeManager _cilTypeManager;
     private readonly ListMethodHelper _listMethods;
-    private readonly Dictionary<TypeSymbol, TypeReference> _cilTypes;
-    private TypeReference CilTypeOf(TypeSymbol type) => _cilTypeManager.GetType(type);//_cilTypes[type.AsRecognisedType()];
+    private TypeReference CilTypeOf(TypeSymbol type) => _cilTypeManager.GetType(type);
 
     public FunctionBodyState BodyState => _bodyStateStack.Peek();
     public FunctionBodyState ParentState()
@@ -60,7 +59,6 @@ public sealed class Emitter{
         _debug = debug;
         _diag = diag;
         _funcs = new();
-        _cilTypes = new();
         _bodyStateStack = new();
         _globals = new();
         _funcClosure = new();
@@ -83,7 +81,6 @@ public sealed class Emitter{
                 if(t is not null)
                 {
                     var typeRef = _assemblyDef.MainModule.ImportReference(t);
-                    _cilTypes[type] = typeRef;
                     _cilTypeManager.Add(type, typeRef);
                     break;
                 }
@@ -91,7 +88,7 @@ public sealed class Emitter{
         }
 
         // IL -> ".class private auto ansi beforefieldinit abstract sealed Program extends [mscorlib]System.Object {"
-        var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[CILBaseTypeSymbol]);
+        var systemObject = _assemblyDef.MainModule.ImportReference(CilTypeOf(CILBaseTypeSymbol));
         _program = new TypeDefinition(WARM_LANG_NAMESPACE, "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, systemObject);
         _assemblyDef.MainModule.Types.Add(_program);
 
@@ -247,7 +244,7 @@ public sealed class Emitter{
         var TYPE_ATTRIBUTES = TypeAttributes.Public | TypeAttributes.AnsiClass 
                               | TypeAttributes.Sealed | TypeAttributes.AutoLayout
                               | TypeAttributes.BeforeFieldInit;
-        var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, _cilTypes[CILBaseTypeSymbol]);
+        var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, CilTypeOf(CILBaseTypeSymbol));
         _assemblyDef.MainModule.Types.Add(typeDef);
 
         //TODO: Must constructor call Dotnet.Object.ctor()?
@@ -261,7 +258,6 @@ public sealed class Emitter{
         bp.Emit(OpCodes.Ret);
         ctor.Body.OptimizeMacros();
 
-        _cilTypes[type] = typeDef;
         _cilTypeManager.Add(type, typeDef);
         var memberFields = new Dictionary<MemberSymbol, FieldReference>();
         foreach(var member in members)
