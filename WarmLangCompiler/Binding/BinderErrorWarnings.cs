@@ -110,7 +110,7 @@ internal static class BinderErrorWarnings
 
     internal static void ReportTypeOfEmptyListMustBeExplicit(this ErrorWarrningBag bag, TextLocation location)
     {
-        var message = $"The type of empty list must be explicit unless used for variable declaration";
+        var message = $"The type of empty list must be explicit unless used for variable declaration. Looks like '[]int' for int";
         bag.Report(message, true, location);
     }
 

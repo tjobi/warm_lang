@@ -583,7 +583,10 @@ public sealed class Binder
             if(le.ElementType is null)
             {
                 if(!allowimplicitListType)
+                {
                     _diag.ReportTypeOfEmptyListMustBeExplicit(le.Location);
+                    return new BoundErrorExpression(le);
+                }
             }
             else
                 type = new ListTypeSymbol(le.ElementType.ToTypeSymbol());
