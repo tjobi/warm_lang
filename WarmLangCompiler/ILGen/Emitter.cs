@@ -23,7 +23,6 @@ public sealed class Emitter{
 
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _stringConcat, _stringEqual, _stringSubscript;
-    private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany, _listLength;
     private readonly MethodReference _objectEquals, _objectCtor, _wlEquals, _wlToString;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
@@ -97,29 +96,22 @@ public sealed class Emitter{
 
         _builtInFunctions = ResolveBuiltInMethods(_mscorlib);
 
-        // Needed for the implemenatation of __wl_tostring
-        var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
-        var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(CILBaseTypeSymbol));
         
         var dotnetString = _mscorlib.MainModule.GetType("System.String");
         _stringConcat    = GetMethodFromTypeDefinition(dotnetString, "Concat", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
         _stringEqual     = GetMethodFromTypeDefinition(dotnetString, "op_Equality", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
         _stringSubscript = GetMethodFromTypeDefinition(dotnetString, "get_Chars", GetCilParamNames(TypeSymbol.Int));
 
-        var dotnetArrayList = _mscorlib.MainModule.GetType("System.Collections.ArrayList");
-        _listEmpty      = GetMethodFromTypeDefinition(dotnetArrayList, ".ctor", GetCilParamNames());
-        _listAdd        = GetMethodFromTypeDefinition(dotnetArrayList, "Add", GetCilParamNames(CILBaseTypeSymbol));
-        _listRemove     = GetMethodFromTypeDefinition(dotnetArrayList, "RemoveAt", GetCilParamNames(TypeSymbol.Int));
-        _listSubscript  = GetMethodFromTypeDefinition(dotnetArrayList, "get_Item", GetCilParamNames(TypeSymbol.Int));
-        _listSet        = GetMethodFromTypeDefinition(dotnetArrayList, "set_Item", GetCilParamNames(TypeSymbol.Int, CILBaseTypeSymbol));
-        _listAddMany    = GetMethodFromTypeDefinition(dotnetArrayList, "AddRange", new[]{"System.Collections.ICollection"});
-        _listLength     = GetMethodFromTypeDefinition(dotnetArrayList, "get_Count", GetCilParamNames());
-
         var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
         _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(CILBaseTypeSymbol, CILBaseTypeSymbol));
         _objectCtor   = GetMethodFromTypeDefinition(dotnetObject, ".ctor", GetCilParamNames());
 
-        var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, toStringConvert, _objectEquals, _stringConcat);
+
+        // Needed for the implemenatation of __wl_tostring
+        var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
+        var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(CILBaseTypeSymbol));
+
+        var functionHelper = new WLRuntimeFunctionHelper(_program, _stringEqual, _objectEquals, toStringConvert, _cilTypeManager);
         //functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
         _wlEquals = functionHelper.CreateWLEquals();
         _wlToString = functionHelper.CreateWLToString();
