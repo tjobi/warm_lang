@@ -62,7 +62,9 @@ public class BinderTests
         var vardecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"), ConstCreater(5));
         var input = MakeRoot(vardecl);    
         var expected = CreateBoundProgram(
-            new BoundVarDeclaration(vardecl, new GlobalVariableSymbol("x", TypeSymbol.Int), new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int))
+            new BoundVarDeclaration(vardecl, 
+                new GlobalVariableSymbol("x", TypeSymbol.Int), 
+                new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int))
         );
 
         var boundProgram = _binder.BindProgram(input);
@@ -111,15 +113,17 @@ public class BinderTests
         var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),MakeToken(TBracketRight,1,1), null);
         var varDecl = new VarDeclaration(_syntaxIntList,MakeVariableToken("x"),rhs);
         var input = MakeRoot(varDecl);
+        
+        var placeholderType = new PlaceholderTypeSymbol();
+        placeholderType.Union(TypeSymbol.Int);
+        
         var expected = CreateBoundProgram(
-            new BoundVarDeclaration(varDecl,new GlobalVariableSymbol("x", TypeSymbol.IntList),
-                    new BoundTypeConversionExpression(rhs, TypeSymbol.IntList,
-                        new BoundListExpression(
-                            rhs,
-                            TypeSymbol.EmptyList, new ImmutableArray<BoundExpression>())
-                    )
-                )
-        );
+            new BoundVarDeclaration(varDecl, new GlobalVariableSymbol("x", TypeSymbol.IntList),
+                    new BoundListExpression(
+                        rhs,
+                        new ListTypeSymbol(placeholderType), 
+                        ImmutableArray<BoundExpression>.Empty)
+        ));
         
         var boundProgram = _binder.BindProgram(input);
 
@@ -188,7 +192,7 @@ public class BinderTests
     }
 
     [Fact]
-    public void BindListConcatenationWithEmptyListWithNoExplicitTypeFails()
+    public void BindListConcatenationWithEmptyListWithNoExplicitTypeSucceeds()
     {
         // [] + [2];
         var left = new ListInitExpression(MakeToken(TCurLeft,1,1), MakeToken(TCurRight,1,1), null);
@@ -202,23 +206,35 @@ public class BinderTests
         var exprStatement = new ExprStatement(binaryExpression);
         var input = MakeRoot(exprStatement);
 
+        var placeholderType = new PlaceholderTypeSymbol();
+        placeholderType.Union(TypeSymbol.Int);
+        
+        var leftType = new ListTypeSymbol(placeholderType);
+
         var expected = CreateBoundProgram(
             new BoundExprStatement(
-                exprStatement, 
-                new BoundErrorExpression(binaryExpression)));
+                exprStatement,
+                new BoundBinaryExpression(binaryExpression,
+                new BoundListExpression(left, leftType, ImmutableArray<BoundExpression>.Empty),
+                new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, leftType, TypeSymbol.IntList, leftType),
+                new BoundListExpression(right, TypeSymbol.IntList, 
+                    new List<BoundExpression>{new BoundConstantExpression(two, TypeSymbol.Int)}.ToImmutableArray()
+                )
+            )));
         
         var boundProgram = _binder.BindProgram(input);
-        var expectedBag = new ErrorWarrningBag();
-        expectedBag.ReportBinaryOperatorCannotBeApplied(new TextLocation(1,1), plus, TypeSymbol.EmptyList, TypeSymbol.IntList);
-        expectedBag.ReportTypeOfEmptyListMustBeExplicit(new TextLocation(1,1));
+        // var expectedBag = new ErrorWarrningBag();
+        // expectedBag.ReportBinaryOperatorCannotBeApplied(new TextLocation(1,1), plus, TypeSymbol.EmptyList, TypeSymbol.IntList);
+        // expectedBag.ReportTypeOfEmptyListMustBeExplicit(new TextLocation(1,1));
 
         boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
         boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
         
-        _diag.Count().Should().Be(2);
-        _diag.Should().BeEquivalentTo(
-            expectedBag, 
-            opt => opt.Including(we => we.Message)
-                      .Including(we => we.IsError));
+        _diag.Count().Should().Be(0);
+        // _diag.Count().Should().Be(2);
+        // _diag.Should().BeEquivalentTo(
+        //     expectedBag, 
+        //     opt => opt.Including(we => we.Message)
+        //               .Including(we => we.IsError));
     }
 }

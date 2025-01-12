@@ -39,7 +39,7 @@ public static class EmitterTypeSymbolHelpers
     public static string ToCilName(this TypeSymbol type) => _toCIL[type.AsRecognisedType()];
 
     public static TypeSymbol AsRecognisedType(this TypeSymbol type)
-        => type is ListTypeSymbol || type == TypeSymbol.EmptyList ? _list : type;
+        => type is ListTypeSymbol ? _list : type;
     public static bool NeedsBoxing(this TypeSymbol type) => type == TypeSymbol.Bool || type == TypeSymbol.Int; 
 
 }

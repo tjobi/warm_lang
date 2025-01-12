@@ -564,6 +564,7 @@ public sealed class Binder
             //this mutes any errors that follow as a result of left/right being errors
             return new BoundErrorExpression(binaryExpr);
         }
+        Union(boundLeft.Type, boundRight.Type);
 
         var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Operator.Kind, boundLeft, boundRight);
         
@@ -575,21 +576,56 @@ public sealed class Binder
         return new BoundBinaryExpression(binaryExpr,boundLeft, boundOperator, boundRight);
     }
 
+    private static void Union(TypeSymbol a, TypeSymbol b)
+    {
+        switch (a,b) 
+        {
+            case (PlaceholderTypeSymbol aa, PlaceholderTypeSymbol bb):
+                if(aa.ActualType is null && bb.ActualType is null)
+                    aa.Union(bb);
+                else if(aa.ActualType is not null && bb.ActualType is null)
+                    bb.Union(aa.ActualType);
+                else if(aa.ActualType is null && bb.ActualType is not null)
+                    aa.Union(bb.ActualType);
+                else //neither are null
+                    throw new Exception($"Something is wrong here - neither '{aa}' nor '{bb}' is null");
+                break;
+            case (PlaceholderTypeSymbol aa, ListTypeSymbol l):
+                aa.Union(l.InnerType);
+                break;
+            case (ListTypeSymbol l, PlaceholderTypeSymbol bb):
+                bb.Union(l.InnerType);
+                break;
+            case (PlaceholderTypeSymbol aa,_):
+                aa.Union(b);
+                break;
+            case (_,PlaceholderTypeSymbol bb):
+                bb.Union(a);
+                break;
+            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut1}, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut2}):
+                Union(ut1, ut2);
+                break;
+            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut1}, ListTypeSymbol lb):
+                Union(ut1, lb.InnerType);
+                break;
+            case (ListTypeSymbol la, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut1}):
+                Union(la.InnerType, ut1);
+                break;
+            case (ListTypeSymbol la, ListTypeSymbol lb):
+                Union(la.InnerType, lb.InnerType);
+                break;
+        }
+    }
+
     private BoundExpression BindListInitExpression(ListInitExpression le, bool allowimplicitListType)
     {
         if(le.IsEmptyList)
         {
-            var type = TypeSymbol.EmptyList;
-            if(le.ElementType is null)
-            {
-                if(!allowimplicitListType)
-                {
-                    _diag.ReportTypeOfEmptyListMustBeExplicit(le.Location);
-                    return new BoundErrorExpression(le);
-                }
-            }
-            else
-                type = new ListTypeSymbol(le.ElementType.ToTypeSymbol());
+            TypeSymbol type;
+            //It was an implicitly typed empty list []
+            if(le.ElementType is null) type = ListTypeSymbol.CreateEmptyList();
+            else type = new ListTypeSymbol(le.ElementType.ToTypeSymbol());
+
             return new BoundListExpression(le, type, ImmutableArray<BoundExpression>.Empty);
         }
 
@@ -664,6 +700,8 @@ public sealed class Binder
 
     private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to, bool allowExplicit = false)
     {
+        Union(expr.Type, to);
+        
         var conversion = Conversion.GetConversion(expr.Type, to);
         if(!conversion.Exists)
         {
