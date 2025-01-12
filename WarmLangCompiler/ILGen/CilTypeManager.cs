@@ -1,6 +1,7 @@
 using WarmLangCompiler.Symbols;
 using Mono.Cecil;
 using Mono.Cecil.Rocks;
+using WarmLangLexerParser.ErrorReporting;
 namespace WarmLangCompiler.ILGen;
 
 public sealed class CilTypeManager 
@@ -12,17 +13,18 @@ public sealed class CilTypeManager
     
     private readonly TypeReference genericList;
     private readonly AssemblyDefinition mscorlib, assemblyDef;
+    private readonly ErrorWarrningBag _diag;
 
     public ListMethodHelper ListHelper { get; }
 
-    public CilTypeManager(AssemblyDefinition mscorlib, AssemblyDefinition programAssembly)
+    public CilTypeManager(AssemblyDefinition mscorlib, AssemblyDefinition programAssembly, ErrorWarrningBag diag)
     {
         toCILType = new();
         methodCache = new();
         ListHelper = new(this);
         this.mscorlib = mscorlib;
         assemblyDef = programAssembly;
-
+        _diag = diag;
         var baseList = mscorlib.MainModule.GetType("System.Collections.Generic.List`1");
         genericList = assemblyDef.MainModule.ImportReference(baseList);
     }
@@ -42,6 +44,10 @@ public sealed class CilTypeManager
 
     private TypeReference GetSpecializedTypeDefinition(TypeSymbol type)
     {
+        if(type is PlaceholderTypeSymbol p && p.ActualType is null)
+        {
+            throw new Exception("Cannot emit placeholder type that has no actual type!");
+        }
         if(type is not ListTypeSymbol l) 
         {
             var msg = $"'{nameof(CilTypeManager)}.{nameof(GetSpecializedTypeDefinition)}' doesn't know type of '{type}'";

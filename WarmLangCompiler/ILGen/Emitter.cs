@@ -69,7 +69,7 @@ public sealed class Emitter{
         
         // IL -> ".assembly extern mscorlib {}"
         _mscorlib = ReadMscorlib();
-        _cilTypeManager = new(_mscorlib, _assemblyDef);
+        _cilTypeManager = new(_mscorlib, _assemblyDef, _diag);
         _listMethods = _cilTypeManager.ListHelper;
         
         foreach(var type in BuiltInTypes())
@@ -111,10 +111,13 @@ public sealed class Emitter{
         var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
         var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(CILBaseTypeSymbol));
 
-        var functionHelper = new WLRuntimeFunctionHelper(_program, _stringEqual, _objectEquals, toStringConvert, _cilTypeManager);
-        //functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
-        _wlEquals = functionHelper.CreateWLEquals();
-        _wlToString = functionHelper.CreateWLToString();
+        var functionHelper = new WLRuntimeFunctionHelper(_program, _mscorlib, 
+                                                         _assemblyDef, _stringEqual, 
+                                                         _objectEquals, toStringConvert, 
+                                                         _stringConcat, _cilTypeManager);
+        
+        _wlEquals = functionHelper.WLEquals;
+        _wlToString = functionHelper.WLToString;
     }
 
     private ImmutableDictionary<FunctionSymbol, MethodReference> ResolveBuiltInMethods(AssemblyDefinition mscorlib)
@@ -1017,7 +1020,11 @@ public sealed class Emitter{
     {
         if (stateOfFuncBody.SharedLocals.Count > 0) //Does the function share locals? Then add a closure
         {
-            var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, CilTypeOf(CILClosureType));
+            var closureType = new TypeDefinition("", $"closure_{func.Name}", 
+                                                 TypeAttributes.NestedPrivate | TypeAttributes.Sealed 
+                                                 | TypeAttributes.SequentialLayout 
+                                                 | TypeAttributes.AnsiClass, 
+                                                 CilTypeOf(CILClosureType));
             _program.NestedTypes.Add(closureType);
             var closureVariable = new VariableDefinition(closureType);
             ilProcessor.Body.Variables.Add(closureVariable);

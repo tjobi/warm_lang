@@ -114,7 +114,7 @@ public class BinderTests
         var varDecl = new VarDeclaration(_syntaxIntList,MakeVariableToken("x"),rhs);
         var input = MakeRoot(varDecl);
         
-        var placeholderType = new PlaceholderTypeSymbol();
+        var placeholderType = new PlaceholderTypeSymbol(1);
         placeholderType.Union(TypeSymbol.Int);
         
         var expected = CreateBoundProgram(
@@ -206,7 +206,7 @@ public class BinderTests
         var exprStatement = new ExprStatement(binaryExpression);
         var input = MakeRoot(exprStatement);
 
-        var placeholderType = new PlaceholderTypeSymbol();
+        var placeholderType = new PlaceholderTypeSymbol(1);
         placeholderType.Union(TypeSymbol.Int);
         
         var leftType = new ListTypeSymbol(placeholderType);

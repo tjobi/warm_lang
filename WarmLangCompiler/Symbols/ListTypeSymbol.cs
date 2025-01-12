@@ -2,7 +2,7 @@ namespace WarmLangCompiler.Symbols;
 
 public sealed class ListTypeSymbol : TypeSymbol
 {
-    public static ListTypeSymbol CreateEmptyList() => new(new PlaceholderTypeSymbol());
+    public static ListTypeSymbol CreateEmptyList(int depth = 0) => new(new PlaceholderTypeSymbol(depth));
 
     public ListTypeSymbol(string name, TypeSymbol innerType) : base(name)
     {
@@ -63,19 +63,25 @@ public sealed class ListTypeSymbol : TypeSymbol
 public sealed class PlaceholderTypeSymbol : TypeSymbol
 {
     public TypeSymbol? ActualType { get; private set;}
-    public PlaceholderTypeSymbol() : base("unknown") { }
+    public int Depth { get; }
+
+    public PlaceholderTypeSymbol(int depth) : base($"unknown-{depth}")
+    {
+        Depth = depth;
+    }
 
     public void Union(TypeSymbol a) => ActualType = a;
 
+    private bool Wins() => ActualType is not null && ActualType is PlaceholderTypeSymbol pt && pt.Depth <= Depth;
     public override TypeSymbol Resolve()
     {
-        if(ActualType is null) return this;
+        if(ActualType is null || Wins()) return this;
         return ActualType.Resolve();
     }
 
     public override string ToString()
     {
-        if(ActualType is null) return base.ToString();
+        if(ActualType is null || Wins()) return base.ToString();
         return $"Wrapped({ActualType})";
     }
 }
