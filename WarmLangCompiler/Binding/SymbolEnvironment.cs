@@ -10,6 +10,8 @@ public sealed class SymbolEnvironment
 
     public Dictionary<string, EntitySymbol> GlobalScope => _scopeStack[0];
 
+    public int Depth => _scopeStack.Count;
+
     public SymbolEnvironment(BinderTypeHelper typeHelper)
     {
         _scopeStack = new();

@@ -1,14 +1,10 @@
 int[] xs = [1,2,3];
-int xsLength = 3;
 
-function safeIndex(int i) int
-{
-    if xsLength < i {
-        xsLength-1;
+function safeIndex(int i) int {
+    if xs.len < i {
+        return xs.len-1;
     }
-    else {
-        i;
-    }
+    return i;
 }
-
+xs = xs + [];
 xs[safeIndex(5000)];

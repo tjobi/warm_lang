@@ -1,16 +1,18 @@
-function makeArr(int size, int step, int start) int[]
+function makeArr(int start, int size, int step) int[]
 {
     function inner(int i, int cur, int[] res) int[]
     {
         if i < size {
             int next = cur + step;
-            inner(i+1, next, res :: next);
+            return inner(i+1, next, res :: next);
         } 
-        else {
-            res;
-        }
+        return res;
     }
-    inner(0,start, []);
+    return inner(0,start,[]);
 }
 
-makeArr(10,2,0);
+function main () 
+{
+    // [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+    stdWriteLine(string(makeArr(0,10,2)));
+}

@@ -1,6 +1,5 @@
 namespace WarmLangCompiler.ILGen;
 
-using System.Diagnostics.CodeAnalysis;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
@@ -9,41 +8,58 @@ using WarmLangCompiler.Symbols;
 public class WLRuntimeFunctionHelper
 {
     private readonly TypeDefinition _program;
-    private readonly Func<TypeSymbol, TypeReference> _cilTypeOf;
-    private readonly MethodReference _listLength;
-    private readonly MethodReference _listSubscript;
     private readonly MethodReference _stringEqual;
-    private readonly MethodReference _toStringConvert;
+    private readonly MethodReference _toStringConvert, _stringConcat;
+    private readonly CilTypeManager typeManager;
     private readonly MethodReference _objEquals;
-    private readonly MethodReference _stringConcat;
-    
-    private MethodReference? _debugPrint;
-    private bool _debug;
+    private readonly MethodReference _listLength, _listSubscript;
+    private readonly TypeReference _listType;
+    private readonly bool _debug;
 
-    public WLRuntimeFunctionHelper(TypeDefinition program, Func<TypeSymbol, TypeReference> cilTypeOf, MethodReference listLength, MethodReference listSubscript, MethodReference stringEqual, MethodReference toString, MethodReference objEquals, MethodReference stringConcat)
+    public MethodDefinition WLToString { get; }
+    public MethodDefinition WLEquals { get; }
+
+    public WLRuntimeFunctionHelper(TypeDefinition program,         AssemblyDefinition mscorlib, 
+                                   AssemblyDefinition assemblyDef, MethodReference stringEqual, 
+                                   MethodReference objEquals,      MethodReference toString, 
+                                   MethodReference stringConcat,   CilTypeManager typeManager, 
+                                   bool debug = false)
     {
         _program = program;
-        _cilTypeOf = cilTypeOf;
-        _listLength = listLength;
-        _listSubscript = listSubscript;
-        _stringEqual = stringEqual;
         _toStringConvert = toString;
+        this.typeManager = typeManager;
         _objEquals = objEquals;
+        _stringEqual = stringEqual;
+        _debug = debug;
         _stringConcat = stringConcat;
-        _debug = false;
-    }
 
-    public void EnableDebugging(MethodReference writeLine)
-    {
-        _debugPrint = writeLine;
-        _debug = true;
-    }
+        //TODO: This shouldn't exist here.
+        // should generate this function for types ... 
+        var dotnetICollection = mscorlib.MainModule.GetType("System.Collections.ICollection");
+        var dotnetIList = mscorlib.MainModule.GetType("System.Collections.IList");
+        _listType = assemblyDef.MainModule.ImportReference(dotnetIList);
 
-    public MethodDefinition CreateWLEquals()
+        var tmpLength= dotnetICollection
+                      .Methods
+                      .First(m => m.Name == "get_Count" && m.Parameters.Count == 0);
+        _listLength = assemblyDef.MainModule.ImportReference(tmpLength);
+
+        var tmpSubscri = dotnetIList
+                        .Methods
+                        .First(m => m.Name == "get_Item" && m.Parameters.Count == 1);
+        _listSubscript = assemblyDef.MainModule.ImportReference(tmpSubscri);
+
+        WLEquals = CreateWLEquals();
+        WLToString = CreateWLToString();
+    }
+    
+    private MethodDefinition CreateWLEquals()
     {
-        var wlEqualsDef = new MethodDefinition("__wl_equals", MethodAttributes.Public | MethodAttributes.Static, _cilTypeOf(TypeSymbol.Bool));
+        var wlEqualsDef = new MethodDefinition("__wl_equals", 
+                                               MethodAttributes.Public | MethodAttributes.Static, 
+                                               typeManager.GetType(TypeSymbol.Bool));
         _program.Methods.Add(wlEqualsDef);
-        var dotnetObject = _cilTypeOf(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
+        var dotnetObject = typeManager.GetType(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
         var arg1 = new ParameterDefinition("arg1", ParameterAttributes.None, dotnetObject);
         var arg2 = new ParameterDefinition("arg2", ParameterAttributes.None, dotnetObject);
         wlEqualsDef.Parameters.Add(arg1);
@@ -54,41 +70,40 @@ public class WLRuntimeFunctionHelper
         var processor = body.GetILProcessor();
         var returnInstr = processor.Create(OpCodes.Ret);
 
-        //if(arg1 is ArrayList && arg2 is ArrayList)
+        // if(arg1 is ArrayList && arg2 is ArrayList)
         //  if(!(arg1.Count == arg2.Count)) return false;    
         //  for(int i = 0; i < arg1.Count; i++)
         //          if( !wlEquals(arg1[i], arg2[i])) return false;
-        //if(arg1 is string && arg2 is string)
+        // if(arg1 is string && arg2 is string)
         //  return string.op_equals(arg1,arg2);
-        //return arg1 == arg2;
-        var listTypeRef = _cilTypeOf(new ListTypeSymbol(TypeSymbol.Void));  // TODO: list<void> it just needs to be any list!
+        // return arg1 == arg2;
 
         processor.Emit(OpCodes.Ldarg, arg1);
-        processor.Emit(OpCodes.Isinst, listTypeRef);  
+        processor.Emit(OpCodes.Isinst, _listType);  
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Cgt_Un);
 
         processor.Emit(OpCodes.Ldarg, arg2);
-        processor.Emit(OpCodes.Isinst, listTypeRef);
+        processor.Emit(OpCodes.Isinst, _listType);
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Cgt_Un);
         processor.Emit(OpCodes.And);
         var lstBreak = processor.Create(OpCodes.Brfalse, processor.Create(OpCodes.Nop));
         processor.Append(lstBreak);
 
-        //if(arg1.Count != arg2.Count)
-        var arg1Count = new VariableDefinition(listTypeRef);
-        var arg1asList = new VariableDefinition(listTypeRef);
-        var arg2asList = new VariableDefinition(listTypeRef);
+        // if(arg1.Count != arg2.Count)
+        var arg1Count = new VariableDefinition(_listType);
+        var arg1asList = new VariableDefinition(_listType);
+        var arg2asList = new VariableDefinition(_listType);
         body.Variables.Add(arg1Count);
         body.Variables.Add(arg1asList);
         body.Variables.Add(arg2asList);
         
         processor.Emit(OpCodes.Ldarg, arg1);
-        processor.Emit(OpCodes.Castclass, listTypeRef);
+        processor.Emit(OpCodes.Castclass, _listType);
         processor.Emit(OpCodes.Stloc, arg1asList);
         processor.Emit(OpCodes.Ldarg, arg2);
-        processor.Emit(OpCodes.Castclass, listTypeRef);
+        processor.Emit(OpCodes.Castclass, _listType);
         processor.Emit(OpCodes.Stloc, arg2asList);
 
         processor.Emit(OpCodes.Ldloc, arg1asList);
@@ -103,7 +118,7 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Ldc_I4_0);
         processor.Emit(OpCodes.Br, returnInstr);
 
-        //if(arg1.count == 0) return true;
+        // if(arg1.count == 0) return true;
         var ldArg1Count = processor.Create(OpCodes.Ldloc, arg1Count);
         processor.Append(ldArg1Count);
         ifCountMatch.Operand = ldArg1Count;
@@ -112,8 +127,8 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Ldc_I4_1);
         processor.Emit(OpCodes.Br, returnInstr);
   
-        //for(int i = 0; i < arg1.Count; i++)
-        var i = new VariableDefinition(_cilTypeOf(TypeSymbol.Int));
+        // for(int i = 0; i < arg1.Count; i++)
+        var i = new VariableDefinition(typeManager.GetType(TypeSymbol.Int));
         body.Variables.Add(i);
         var newIValue = processor.Create(OpCodes.Ldc_I4_0);
         processor.Append(newIValue);
@@ -123,8 +138,8 @@ public class WLRuntimeFunctionHelper
         var breakToCond = processor.Create(OpCodes.Br, processor.Create(OpCodes.Nop));
         processor.Append(breakToCond);
 
-        //loop body
-        //if(!wlEquals(arg1[i], arg2[i])) return false;
+        // loop body
+        // if(!wlEquals(arg1[i], arg2[i])) return false;
         var firstInBody = processor.Create(OpCodes.Ldloc, arg1asList);
         processor.Append(firstInBody);        
         processor.Emit(OpCodes.Ldloc, i);
@@ -148,7 +163,7 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Add);
         processor.Emit(OpCodes.Stloc, i);
 
-        //loop condition        
+        // loop condition        
         var condStart = processor.Create(OpCodes.Ldloc, i);
         processor.Append(condStart);
         breakToCond.Operand = condStart;
@@ -158,15 +173,15 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Ldc_I4_1);               
         processor.Emit(OpCodes.Br, returnInstr);        //made it all the way through the loop, return true
 
-        //elseif(arg1 is string ?)
+        // elseif(arg1 is string ?)
         var strStart = processor.Create(OpCodes.Ldarg, arg1);
         processor.Append(strStart);
         lstBreak.Operand = strStart;
-        processor.Emit(OpCodes.Isinst, _cilTypeOf(TypeSymbol.String));
+        processor.Emit(OpCodes.Isinst, typeManager.GetType(TypeSymbol.String));
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Cgt_Un);
         processor.Emit(OpCodes.Ldarg, arg2);
-        processor.Emit(OpCodes.Isinst, _cilTypeOf(TypeSymbol.String));
+        processor.Emit(OpCodes.Isinst, typeManager.GetType(TypeSymbol.String));
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Cgt_Un);
         processor.Emit(OpCodes.And);
@@ -177,7 +192,7 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Call, _stringEqual);
         processor.Emit(OpCodes.Br, returnInstr);
         
-        //else primitive equals --uses object.equals();
+        // else primitive equals --uses object.equals();
         var primitiveStart = processor.Create(OpCodes.Ldarg, arg1);
         strBreak.Operand = primitiveStart;
         processor.Append(primitiveStart);
@@ -198,11 +213,13 @@ public class WLRuntimeFunctionHelper
         return wlEqualsDef;
     }
 
-    public MethodDefinition CreateWLToString()
+    private MethodDefinition CreateWLToString()
     {
-        var wlToString = new MethodDefinition("__wl_tostring", MethodAttributes.Public | MethodAttributes.Static, _cilTypeOf(TypeSymbol.String));
+        var wlToString = new MethodDefinition("__wl_tostring", 
+                                              MethodAttributes.Public | MethodAttributes.Static, 
+                                              typeManager.GetType(TypeSymbol.String));
         _program.Methods.Add(wlToString);
-        var dotnetObject = _cilTypeOf(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
+        var dotnetObject = typeManager.GetType(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
         var arg = new ParameterDefinition("arg", ParameterAttributes.None, dotnetObject);
         wlToString.Parameters.Add(arg);
 
@@ -214,22 +231,21 @@ public class WLRuntimeFunctionHelper
         var convertStart = processor.Create(OpCodes.Ldarg, arg);
 
         //if(arg is List)
-        var outString = new VariableDefinition(_cilTypeOf(TypeSymbol.String));
+        var outString = new VariableDefinition(typeManager.GetType(TypeSymbol.String));
         body.Variables.Add(outString);
-        var listTypeRef = _cilTypeOf(new ListTypeSymbol(TypeSymbol.Void));
 
         processor.Emit(OpCodes.Ldarg, arg);
-        processor.Emit(OpCodes.Isinst, listTypeRef);
+        processor.Emit(OpCodes.Isinst, _listType);
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Cgt_Un);
         processor.Emit(OpCodes.Brfalse, convertStart);
 
-        var count = new VariableDefinition(_cilTypeOf(TypeSymbol.Int));
-        var asList = new VariableDefinition(listTypeRef);
+        var count = new VariableDefinition(typeManager.GetType(TypeSymbol.Int));
+        var asList = new VariableDefinition(_listType);
         body.Variables.Add(count);
         body.Variables.Add(asList);
         processor.Emit(OpCodes.Ldarg, arg);
-        processor.Emit(OpCodes.Castclass, listTypeRef);
+        processor.Emit(OpCodes.Castclass, _listType);
         processor.Emit(OpCodes.Stloc, asList);
         processor.Emit(OpCodes.Ldloc, asList);
         processor.Emit(OpCodes.Callvirt, _listLength);
@@ -240,7 +256,7 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Stloc, outString);
 
         //for(int i = 0; i < arg1.Count; i++)
-        var i = new VariableDefinition(_cilTypeOf(TypeSymbol.Int));
+        var i = new VariableDefinition(typeManager.GetType(TypeSymbol.Int));
         body.Variables.Add(i);
         var loopConditionStart = processor.Create(OpCodes.Ldloc, i);
         processor.Emit(OpCodes.Ldc_I4_0);

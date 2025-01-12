@@ -49,11 +49,6 @@ public sealed class Conversion
                 return Explicit;
         }
 
-        if(from.ResolveDeelpyNestedType() == EmptyList && to is ListTypeSymbol)
-        {
-            return Implicit;
-        }
-
         //Everything is explicitly convertible to a string - Could even remove the checks for Int and Bool above 
         if(from != WLString && from != Error && to == WLString)
             return Explicit;

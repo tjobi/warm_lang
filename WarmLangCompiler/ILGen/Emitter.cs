@@ -23,7 +23,6 @@ public sealed class Emitter{
 
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _stringConcat, _stringEqual, _stringSubscript;
-    private readonly MethodReference _listEmpty, _listAdd, _listRemove, _listSubscript, _listSet, _listAddMany, _listLength;
     private readonly MethodReference _objectEquals, _objectCtor, _wlEquals, _wlToString;
     
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
@@ -41,8 +40,9 @@ public sealed class Emitter{
     private TypeDefinition _program;
     private AssemblyDefinition _mscorlib;
 
-    private readonly Dictionary<TypeSymbol, TypeReference> _cilTypes;
-    private TypeReference CilTypeOf(TypeSymbol type) => _cilTypes[type.AsRecognisedType()];
+    private readonly CilTypeManager _cilTypeManager;
+    private readonly ListMethodHelper _listMethods;
+    private TypeReference CilTypeOf(TypeSymbol type) => _cilTypeManager.GetType(type);
 
     public FunctionBodyState BodyState => _bodyStateStack.Peek();
     public FunctionBodyState ParentState()
@@ -58,7 +58,6 @@ public sealed class Emitter{
         _debug = debug;
         _diag = diag;
         _funcs = new();
-        _cilTypes = new();
         _bodyStateStack = new();
         _globals = new();
         _funcClosure = new();
@@ -70,6 +69,8 @@ public sealed class Emitter{
         
         // IL -> ".assembly extern mscorlib {}"
         _mscorlib = ReadMscorlib();
+        _cilTypeManager = new(_mscorlib, _assemblyDef, _diag);
+        _listMethods = _cilTypeManager.ListHelper;
         
         foreach(var type in BuiltInTypes())
         {
@@ -78,14 +79,15 @@ public sealed class Emitter{
                 var t = module.GetType(type.ToCilName());
                 if(t is not null)
                 {
-                    _cilTypes[type] = _assemblyDef.MainModule.ImportReference(t);
+                    var typeRef = _assemblyDef.MainModule.ImportReference(t);
+                    _cilTypeManager.Add(type, typeRef);
                     break;
                 }
             }
         }
 
         // IL -> ".class private auto ansi beforefieldinit abstract sealed Program extends [mscorlib]System.Object {"
-        var systemObject = _assemblyDef.MainModule.ImportReference(_cilTypes[CILBaseTypeSymbol]);
+        var systemObject = _assemblyDef.MainModule.ImportReference(CilTypeOf(CILBaseTypeSymbol));
         _program = new TypeDefinition(WARM_LANG_NAMESPACE, "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, systemObject);
         _assemblyDef.MainModule.Types.Add(_program);
 
@@ -94,32 +96,28 @@ public sealed class Emitter{
 
         _builtInFunctions = ResolveBuiltInMethods(_mscorlib);
 
-        // Needed for the implemenatation of __wl_tostring
-        var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
-        var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(CILBaseTypeSymbol));
         
         var dotnetString = _mscorlib.MainModule.GetType("System.String");
         _stringConcat    = GetMethodFromTypeDefinition(dotnetString, "Concat", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
         _stringEqual     = GetMethodFromTypeDefinition(dotnetString, "op_Equality", GetCilParamNames(TypeSymbol.String, TypeSymbol.String));
         _stringSubscript = GetMethodFromTypeDefinition(dotnetString, "get_Chars", GetCilParamNames(TypeSymbol.Int));
 
-        var dotnetArrayList = _mscorlib.MainModule.GetType("System.Collections.ArrayList");
-        _listEmpty      = GetMethodFromTypeDefinition(dotnetArrayList, ".ctor", GetCilParamNames());
-        _listAdd        = GetMethodFromTypeDefinition(dotnetArrayList, "Add", GetCilParamNames(CILBaseTypeSymbol));
-        _listRemove     = GetMethodFromTypeDefinition(dotnetArrayList, "RemoveAt", GetCilParamNames(TypeSymbol.Int));
-        _listSubscript  = GetMethodFromTypeDefinition(dotnetArrayList, "get_Item", GetCilParamNames(TypeSymbol.Int));
-        _listSet        = GetMethodFromTypeDefinition(dotnetArrayList, "set_Item", GetCilParamNames(TypeSymbol.Int, CILBaseTypeSymbol));
-        _listAddMany    = GetMethodFromTypeDefinition(dotnetArrayList, "AddRange", new[]{"System.Collections.ICollection"});
-        _listLength     = GetMethodFromTypeDefinition(dotnetArrayList, "get_Count", GetCilParamNames());
-
         var dotnetObject = _mscorlib.MainModule.GetType("System.Object");
         _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(CILBaseTypeSymbol, CILBaseTypeSymbol));
         _objectCtor   = GetMethodFromTypeDefinition(dotnetObject, ".ctor", GetCilParamNames());
 
-        var functionHelper = new WLRuntimeFunctionHelper(_program, CilTypeOf, _listLength, _listSubscript, _stringEqual, toStringConvert, _objectEquals, _stringConcat);
-        //functionHelper.EnableDebugging(_builtInFunctions[BuiltInFunctions.StdWriteLine]);
-        _wlEquals = functionHelper.CreateWLEquals();
-        _wlToString = functionHelper.CreateWLToString();
+
+        // Needed for the implemenatation of __wl_tostring
+        var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
+        var toStringConvert = GetMethodFromTypeDefinition(dotnetConvert, "ToString", GetCilParamNames(CILBaseTypeSymbol));
+
+        var functionHelper = new WLRuntimeFunctionHelper(_program, _mscorlib, 
+                                                         _assemblyDef, _stringEqual, 
+                                                         _objectEquals, toStringConvert, 
+                                                         _stringConcat, _cilTypeManager);
+        
+        _wlEquals = functionHelper.WLEquals;
+        _wlToString = functionHelper.WLToString;
     }
 
     private ImmutableDictionary<FunctionSymbol, MethodReference> ResolveBuiltInMethods(AssemblyDefinition mscorlib)
@@ -241,7 +239,7 @@ public sealed class Emitter{
         var TYPE_ATTRIBUTES = TypeAttributes.Public | TypeAttributes.AnsiClass 
                               | TypeAttributes.Sealed | TypeAttributes.AutoLayout
                               | TypeAttributes.BeforeFieldInit;
-        var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, _cilTypes[CILBaseTypeSymbol]);
+        var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, CilTypeOf(CILBaseTypeSymbol));
         _assemblyDef.MainModule.Types.Add(typeDef);
 
         //TODO: Must constructor call Dotnet.Object.ctor()?
@@ -255,7 +253,7 @@ public sealed class Emitter{
         bp.Emit(OpCodes.Ret);
         ctor.Body.OptimizeMacros();
 
-        _cilTypes[type] = typeDef;
+        _cilTypeManager.Add(type, typeDef);
         var memberFields = new Dictionary<MemberSymbol, FieldReference>();
         foreach(var member in members)
         {
@@ -515,14 +513,14 @@ public sealed class Emitter{
 
     private void EmitListExpression(ILProcessor processor, BoundListExpression listInit)
     {
-        processor.Emit(OpCodes.Newobj, _listEmpty);
+        var ctor = _listMethods.Empty(listInit.Type);
+        var add = _listMethods.Add(listInit.Type);
+        processor.Emit(OpCodes.Newobj, ctor);
         foreach(var expr in listInit.Expressions)
         {
             processor.Emit(OpCodes.Dup);
             EmitExpression(processor, expr);
-            EmitBoxIfNeeded(processor, expr.Type);
-            processor.Emit(OpCodes.Callvirt, _listAdd);
-            processor.Emit(OpCodes.Pop);  // System.Int32 ArrayList::Add(System.Object)  
+            processor.Emit(OpCodes.Callvirt, add);
         }
     }
 
@@ -571,8 +569,7 @@ public sealed class Emitter{
                     EmitExpression(processor, assignment.RightHandSide);
                     processor.Emit(OpCodes.Stloc, tmpVar);
                     processor.Emit(OpCodes.Ldloc, tmpVar);
-                    EmitBoxIfNeeded(processor, assignment.RightHandSide.Type);
-                    processor.Emit(OpCodes.Callvirt, _listSet);
+                    processor.Emit(OpCodes.Callvirt, _listMethods.Update(lts));
                     processor.Emit(OpCodes.Ldloc, tmpVar);
                     return;
                 }
@@ -676,20 +673,23 @@ public sealed class Emitter{
                 var tmpVar = new VariableDefinition(type);
                 processor.Body.Variables.Add(tmpVar);
 
+                var length = _listMethods.Length(unary.Left.Type);
+                var remove = _listMethods.Remove(unary.Left.Type);
+                var subscr = _listMethods.Subscript(unary.Left.Type);
+
                 processor.Emit(OpCodes.Dup);                            //Duplicate to be consumed by _listsubcript
                 processor.Emit(OpCodes.Dup);                            //Duplicate, consumed by _listLength
-                processor.Emit(OpCodes.Callvirt, _listLength);          
+                processor.Emit(OpCodes.Callvirt, length);          
                 processor.Emit(OpCodes.Ldc_I4_1);
                 processor.Emit(OpCodes.Sub);
-                processor.Emit(OpCodes.Callvirt, _listSubscript);
-                processor.Emit(OpCodes.Unbox_Any, type);                //Prepare return value from unary expression
+                processor.Emit(OpCodes.Callvirt, subscr);
                 processor.Emit(OpCodes.Stloc, tmpVar);                  //store away value, so we can remove the end
                 
                 processor.Emit(OpCodes.Dup);                            //Duplicate to be consumed by _listLength
-                processor.Emit(OpCodes.Callvirt, _listLength);
+                processor.Emit(OpCodes.Callvirt, length);
                 processor.Emit(OpCodes.Ldc_I4_1);
                 processor.Emit(OpCodes.Sub);          
-                processor.Emit(OpCodes.Callvirt, _listRemove);          //consumed the original list pointer and returns void
+                processor.Emit(OpCodes.Callvirt, remove);          //consumed the original list pointer and returns void
 
                 processor.Emit(OpCodes.Ldloc, tmpVar);                  //leave value of removed on top of stack. 
                 break;
@@ -712,24 +712,24 @@ public sealed class Emitter{
         {
             if(binary.Operator.Kind != ListConcat)
                 EmitExpression(processor, binary.Left);
-            
+
             switch(binary.Operator.Kind)
             {
                 case ListConcat: 
-                    processor.Emit(OpCodes.Newobj, _listEmpty);
+                    var ctor = _listMethods.Empty(leftType);
+                    var addMany = _listMethods.AddMany(leftType);
+                    processor.Emit(OpCodes.Newobj, ctor);
                     processor.Emit(OpCodes.Dup);
                     processor.Emit(OpCodes.Dup);
                     EmitExpression(processor, binary.Left);
-                    processor.Emit(OpCodes.Callvirt, _listAddMany);
+                    processor.Emit(OpCodes.Callvirt, addMany);
                     EmitExpression(processor, binary.Right);
-                    processor.Emit(OpCodes.Callvirt, _listAddMany);
+                    processor.Emit(OpCodes.Callvirt, addMany);
                     break;
                 case ListAdd:
                     processor.Emit(OpCodes.Dup);
                     EmitExpression(processor, binary.Right);
-                    EmitBoxIfNeeded(processor, binary.Right.Type);
-                    processor.Emit(OpCodes.Callvirt, _listAdd);
-                    processor.Emit(OpCodes.Pop);
+                    processor.Emit(OpCodes.Callvirt, _listMethods.Add(leftType));
                     break;
                 case BoundBinaryOperatorKind.Equals:
                     EmitExpression(processor, binary.Right);
@@ -962,8 +962,7 @@ public sealed class Emitter{
                         processor.Emit(OpCodes.Callvirt, _stringSubscript);
                     else if(sa.Target.Type is ListTypeSymbol lts)
                     {
-                        processor.Emit(OpCodes.Callvirt, _listSubscript);
-                        processor.Emit(OpCodes.Unbox_Any, CilTypeOf(lts.InnerType));
+                        processor.Emit(OpCodes.Callvirt, _listMethods.Subscript(lts));
                     }
                     return;
                 }
@@ -986,7 +985,7 @@ public sealed class Emitter{
             }
             else if(type is ListTypeSymbol)
             {
-                processor.Emit(OpCodes.Callvirt, _listLength);
+                processor.Emit(OpCodes.Callvirt, _listMethods.Length(type));
                 return;
             }
         }
@@ -1021,7 +1020,11 @@ public sealed class Emitter{
     {
         if (stateOfFuncBody.SharedLocals.Count > 0) //Does the function share locals? Then add a closure
         {
-            var closureType = new TypeDefinition("", $"closure_{func.Name}", TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass, CilTypeOf(CILClosureType));
+            var closureType = new TypeDefinition("", $"closure_{func.Name}", 
+                                                 TypeAttributes.NestedPrivate | TypeAttributes.Sealed 
+                                                 | TypeAttributes.SequentialLayout 
+                                                 | TypeAttributes.AnsiClass, 
+                                                 CilTypeOf(CILClosureType));
             _program.NestedTypes.Add(closureType);
             var closureVariable = new VariableDefinition(closureType);
             ilProcessor.Body.Variables.Add(closureVariable);

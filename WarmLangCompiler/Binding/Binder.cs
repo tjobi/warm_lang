@@ -564,9 +564,9 @@ public sealed class Binder
             //this mutes any errors that follow as a result of left/right being errors
             return new BoundErrorExpression(binaryExpr);
         }
+        Union(boundLeft.Type, boundRight.Type);
 
         var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Operator.Kind, boundLeft, boundRight);
-        
         if(boundOperator is null)
         {
             _diag.ReportBinaryOperatorCannotBeApplied(binaryExpr.Location, binaryExpr.Operator, boundLeft.Type, boundRight.Type);
@@ -579,14 +579,11 @@ public sealed class Binder
     {
         if(le.IsEmptyList)
         {
-            var type = TypeSymbol.EmptyList;
-            if(le.ElementType is null)
-            {
-                if(!allowimplicitListType)
-                    _diag.ReportTypeOfEmptyListMustBeExplicit(le.Location);
-            }
-            else
-                type = new ListTypeSymbol(le.ElementType.ToTypeSymbol());
+            TypeSymbol type;
+            //It was an implicitly typed empty list []
+            if(le.ElementType is null) type = ListTypeSymbol.CreateEmptyList(_scope.Depth);
+            else type = new ListTypeSymbol(le.ElementType.ToTypeSymbol());
+
             return new BoundListExpression(le, type, ImmutableArray<BoundExpression>.Empty);
         }
 
@@ -661,6 +658,8 @@ public sealed class Binder
 
     private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to, bool allowExplicit = false)
     {
+        Union(expr.Type, to);
+        
         var conversion = Conversion.GetConversion(expr.Type, to);
         if(!conversion.Exists)
         {
@@ -705,5 +704,49 @@ public sealed class Binder
                 break;
         }
         return null;
+    }
+
+    private static void Union(TypeSymbol _a, TypeSymbol _b)
+    {
+        var stack = new Stack<(TypeSymbol, TypeSymbol)>();
+        stack.Push((_a,_b));
+        while(stack.Count > 0)
+        {
+            var (curA,curB) = stack.Peek();
+            switch(stack.Pop())
+            {
+            case (PlaceholderTypeSymbol aa, PlaceholderTypeSymbol bb):
+                if(aa.ActualType is null && bb.ActualType is null)          
+                {
+                    if(aa.Depth > bb.Depth) bb.Union(aa);
+                    else                    aa.Union(bb);
+                }
+                else if(aa.ActualType is not null && bb.ActualType is null) bb.Union(aa.ActualType);
+                else if(aa.ActualType is null && bb.ActualType is not null) aa.Union(bb.ActualType);
+                else //neither are null
+                    throw new Exception($"Something is wrong here - neither '{aa}' nor '{bb}' is null");
+                break;
+            case (PlaceholderTypeSymbol aa,_):
+                aa.Union(curB);
+                break;
+            case (_,PlaceholderTypeSymbol bb):
+                bb.Union(curA);
+                break;
+            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut1}, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut2}):
+                stack.Push((ut1,ut2));
+                break;
+            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut}, ListTypeSymbol lb):
+                stack.Push((ut,lb.InnerType));
+                break;
+            case (ListTypeSymbol la, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut}):
+                stack.Push((ut, la.InnerType));
+                break;
+            case (ListTypeSymbol la, ListTypeSymbol lb):
+                stack.Push((la.InnerType, lb.InnerType));
+                break;
+            }
+        }
+        _a.Resolve();
+        _b.Resolve();
     }
 }
