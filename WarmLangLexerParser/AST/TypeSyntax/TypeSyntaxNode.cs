@@ -19,17 +19,29 @@ public abstract class TypeSyntaxNode : ASTNode
             TInt => new TypeSyntaxInt(token.Location),
             TBool => new TypeSyntaxBool(token.Location),
             TString => new TypeSyntaxString(token.Location),
-            TIdentifier => new TypeSyntaxUserDefined(token), //user-defined types
+            TIdentifier => new TypeSyntaxIdentifier(token), //user-defined types
             //fine to throw an exception here, means we need to implement another case 
             _ => throw new NotImplementedException($"{nameof(TypeSyntaxNode)} doesn't recognize {token.Kind} yet")
         };
     }
 
-    public static bool TryGetAsUserDefined(SyntaxToken token, [NotNullWhen(true)] out TypeSyntaxUserDefined? res)
+    public static bool TryGetAsUserDefined(SyntaxToken token, [NotNullWhen(true)] out TypeSyntaxIdentifier? res)
     {
         res = null;
         if(token.Kind == TIdentifier && token.Kind.IsPossibleType())
-            res = new TypeSyntaxUserDefined(token);
+            res = new TypeSyntaxIdentifier(token);
         return res is not null;
     }
+}
+
+public sealed class TypeSyntaxParameterType : TypeSyntaxNode
+{
+    public TypeSyntaxParameterType(SyntaxToken token) : base(token.Location)
+    {
+        Name = token.Name!;
+    }
+
+    public string Name { get; }
+
+    public override string ToString() => Name;
 }

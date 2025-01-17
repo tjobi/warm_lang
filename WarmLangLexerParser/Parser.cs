@@ -232,6 +232,10 @@ public class Parser
             var dot = MatchKind(TDot);
         }
         var name = MatchKind(TIdentifier);
+
+        //case id<T>()
+        var typeParams = ParseTypeParameters();
+
         var _ = MatchKind(TParLeft);
         //Params are tuples of:  "function myFunc(int x, int y)" -> (int, x) -> (ParameterType, ParameterName)
         var parameters = ParseParameterList();
@@ -241,7 +245,25 @@ public class Parser
             returnType = ParseType();
         }
         var body = (BlockStatement)ParseBlockStatement();
-        return new FuncDeclaration(toExtend, funcKeyword, name, parameters, returnType, body);
+        return new FuncDeclaration(toExtend, funcKeyword, name, typeParams, parameters, returnType, body);
+    }
+
+    private List<TypeSyntaxParameterType> ParseTypeParameters()
+    {
+        var typeParams = new List<TypeSyntaxParameterType>();
+        if(Current.Kind == TLessThan) {
+            var openAngle = NextToken();
+            var parseTypeParameters = true;
+            while(parseTypeParameters && NotEndOfFile)
+            {
+                var typeParamName = MatchKind(TIdentifier);
+                typeParams.Add(new(typeParamName));
+                if(Current.Kind == TComma) { NextToken(); }
+                else parseTypeParameters=false;
+            }
+            var closeAngle = MatchKind(TGreaterThan);
+        }
+        return typeParams;
     }
 
     private List<(TypeSyntaxNode, SyntaxToken)> ParseParameterList()
@@ -406,6 +428,31 @@ public class Parser
                 case TParLeft:
                 {
                     res = ParseCallExpression(res);  
+                } continue;
+                case TLessThan: 
+                {
+                    var checkpoint = currentToken;
+                    var openAngle = NextToken();
+                    var typeParams = new List<TypeSyntaxNode>();
+                    var ateSome = false;
+                    while (TryParseType(out TypeSyntaxNode? type) && NotEndOfFile)
+                    {
+                        typeParams.Add(type);
+                        ateSome = true;
+                        if(Current.Kind != TComma) break;
+                        MatchKind(TComma);
+                    }
+                    if(ateSome && Current.Kind == TGreaterThan 
+                       && Peek(1).Kind == TParLeft)
+                    {
+                        var closeAngle = MatchKind(TGreaterThan);
+                        var resAccess = AccessFromExpression(res);
+                        res = new TypeApplication(resAccess, openAngle, typeParams, closeAngle);
+                    } else
+                    {
+                        currentToken = checkpoint;
+                        return res;
+                    }
                 } continue;
                 case TBracketLeft:
                 {

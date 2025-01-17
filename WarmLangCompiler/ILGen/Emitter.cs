@@ -203,10 +203,11 @@ public sealed class Emitter{
         if(_diag.Any())
             return; //something went wrong in constructor
         
+        foreach(var (type, _) in program.GetDeclaredTypes()) 
+            EmitTypeDeclaration(type);
+        
         foreach(var (type, members) in program.GetDeclaredTypes())
-        {
-            EmitTypeDeclaration(type, members);
-        }
+            EmitTypeMembers(type, members);
 
         foreach(var func in program.GetFunctionSymbols())
         {
@@ -234,43 +235,62 @@ public sealed class Emitter{
         _assemblyDef.Write(outfile);
     }
 
-    private void EmitTypeDeclaration(TypeSymbol type, IList<MemberSymbol> members)
+    //Attaches the members, fields + ctor to a type - must be preceeded by a EmitTypeDeclaration call to the same type
+    private void EmitTypeMembers(TypeSymbol type, IList<MemberSymbol> members) 
     {
-        var TYPE_ATTRIBUTES = TypeAttributes.Public | TypeAttributes.AnsiClass 
-                              | TypeAttributes.Sealed | TypeAttributes.AutoLayout
-                              | TypeAttributes.BeforeFieldInit;
-        var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, CilTypeOf(CILBaseTypeSymbol));
-        _assemblyDef.MainModule.Types.Add(typeDef);
-
-        //TODO: Must constructor call Dotnet.Object.ctor()?
-        var CONSTRUCTOR_ATTRIBUTES = MethodAttributes.Public | MethodAttributes.HideBySig
+        var typeDef = _cilTypeManager.GetTypeDefinition(type);
+        
+        const MethodAttributes CONSTRUCTOR_ATTRIBUTES = 
+                                       MethodAttributes.Public | MethodAttributes.HideBySig
                                      | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName;
         var ctor = new MethodDefinition(".ctor", CONSTRUCTOR_ATTRIBUTES, CilTypeOf(TypeSymbol.Void));
         typeDef.Methods.Add(ctor);
+        
         var bp = ctor.Body.GetILProcessor();
         bp.Emit(OpCodes.Ldarg_0);
         bp.Emit(OpCodes.Call, _objectCtor);
         bp.Emit(OpCodes.Ret);
         ctor.Body.OptimizeMacros();
 
-        _cilTypeManager.Add(type, typeDef);
+        const FieldAttributes FIELD_ATTRIBUTES = FieldAttributes.Public;
         var memberFields = new Dictionary<MemberSymbol, FieldReference>();
         foreach(var member in members)
         {
             //TODO: Revisit when member functions can be declared on the type declaration
             if(member is not MemberFieldSymbol f) continue;
-            var FIELD_ATTRIBUTES = FieldAttributes.Public;
             var fieldDef = new FieldDefinition(f.Name, FIELD_ATTRIBUTES, CilTypeOf(member.Type));
             memberFields[member] = fieldDef;
             typeDef.Fields.Add(fieldDef);
         }
         _typeInfoOf[type] = new WLTypeInformation(type, typeDef, ctor, memberFields);
     }
+    
+    // Creates the type actual IL type and ONLY the type. So it can later be used for types using this type
+    private void EmitTypeDeclaration(TypeSymbol type) 
+    {
+        const TypeAttributes TYPE_ATTRIBUTES = 
+                                TypeAttributes.Public | TypeAttributes.AnsiClass 
+                              | TypeAttributes.Sealed | TypeAttributes.AutoLayout
+                              | TypeAttributes.BeforeFieldInit;
+        var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, CilTypeOf(CILBaseTypeSymbol));
+        _assemblyDef.MainModule.Types.Add(typeDef);
+        _cilTypeManager.Add(type, typeDef);
+    }
 
     private void EmitFunctionDeclaration(FunctionSymbol func)
     {
-        var funcDefintion = new MethodDefinition(func.Name, MethodAttributes.Static | MethodAttributes.Public, CilTypeOf(func.Type));
+        var funcDefintion = new MethodDefinition(func.Name, MethodAttributes.Static | MethodAttributes.Public, CilTypeOf(TypeSymbol.Void));
         
+        foreach(var typeParam in func.TypeParameters)
+        {
+            var genericParam = new GenericParameter(typeParam.Name, funcDefintion);
+            _cilTypeManager.Add(typeParam, genericParam);
+            funcDefintion.GenericParameters.Add(genericParam);
+        }
+        //incase of generic method, we cannot assign the return type first.
+        funcDefintion.ReturnType = CilTypeOf(func.Type);
+
+
         foreach(var @param in func.Parameters)
         {
             var paramDef = new ParameterDefinition(@param.Name, ParameterAttributes.None, CilTypeOf(@param.Type));
@@ -473,6 +493,9 @@ public sealed class Emitter{
             case BoundNullExpression:
                 processor.Emit(OpCodes.Ldnull);
                 break;
+            // case BoundTypeApplication appli:
+            //     EmitBoundTypeApplication(processor, appli);
+            //     break;
             default: 
                 throw new NotImplementedException($"{nameof(Emitter)} doesn't know '{expr} yet'");
         }
@@ -622,7 +645,17 @@ public sealed class Emitter{
             }
         }
 
-        processor.Emit(OpCodes.Call, _funcs[call.Function]);
+        if(call.Function is SpecializedFunctionSymbol sp) 
+        {
+            var generic = new GenericInstanceMethod(_funcs[sp.SpecializedFrom]);
+            foreach(var typeParam in sp.TypeParameters)
+            {
+                generic.GenericArguments.Add(CilTypeOf(typeParam));
+            }
+            processor.Emit(OpCodes.Call, generic);
+        }
+        else 
+            processor.Emit(OpCodes.Call, _funcs[call.Function]);;
     }
 
     private void PrintBodyClosures()

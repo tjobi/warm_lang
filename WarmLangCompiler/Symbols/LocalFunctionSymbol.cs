@@ -7,8 +7,11 @@ namespace WarmLangCompiler.Symbols;
 
 public sealed class LocalFunctionSymbol : FunctionSymbol
 {
-    public LocalFunctionSymbol(SyntaxToken nameToken, ImmutableArray<ParameterSymbol> parameters, TypeSymbol type)
-    : base(nameToken, parameters, type)  { }
+    public LocalFunctionSymbol(SyntaxToken nameToken,
+                               ImmutableArray<TypeParameterSymbol> typeParameters, 
+                               ImmutableArray<ParameterSymbol> parameters, 
+                               TypeSymbol returnType)
+    : base(nameToken, typeParameters, parameters, returnType)  { }
 
     public BoundBlockStatement? Body { get; set; }
     public HashSet<ScopedVariableSymbol>? Closure { get; set; }

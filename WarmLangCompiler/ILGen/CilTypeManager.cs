@@ -42,6 +42,8 @@ public sealed class CilTypeManager
         return toCILType[key] = typeDef;
     }
 
+    public TypeDefinition GetTypeDefinition(TypeSymbol type) => GetType(type).Resolve();
+
     private TypeReference GetSpecializedTypeDefinition(TypeSymbol type)
     {
         if(type is PlaceholderTypeSymbol p && p.ActualType is null)

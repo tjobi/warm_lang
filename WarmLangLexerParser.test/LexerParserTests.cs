@@ -1130,6 +1130,7 @@ x;
                 null,
                 MakeToken(TFunc,new TextLocation(1,1,length:8)),
                 MakeToken(TIdentifier,1,10, "f"),
+                new List<TypeSyntaxParameterType>(),
                 new List<(TypeSyntaxNode, SyntaxToken)>(),
                 new TypeSyntaxInt(new TextLocation(1,14,1,17)),
                 new BlockStatement(

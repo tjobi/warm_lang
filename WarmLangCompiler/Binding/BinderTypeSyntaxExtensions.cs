@@ -6,43 +6,49 @@ namespace WarmLangCompiler.Binding;
 
 public static class BinderTypeSyntaxExtensions
 {
-    private static TypeSymbol ResolveNestedTypeSyntax(TypeSyntaxNode aType)
-    {
-        if(aType is TypeSyntaxList tsl)
-        {
-            TypeSymbol res = ResolveNestedTypeSyntax(tsl.InnerType);
-            return new ListTypeSymbol($"list<{res}>", res);
-        }
-        return aType.ToTypeSymbol();
-    }
-    public static TypeSymbol ToTypeSymbol(this TypeSyntaxNode? type)
-    {
-        if(type is null)
-        {
-            return TypeSymbol.Void;
-        }
-        switch(type)
-        {
-            case TypeSyntaxInt: 
-                return TypeSymbol.Int;
-            case TypeSyntaxBool: 
-                return TypeSymbol.Bool;
-            case TypeSyntaxString:
-                return TypeSymbol.String;
-            case TypeSyntaxList list: 
-            {
-                if(list.InnerType is TypeSyntaxInt)
-                    return TypeSymbol.IntList;
-                return ResolveNestedTypeSyntax(type);
-            }
-            case TypeSyntaxUserDefined u:
-                if(!TypeSymbol.DefinedTypes.TryGetValue(u.Name, out var res)) 
-                    TypeSymbol.DefinedTypes[u.Name] = res = new TypeSymbol(u.Name);
-                return res;
-            default:
-                throw new NotImplementedException($"BinderTypeExntensions doesn't know {type}");
-        }
-    }
+    // public static TypeSymbol(this TypeSyntaxNode type)
+    // {
+    //     return type switch
+    //     {
+
+    //     }
+    // }
+
+    // private static TypeSymbol ResolveNestedTypeSyntax(TypeSyntaxNode aType)
+    // {
+    //     if(aType is TypeSyntaxList tsl)
+    //     {
+    //         TypeSymbol res = ResolveNestedTypeSyntax(tsl.InnerType);
+    //         return new ListTypeSymbol($"list<{res}>", res);
+    //     }
+    //     return aType.ToTypeSymbol();
+    // }
+    // public static TypeSymbol ToTypeSymbol(this TypeSyntaxNode? type)
+    // {
+    //     if(type is null)
+    //     {
+    //         return TypeSymbol.Void;
+    //     }
+    //     switch(type)
+    //     {
+    //         case TypeSyntaxInt: 
+    //             return TypeSymbol.Int;
+    //         case TypeSyntaxBool: 
+    //             return TypeSymbol.Bool;
+    //         case TypeSyntaxString:
+    //             return TypeSymbol.String;
+    //         case TypeSyntaxList list: 
+    //         {
+    //             if(list.InnerType is TypeSyntaxInt)
+    //                 return TypeSymbol.IntList;
+    //             return ResolveNestedTypeSyntax(type);
+    //         }
+    //         case TypeSyntaxIdentifier u:
+    //             throw new NotImplementedException("Type identifiers");
+    //         default:
+    //             throw new NotImplementedException($"BinderTypeExntensions doesn't know {type}");
+    //     }
+    // }
 }
 
 public static class BinderTokenKindExtensions 

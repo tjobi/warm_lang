@@ -12,8 +12,6 @@ public class TypeSymbol : Symbol
 
     public static readonly TypeSymbol ListBase = new("only-for-use-by-compiler");
 
-    public static readonly Dictionary<string, TypeSymbol> DefinedTypes = new();
-
     public bool IsValueType { get; }
 
     public TypeSymbol(string name, bool isValueType = false) 
@@ -23,18 +21,6 @@ public class TypeSymbol : Symbol
     }
 
     public override string ToString() => Name;
-
-
-    public TypeSymbol ResolveDeelpyNestedType() => Resolver(this);
-
-    private TypeSymbol Resolver(TypeSymbol t)
-    {
-        if(t is ListTypeSymbol lts)
-        {
-            return Resolver(lts.InnerType);
-        }
-        return t;
-    }
 
     public TypeSymbol NestedTypeOrThis()
     {
@@ -47,7 +33,6 @@ public class TypeSymbol : Symbol
 
     //In case of any placeholder types - this method removes those
     public virtual TypeSymbol Resolve() => this;
-    
 
     public static bool operator ==(TypeSymbol a, TypeSymbol b)
     {

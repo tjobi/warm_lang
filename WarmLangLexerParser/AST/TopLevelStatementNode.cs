@@ -34,7 +34,7 @@ public sealed class TopLevelTypeDeclaration : TopLevelNode
         Members = members;
     }
 
-    public TypeSyntaxUserDefined Type { get; }
+    public TypeSyntaxIdentifier Type { get; }
     public IList<MemberDeclaration> Members { get; }
 
     public override string ToString()
