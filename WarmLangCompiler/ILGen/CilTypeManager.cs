@@ -36,7 +36,7 @@ public sealed class CilTypeManager
     {
         // key = key.Resolve();
         if(toCILType.ContainsKey(key)) return toCILType[key];
-
+        
         //If it is not there, then we assume it's a generic type - so create it and cache it
         var typeDef = GetSpecializedTypeDefinition(key);
         return toCILType[key] = typeDef;
@@ -48,6 +48,7 @@ public sealed class CilTypeManager
     {
         if(type is PlaceholderTypeSymbol p && p.ActualType is null)
         {
+            
             throw new Exception("Cannot emit placeholder type that has no actual type!");
         }
         if(type is not ListTypeSymbol l) 
@@ -55,6 +56,7 @@ public sealed class CilTypeManager
             var msg = $"'{nameof(CilTypeManager)}.{nameof(GetSpecializedTypeDefinition)}' doesn't know type of '{type}'";
             throw new NotImplementedException(msg);
         }
+        
         var inner = GetType(l.InnerType);
         return genericList.MakeGenericInstanceType(inner);
     }

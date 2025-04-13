@@ -296,6 +296,7 @@ public sealed class Binder
     {
         var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
         var uniqueParameterNames = new HashSet<string>();
+        
         for (int i = 0; i < func.Params.Count; i++)
         {
             var (type, name) = func.Params[i];
@@ -438,30 +439,56 @@ public sealed class Binder
 
     private BoundExpression BindTypeApplication(TypeApplication application)
     {
-        var func = BindAccessCallExpression(application.AppliedOn, out var access);
+        var funcDef = BindAccessCallExpression(application.AppliedOn, out var access);
         //A little ugly having to expectFunc ... 
         //make it work, then make it pretty
         
-        if(func is null)
+        if(funcDef is null)
             throw new NotImplementedException($"{nameof(BindTypeApplication)}: Type application is only allowed on functions");
         
-        if(func.TypeParameters.Length != application.TypeParams.Count) 
+        if(funcDef.TypeParameters.Length != application.TypeParams.Count) 
             throw new NotImplementedException($"{nameof(BindTypeApplication)}: Proper error, either missing or too many");
         
-        var typeParams = new List<TypeSymbol>();
-
-        for (int i = 0; i < func.TypeParameters.Length; i++)
+        // TypeParameters of the original function can be retrieved from the BoundTypeApplication
+        var instantiatedParameters     = ImmutableArray.CreateBuilder<ParameterSymbol>(funcDef.Parameters.Length);
+        var instantiatedTypeParameters = new List<TypeSymbol>();
+        //FIXME: Honestly, a rewrite from typesymbol to a typeId is due...
+        //       => pretty nasty using strings - but type parameters are unique within a function so should be fine... 
+        var typeParametersMap = new Dictionary<string, TypeSymbol>();
+        // We have to create a concrete version of the definition. Any TypeParameterSymbol is replaced by its concrete...
+        for (int i = 0; i < funcDef.TypeParameters.Length; i++)
         {
-            var typeParam = func.TypeParameters[i];
-            var concreteParamType = _typeScope.GetTypeOrCrash(application.TypeParams[i]);
-            var typeParamInfo = new TypeInformation(typeParam, concreteParamType); 
-            _typeScope.TryAddType(typeParam, out var _, typeParamInfo);
-
-            typeParams.Add(concreteParamType);
+            var typeParam = funcDef.TypeParameters[i];
+            var concrete = _typeScope.GetTypeOrCrash(application.TypeParams[i]);
+            instantiatedTypeParameters.Add(concrete);
+            typeParametersMap[typeParam.Name] = concrete;
         }
 
-        var specailized = new SpecializedFunctionSymbol(func, typeParams);
+        //Let's also concretize the actual parameters + return type
+        var concreteReturn = ConcretifyType(funcDef.Type, typeParametersMap);
+        for (int i = 0; i < funcDef.Parameters.Length; i++)
+        {
+            var param = funcDef.Parameters[i];
+            var concrete = ConcretifyType(param.Type, typeParametersMap);
+            instantiatedParameters.Add(new ParameterSymbol(param.Name, concrete, param.Placement));
+        }
+
+
+        var specailized = new SpecializedFunctionSymbol(funcDef, instantiatedTypeParameters, 
+                                                        instantiatedParameters.MoveToImmutable(), concreteReturn,
+                                                        application.Location);
+
         return new BoundTypeApplication(application, access, specailized);
+    }
+
+    private TypeSymbol ConcretifyType(TypeSymbol param, Dictionary<string, TypeSymbol> typeParametersMap) 
+    {
+        return param switch
+        {
+            TypeParameterSymbol tp => typeParametersMap[tp.Name],
+            ListTypeSymbol list => new ListTypeSymbol(ConcretifyType(list.InnerType, typeParametersMap)),
+            _ => param 
+        };
     }
 
     private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
@@ -529,6 +556,7 @@ public sealed class Binder
                 var boundArg = arguments[i];
                 var functionParameter = function.Parameters[i];
                 arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
+                Console.WriteLine(functionParameter.Type + " : " + boundArg.Type);
             }
         } 
         
@@ -645,7 +673,7 @@ public sealed class Binder
             //this mutes any errors that follow as a result of left/right being errors
             return new BoundErrorExpression(binaryExpr);
         }
-        Unify(boundLeft.Type, boundRight.Type);
+        _typeScope.Unify(boundLeft.Type, boundRight.Type);
 
         var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Operator.Kind, boundLeft, boundRight);
         if(boundOperator is null)
@@ -660,11 +688,12 @@ public sealed class Binder
     {
         if(le.IsEmptyList)
         {
-            TypeSymbol type;
+            TypeSymbol inner;
             //It was an implicitly typed empty list []
-            if(le.ElementType is null) type = ListTypeSymbol.CreateEmptyList(_scope.Depth);
-            else type = new ListTypeSymbol(_typeScope.GetTypeOrCrash(le.ElementType));
+            if(le.ElementType is null) inner = _typeScope.CreatePlacerHolderType();
+            else inner = _typeScope.GetTypeOrCrash(le.ElementType);
 
+            var type = new ListTypeSymbol(inner);
             return new BoundListExpression(le, type, ImmutableArray<BoundExpression>.Empty);
         }
 
@@ -739,12 +768,17 @@ public sealed class Binder
 
     private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to, bool allowExplicit = false)
     {
+        if(expr.Type is ListTypeSymbol l)
+        {
+            Console.WriteLine(l.InnerType.GetType());
+            _typeScope.Unify(expr.Type, to);
+
+        }
         if(_typeScope.IsSpecializedAs(to, expr.Type) || _typeScope.IsSpecializedAs(expr.Type, to))
         {
             return expr;
         }
 
-        Unify(expr.Type, to);
         
         var conversion = Conversion.GetConversion(expr.Type, to);
         if(!conversion.Exists)
@@ -793,47 +827,4 @@ public sealed class Binder
         return null;
     }
 
-    private static void Unify(TypeSymbol _a, TypeSymbol _b)
-    {
-        var stack = new Stack<(TypeSymbol, TypeSymbol)>();
-        stack.Push((_a,_b));
-        while(stack.Count > 0)
-        {
-            var (curA,curB) = stack.Peek();
-            switch(stack.Pop())
-            {
-            case (PlaceholderTypeSymbol aa, PlaceholderTypeSymbol bb):
-                if(aa.ActualType is null && bb.ActualType is null)          
-                {
-                    if(aa.Depth > bb.Depth) bb.Union(aa);
-                    else                    aa.Union(bb);
-                }
-                else if(aa.ActualType is not null && bb.ActualType is null) bb.Union(aa.ActualType);
-                else if(aa.ActualType is null && bb.ActualType is not null) aa.Union(bb.ActualType);
-                else //neither are null
-                    throw new Exception($"Something is wrong here - neither '{aa}' nor '{bb}' is null");
-                break;
-            case (PlaceholderTypeSymbol aa,_):
-                aa.Union(curB);
-                break;
-            case (_,PlaceholderTypeSymbol bb):
-                bb.Union(curA);
-                break;
-            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut1}, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut2}):
-                stack.Push((ut1,ut2));
-                break;
-            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut}, ListTypeSymbol lb):
-                stack.Push((ut,lb.InnerType));
-                break;
-            case (ListTypeSymbol la, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut}):
-                stack.Push((ut, la.InnerType));
-                break;
-            case (ListTypeSymbol la, ListTypeSymbol lb):
-                stack.Push((la.InnerType, lb.InnerType));
-                break;
-            }
-        }
-        _a.Resolve();
-        _b.Resolve();
-    }
 }

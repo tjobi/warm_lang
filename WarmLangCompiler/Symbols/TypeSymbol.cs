@@ -31,15 +31,10 @@ public class TypeSymbol : Symbol
         return this;
     }
 
-    //In case of any placeholder types - this method removes those
-    public virtual TypeSymbol Resolve() => this;
-
     public static bool operator ==(TypeSymbol a, TypeSymbol b)
     {
         if(a is null || b is null)
             return false;
-        a = a.Resolve();
-        b = b.Resolve();
         return a.Equals(b);
     }
 
@@ -65,7 +60,7 @@ public class TypeSymbol : Symbol
 
     public override int GetHashCode()
     {
-        int hashCode = Resolve().Name.GetHashCode();
+        int hashCode = Name.GetHashCode();
         return hashCode;
     }
 }

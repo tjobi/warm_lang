@@ -203,11 +203,9 @@ public sealed class Emitter{
         if(_diag.Any())
             return; //something went wrong in constructor
         
-        foreach(var (type, _) in program.GetDeclaredTypes()) 
-            EmitTypeDeclaration(type);
+        foreach(var (type, _) in program.GetDeclaredTypes()) EmitTypeDeclaration(type);
         
-        foreach(var (type, members) in program.GetDeclaredTypes())
-            EmitTypeMembers(type, members);
+        foreach(var (type, members) in program.GetDeclaredTypes()) EmitTypeMembers(type, members);
 
         foreach(var func in program.GetFunctionSymbols())
         {
@@ -519,7 +517,6 @@ public sealed class Emitter{
         }
         if(conv.Type == TypeSymbol.String)
         {
-            // TODO: FIX printing, most important for lists, but others would also be cool. So that they match interpreter. 
             var convExprType = conv.Expression.Type;
             EmitBoxIfNeeded(processor, convExprType);
             processor.Emit(OpCodes.Call, _wlToString);
@@ -648,7 +645,7 @@ public sealed class Emitter{
         if(call.Function is SpecializedFunctionSymbol sp) 
         {
             var generic = new GenericInstanceMethod(_funcs[sp.SpecializedFrom]);
-            foreach(var typeParam in sp.TypeParameters)
+            foreach(var typeParam in sp.ConcreteTypeParameters)
             {
                 generic.GenericArguments.Add(CilTypeOf(typeParam));
             }
