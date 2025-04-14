@@ -1,3 +1,5 @@
+using WarmLangLexerParser.AST;
+
 namespace WarmLangCompiler.Symbols;
 
 public sealed class ListTypeSymbol : TypeSymbol
@@ -51,6 +53,12 @@ public sealed class ListTypeSymbol : TypeSymbol
         hashCode = (hashCode * 397) ^ InnerType.GetHashCode();
         return hashCode; 
     }
+
+    public override TypeSymbol Resolve()
+    {
+        InnerType = InnerType.Resolve();
+        return this;
+    }
 }
 
 public sealed class PlaceholderTypeSymbol : TypeSymbol
@@ -66,9 +74,16 @@ public sealed class PlaceholderTypeSymbol : TypeSymbol
 
     public void Union(TypeSymbol a) => ActualType = a;
 
+    private bool Wins() => ActualType is not null && ActualType is PlaceholderTypeSymbol pt && pt.Depth <= Depth;
+    public override TypeSymbol Resolve()
+    {
+        if(ActualType is null || Wins()) return this;
+        return ActualType.Resolve();
+    }
+
     public override string ToString()
     {
-        if(ActualType is null) base.ToString();
+        if(ActualType is null || Wins()) return base.ToString();
         return $"Wrapped({ActualType})";
     }
 }

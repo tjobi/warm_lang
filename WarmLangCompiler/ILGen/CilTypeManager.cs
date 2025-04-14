@@ -34,7 +34,7 @@ public sealed class CilTypeManager
 
     public TypeReference GetType(TypeSymbol key) 
     {
-        // key = key.Resolve();
+        key = key.Resolve();
         if(toCILType.ContainsKey(key)) return toCILType[key];
         
         //If it is not there, then we assume it's a generic type - so create it and cache it

@@ -285,16 +285,16 @@ public sealed class BinderTypeScope
             switch(stack.Pop())
             {
             case (PlaceholderTypeSymbol aa, PlaceholderTypeSymbol bb):
-                // if(aa.ActualType is null && bb.ActualType is null)          
-                // {
-                //     if(aa.Depth > bb.Depth) bb.Union(aa);
-                //     else                    aa.Union(bb);
-                // }
-                // else if(aa.ActualType is not null && bb.ActualType is null) bb.Union(aa.ActualType);
-                // else if(aa.ActualType is null && bb.ActualType is not null) aa.Union(bb.ActualType);
-                // else //neither are null
+                if(aa.ActualType is null && bb.ActualType is null)          
+                {
+                    if(aa.Depth > bb.Depth) bb.Union(aa);
+                    else                    aa.Union(bb);
+                }
+                else if(aa.ActualType is not null && bb.ActualType is null) bb.Union(aa.ActualType);
+                else if(aa.ActualType is null && bb.ActualType is not null) aa.Union(bb.ActualType);
+                else //neither are null - failure state
                     throw new BinderTypeScopeExeception($"Something is wrong here - neither '{aa}' nor '{bb}' is null");
-                // break;
+                break;
             case (PlaceholderTypeSymbol aa,_):
                 var updated = UpdateTypeInformation(aa, info => new(info.Type, curB));
                 aa.Union(curB);
@@ -315,23 +315,10 @@ public sealed class BinderTypeScope
             case (ListTypeSymbol la, ListTypeSymbol lb):
                 stack.Push((la.InnerType, lb.InnerType));
                 break;
-            // case (_, TypeParameterSymbol tb):
-            // {
-            //     var other = curA is ListTypeSymbol la ? la.InnerType : curA;
-            //     var infoTb = GetTypeInformation(tb);
-            //     if(infoTb is null || infoTb.SpecializedAs is null) return;
-            //     stack.Push((other, infoTb.SpecializedAs));
-
-            // } break;
-            // case (TypeParameterSymbol ta,_):
-            // {
-            //     var other = curB is ListTypeSymbol lb ? lb.InnerType : curB;
-            //     var infoTa = GetTypeInformation(ta);
-            //     if(infoTa is null || infoTa.SpecializedAs is null) return;
-            //     stack.Push((infoTa.SpecializedAs, other));
-            // } break;
             }
         }
+        _a.Resolve();
+        _b.Resolve();
     }
 
     public PlaceholderTypeSymbol CreatePlacerHolderType()

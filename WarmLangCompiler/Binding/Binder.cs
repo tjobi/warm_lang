@@ -556,7 +556,6 @@ public sealed class Binder
                 var boundArg = arguments[i];
                 var functionParameter = function.Parameters[i];
                 arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
-                Console.WriteLine(functionParameter.Type + " : " + boundArg.Type);
             }
         } 
         
@@ -770,7 +769,6 @@ public sealed class Binder
     {
         if(expr.Type is ListTypeSymbol l)
         {
-            Console.WriteLine(l.InnerType.GetType());
             _typeScope.Unify(expr.Type, to);
 
         }
