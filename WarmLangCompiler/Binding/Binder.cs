@@ -767,16 +767,7 @@ public sealed class Binder
 
     private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to, bool allowExplicit = false)
     {
-        if(expr.Type is ListTypeSymbol l)
-        {
-            _typeScope.Unify(expr.Type, to);
-
-        }
-        if(_typeScope.IsSpecializedAs(to, expr.Type) || _typeScope.IsSpecializedAs(expr.Type, to))
-        {
-            return expr;
-        }
-
+        _typeScope.Unify(expr.Type, to);
         
         var conversion = Conversion.GetConversion(expr.Type, to);
         if(!conversion.Exists)
