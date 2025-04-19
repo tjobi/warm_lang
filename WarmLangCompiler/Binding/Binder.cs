@@ -249,6 +249,13 @@ public sealed class Binder
     {
         var nameToken = funcDecl.NameToken;
         var typeParameters = CreateTypeParameterSymbols(funcDecl);
+        _typeScope.Push();
+        foreach(var typeParam in typeParameters) 
+        {
+            if(!_typeScope.TryAddType(typeParam, out var _))
+                _diag.ReportTypeAlreadyDeclared(typeParam.Location, typeParam.Name);
+        }
+
         var parameters = CreateParameterSymbols(funcDecl);
         var returnType = _typeScope.GetTypeOrCrash(funcDecl.ReturnType);
         var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, returnType);
@@ -268,6 +275,7 @@ public sealed class Binder
         _closureStack.Push(new());
         var boundBody = BindFunctionBody(symbol, funcDecl.Body);
         symbol.Body = boundBody;
+        _typeScope.Pop();
         if(symbol.Closure is null)  symbol.Closure = _closureStack.Pop();
         else                        symbol.Closure.UnionWith(_closureStack.Pop());
 

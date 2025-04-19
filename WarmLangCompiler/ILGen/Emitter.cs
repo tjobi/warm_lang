@@ -439,9 +439,18 @@ public sealed class Emitter{
     private void EmitLocalFunctionDeclaration(LocalFunctionSymbol func)
     {
         var funcName = $"_local_{_localFuncId++}_{func.Name}";
-        var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(func.Type));
+        var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(TypeSymbol.Void));
         _funcs[func] = funcDefintion;
         _program.Methods.Add(funcDefintion);
+        
+        foreach(var typeParam in func.TypeParameters)
+        {
+            var genericParam = new GenericParameter(typeParam.Name, funcDefintion);
+            _cilTypeManager.Add(typeParam, genericParam);
+            funcDefintion.GenericParameters.Add(genericParam);
+        }
+        funcDefintion.ReturnType = CilTypeOf(func.Type);
+
 
         foreach(var @param in func.Parameters)
         {
