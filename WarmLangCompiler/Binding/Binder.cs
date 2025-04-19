@@ -120,23 +120,23 @@ public sealed class Binder
     private void BindTypeDeclarations(ASTRoot root)
     {
         var typeDecls = root.GetChildrenOf<TopLevelTypeDeclaration>().ToList();
-        var skipTypeDecl = new HashSet<int>();
+        var declaredTypes = new List<(TypeSymbol, TopLevelTypeDeclaration)>();
         for (int i = 0; i < typeDecls.Count; i++)
         {
             var typeSyntax = typeDecls[i].Type;
-            if (!_typeScope.TryAddType(typeSyntax, out var _))
+            if (_typeScope.TryAddType(typeSyntax, out var typeSymbol))
+            {
+                declaredTypes.Add((typeSymbol, typeDecls[i]));
+            }
+            else 
             {
                 _diag.ReportTypeAlreadyDeclared(typeSyntax.Location, typeSyntax.Name);
-                skipTypeDecl.Add(i);
+                //Skip the declaring it c
             }
         }
-        for (int i = 0; i < typeDecls.Count; i++)
+        foreach(var (typeSymbol, decl) in declaredTypes)
         {
-            if (skipTypeDecl.Contains(i)) continue;
-
-            var typeDecl = typeDecls[i];
-            var typeSymbol = _typeScope.GetTypeOrThrow(typeDecl.Type);
-            foreach (var member in typeDecl.Members)
+            foreach (var member in decl.Members)
             {
                 var memberType = _typeScope.GetTypeOrThrow(member.Type);
                 var memberSymbol = new MemberFieldSymbol(member.Name, memberType);
@@ -448,14 +448,14 @@ public sealed class Binder
     private BoundExpression BindTypeApplication(TypeApplication application)
     {
         var funcDef = BindAccessCallExpression(application.AppliedOn, out var access);
-        //A little ugly having to expectFunc ... 
-        //make it work, then make it pretty
         
-        if(funcDef is null)
-            throw new NotImplementedException($"{nameof(BindTypeApplication)}: Type application is only allowed on functions");
+        if(funcDef is null) return new BoundErrorExpression(application);
         
         if(funcDef.TypeParameters.Length != application.TypeParams.Count) 
-            throw new NotImplementedException($"{nameof(BindTypeApplication)}: Proper error, either missing or too many");
+        {
+            _diag.ReportMismatchingTypeParameters(application.Location, application.TypeParams.Count, funcDef.TypeParameters.Length, funcDef);
+            return new BoundErrorExpression(application);
+        }
         
         // TypeParameters of the original function can be retrieved from the BoundTypeApplication
         var instantiatedParameters     = ImmutableArray.CreateBuilder<ParameterSymbol>(funcDef.Parameters.Length);
@@ -494,7 +494,8 @@ public sealed class Binder
         return param switch
         {
             TypeParameterSymbol tp => typeParametersMap[tp.Name],
-            ListTypeSymbol list => new ListTypeSymbol(ConcretifyType(list.InnerType, typeParametersMap)),
+            TypeSymbol lst when _typeScope.IsListTypeAndGetNested(lst, out var inner) =>
+                _typeScope.GetOrCreateListType(ConcretifyType(inner, typeParametersMap)),
             _ => param 
         };
     }

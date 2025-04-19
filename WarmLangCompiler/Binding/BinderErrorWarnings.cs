@@ -134,7 +134,7 @@ internal static class BinderErrorWarnings
 
     internal static void ReportExpectedFunctionName(this ErrorWarrningBag bag, TextLocation location)
     {
-        var message = "Expected a function name";
+        var message = "Expected a function or a callable expression";
         bag.Report(message, true, location);
     }
 
@@ -183,6 +183,12 @@ internal static class BinderErrorWarnings
     internal static void ReportCannotAssignToReadonlyMember(this ErrorWarrningBag bag, TypeSymbol type, string memberName, TextLocation location)
     {
         var message = $"Cannot assign to field '{type}.{memberName}' -- it is readonly";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int receieved, int expected, FunctionSymbol func)
+    {
+        var message = $"Received {receieved} type arguements but required {expected} for function '{func.Name}'";
         bag.Report(message, true, location);
     }
 }

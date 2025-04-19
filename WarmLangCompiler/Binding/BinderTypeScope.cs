@@ -4,7 +4,7 @@ using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangCompiler.Binding;
 
-using InternalTypeScope = HashSet<int>;
+using InternalTypeScope = Dictionary<string, int>;
 using TypeInformationLookup = Dictionary<int, TypeInformation>;
 
 public sealed class BinderTypeScope
@@ -45,7 +45,7 @@ public sealed class BinderTypeScope
         _scopes.Add(new InternalTypeScope());
         foreach(var builtin in BuiltinTypes()) 
         {
-            Global.Add(TypeToId(builtin));
+            Global.Add(builtin.Name, TypeToId(builtin));
             _idToInformation.Add(TypeToId(builtin), new(builtin));
             _typeUnion.Add(builtin);
         }
@@ -70,7 +70,7 @@ public sealed class BinderTypeScope
         {
             foreach(var scope in _scopes)
             {
-                if(scope.Contains(TypeToId(type))) 
+                if(scope.ContainsKey(type.Name)) 
                     return scope;
             }
         }
@@ -82,7 +82,7 @@ public sealed class BinderTypeScope
 
         var scope = GetDefiningScopeOf(type);
         if(scope is null || type is null) return null;
-        var parentId = _typeUnion.Find(type);
+        var parentId = _typeUnion.Find(scope[type.Name]);
         if(_idToInformation.TryGetValue(parentId, out var info)) return (info.Type, info);
         return null;
     }
@@ -104,7 +104,7 @@ public sealed class BinderTypeScope
         //Too many strings?
         var listType = new TypeSymbol($"{TypeSymbol.List}<{typeParam}>");
         var info = new ListTypeInformation(listType, TypeSymbol.List, typeParam);
-        Global.Add(TypeToId(listType));
+        Global.Add(listType.Name, TypeToId(listType));
         _idToInformation.Add(TypeToId(listType), info);
         _typeUnion.Add(listType);
         return listType;
@@ -128,9 +128,9 @@ public sealed class BinderTypeScope
         res = null;
         var knownTypeOrNull = GetType(type); 
         if(knownTypeOrNull is not null) return false;
-
-        Top.Add(TypeToId(type));
+        Top.Add(type.Name, TypeToId(type));
         _idToInformation[TypeToId(type)] = typeInfo ?? new TypeInformation(type);
+        _typeUnion.Add(type);
         res = type;
         if(type is not TypeParameterSymbol) _userDefinedTypes.Add(res);
         return true;
@@ -193,7 +193,7 @@ public sealed class BinderTypeScope
         var res = new List<(TypeSymbol,IEnumerable<FunctionSymbol>)>();
         foreach(var scope in _scopes) 
         {
-            foreach(var typeId in scope) 
+            foreach(var (_, typeId) in scope) 
             {
                 var info = _idToInformation[typeId];
                 res.Add((info.Type, info.GetMethodFunctionSymbols()));
@@ -255,8 +255,14 @@ public sealed class BinderTypeScope
             throw new BinderTypeScopeExeception($"Illegal state, expected 1 scope, but had {_scopes.Count}");
         
         var declaredTypes = _userDefinedTypes.ToList().AsReadOnly();
-        // return new TypeMemberInformation(_scopes[0].AsReadOnly(), declaredTypes);
-        return new TypeMemberInformation(new Dictionary<TypeSymbol, TypeInformation>().AsReadOnly(), declaredTypes);
+        var typeInfoDict = new Dictionary<TypeSymbol, TypeInformation>();
+        foreach(var (_, typeId) in Global)
+        {
+            var info = _idToInformation[_typeUnion.Find(typeId)];
+            if(typeInfoDict.ContainsKey(info.Type)) continue;
+            typeInfoDict.Add(info.Type, info);
+        }
+        return new TypeMemberInformation(typeInfoDict.AsReadOnly(), declaredTypes);
     }
 
     public bool IsSubscriptable(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? nested)
@@ -355,7 +361,7 @@ public sealed class BinderTypeScope
         //FIXME: Create the placeholder info at the global level
         var placeholderInfo = new PlaceHolderInformation(_scopes.Count);
         var ts = placeholderInfo.Type;
-        Global.Add(TypeToId(ts));
+        Global.Add(ts.Name, TypeToId(ts));
         _typeUnion.Add(ts);
         _idToInformation[TypeToId(ts)] = placeholderInfo;
         return ts;
@@ -365,5 +371,5 @@ public sealed class BinderTypeScope
     {
         Console.WriteLine(_typeUnion);
         Console.WriteLine("  " + string.Join("\n  ", _idToInformation.Select(kv => kv.Value.Type).Select(t => (t.Name, t.TypeID))));
-    } 
+    }
 }
