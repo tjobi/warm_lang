@@ -6,4 +6,6 @@ public sealed class BoundErrorStatement : BoundStatement
 {
     public BoundErrorStatement(StatementNode node)
     : base(node) { }
+
+    public override string ToString() => $"Error ({NodeString()})";
 }

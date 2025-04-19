@@ -14,7 +14,7 @@ public sealed class ListTypeSymbol : TypeSymbol
 
     public TypeSymbol InnerType { get; private set;}
 
-    public static TypeSymbol BasicList => ListBase;
+    public static TypeSymbol BasicList => List;
 
     public static bool operator == (ListTypeSymbol a, ListTypeSymbol b)
     {

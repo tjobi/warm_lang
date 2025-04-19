@@ -14,4 +14,6 @@ public sealed class BoundReturnStatement : BoundStatement
     }
 
     public BoundExpression? Expression { get; }
+
+    public override string ToString() => $"(return {Expression})";
 }

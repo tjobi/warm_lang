@@ -11,4 +11,6 @@ public class BoundExprStatement : BoundStatement
     }
 
     public BoundExpression Expression { get; }
+
+    public override string ToString() => $"({Expression};)";
 }

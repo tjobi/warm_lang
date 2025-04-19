@@ -1,40 +1,10 @@
-using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangCompiler.Binding;
 
-using TypeFieldDict = Dictionary<TypeSymbol, IList<MemberSymbol>>;
-using TypeMethodDict = Dictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>;
-
-using InternalTypeScope = Dictionary<string, TypeInformation>;
-public record TypeInformation(
-    TypeSymbol Type,
-    List<MemberSymbol> Members,
-    Dictionary<FunctionSymbol, BoundBlockStatement> MethodBodies,
-    TypeSymbol? SpecializedAs = null
-)
-{
-    public TypeInformation(TypeSymbol type) 
-    : this(type, new(), new()) { }
-
-    public TypeInformation(TypeSymbol type, TypeSymbol SpecializedAs) 
-    : this(type, new(), new(), SpecializedAs) { }
-
-    public IEnumerable<FunctionSymbol> GetMethodFunctionSymbols()
-    {
-        foreach(var m in Members)
-            if(m is MemberFuncSymbol mf) yield return mf.Function;
-    }
-
-    public IEnumerable<MemberFieldSymbol> GetFields()
-    {
-        foreach(var m in Members)
-            if(m is MemberFieldSymbol mf) yield return mf;
-    }
-}
-
+using InternalTypeScope = Dictionary<TypeSymbol, TypeInformation>;
 
 public sealed class BinderTypeScope
 {
@@ -48,7 +18,7 @@ public sealed class BinderTypeScope
         yield return TypeSymbol.Int;
         yield return TypeSymbol.Bool;
         yield return TypeSymbol.String;
-        yield return TypeSymbol.ListBase;
+        yield return TypeSymbol.List;
         yield return TypeSymbol.Void;
     }
 
@@ -62,15 +32,14 @@ public sealed class BinderTypeScope
     {
         _scopes = new();
         _userDefinedTypes = new();
-        var globalTypeScope = new InternalTypeScope();
+        _scopes.Add(new InternalTypeScope());
         foreach(var builtin in BuiltinTypes()) 
-            globalTypeScope.Add(builtin.Name, new(builtin));
+            Global.Add(builtin, new(builtin));
 
         foreach(var (type, fields) in BuiltinMembers.CreateMembersForBuiltins())
         {
-            globalTypeScope[type.Name] = new TypeInformation(type, fields.ToList(), new());
+            Global[type] = new TypeInformation(type, fields.ToList(), new());
         }
-        _scopes.Add(globalTypeScope);
     }
 
     public void Push() => _scopes.Add(new());
@@ -87,16 +56,9 @@ public sealed class BinderTypeScope
         {
             foreach(var scope in _scopes)
             {
-                if(scope.ContainsKey(type.Name)) 
+                if(scope.ContainsKey(type)) 
                     return scope;
             }
-        }
-        if(type is ListTypeSymbol)
-        {
-            //List wasn't found, so we will create it - create a concrete type of list... list<int>, list<bool>...
-            var info = new TypeInformation(type);
-            Global.Add(type.Name, info);
-            return Global;
         }
         return null;
     }
@@ -105,8 +67,22 @@ public sealed class BinderTypeScope
     {
         var scope = GetDefiningScopeOf(type);
         if(scope is null || type is null) return null;
-        if(scope.TryGetValue(type.Name, out var info)) return (info.Type, info);
+        if(scope.TryGetValue(type, out var info)) return (info.Type, info);
         return null;
+    }
+
+    public TypeSymbol GetOrCreateListType(TypeSymbol typeParam)
+    {
+        //Too many strings?
+        var listType = new TypeSymbol($"{TypeSymbol.List}<{typeParam}>");
+        if(TryGetTypeInformation(listType, out var info)) 
+        {
+            //We foudn a cached version of the list
+            return info.Type;
+        }
+        info = new GenericTypeInformation(listType, TypeSymbol.List, typeParam);
+        Top.Add(listType, info);
+        return listType;
     }
 
     public bool TryAddType(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? res, TypeInformation? typeInfo = null)
@@ -115,7 +91,7 @@ public sealed class BinderTypeScope
         var knownTypeOrNull = GetType(type); 
         if(knownTypeOrNull is not null) return false;
 
-        Top.Add(type.Name, typeInfo ?? new TypeInformation(type));
+        Top.Add(type, typeInfo ?? new TypeInformation(type));
         res = type;
         if(type is not TypeParameterSymbol) _userDefinedTypes.Add(res);
         return true;
@@ -145,8 +121,8 @@ public sealed class BinderTypeScope
         return res.Value.Type;
     }
 
-    public TypeSymbol GetTypeOrCrash(TypeSyntaxNode? type) => GetTypeOrCrash(AsTypeSymbol(type));
-    public TypeSymbol GetTypeOrCrash(TypeSymbol? type) 
+    public TypeSymbol GetTypeOrThrow(TypeSyntaxNode? type) => GetTypeOrThrow(AsTypeSymbol(type));
+    public TypeSymbol GetTypeOrThrow(TypeSymbol? type) 
         => GetType(type) ?? throw new BinderTypeScopeExeception($"{nameof(BinderTypeScope)} - cannot find '{type}'");
 
     private TypeSymbol AsTypeSymbol(TypeSyntaxNode? typeSyntax) 
@@ -158,8 +134,8 @@ public sealed class BinderTypeScope
             TypeSyntaxBool => TypeSymbol.Bool,
             TypeSyntaxString => TypeSymbol.String,
             TypeSyntaxIdentifier ident => 
-                !ContainsTypeParameterWithName(ident, out var typeParam) ? TypeSymbolFromString(ident.Name) : typeParam,
-            TypeSyntaxList lst => new ListTypeSymbol(AsTypeSymbol(lst.InnerType)),
+                ContainsTypeParameterWithName(ident, out var typeParam) ? typeParam : TypeSymbolFromString(ident.Name),
+            TypeSyntaxList lst => GetOrCreateListType(AsTypeSymbol(lst.InnerType)),
             TypeSyntaxParameterType tv => new TypeParameterSymbol(tv),
             _ => throw new NotImplementedException($"BinderTypeExntensions doesn't know {typeSyntax}")
         };
@@ -186,6 +162,12 @@ public sealed class BinderTypeScope
         return res;
     }
 
+    public TypeInformation GetTypeInformationOrThrow(TypeSymbol type)
+    {
+        return GetTypeInformation(type) 
+               ?? throw new BinderTypeScopeExeception($"{nameof(GetTypeAndInformation)} - couldn't find information for '{type}'");
+    }
+
     public TypeInformation? GetTypeInformation(TypeSymbol type)
     {
         var res = GetTypeAndInformation(type);
@@ -198,9 +180,9 @@ public sealed class BinderTypeScope
     private TypeInformation UpdateTypeInformation(TypeSymbol type, Func<TypeInformation, TypeInformation> f)
     {
         var scope = GetDefiningScopeOf(type);
-        if(scope is null || !scope.ContainsKey(type.Name)) 
+        if(scope is null || !scope.ContainsKey(type)) 
             throw new BinderTypeScopeExeception($"{nameof(UpdateTypeInformation)} - compiler bug - where is '{type}' defined?");
-        return scope[type.Name] = f(scope[type.Name]);
+        return scope[type] = f(scope[type]);
     }
 
     public void AddMethodBody(TypeSymbol type, FunctionSymbol func, BoundBlockStatement body)
@@ -221,36 +203,18 @@ public sealed class BinderTypeScope
     {
         //TODO: other generics objects?
         memberSymbol = null;
-        var typeInfo = GetTypeAndInformation(type);
-        if(typeInfo is null) return false;
+        var typeAndInfo = GetTypeAndInformation(type);
+        if(typeAndInfo is not var (t, info)) return false;
 
-        var members = typeInfo.Value.Info.Members;
+        var members = typeAndInfo.Value.Info.Members;
         memberSymbol = members.FirstOrDefault(m => m.Name == name);
-        if(memberSymbol is null && type is ListTypeSymbol)
-        {   //Try again if it's a list - incase it exists on the listbase
-            TryFindMember(TypeSymbol.ListBase, name, out memberSymbol);
+
+        // if the type is specialized/instantiation of a generic - member may reside on base
+        if(memberSymbol is null && info is GenericTypeInformation gt)
+        {
+            TryFindMember(gt.SpecializedFrom, name, out memberSymbol);
         }
         return memberSymbol is not null;
-    }
-
-    public bool IsSpecializedAs(TypeSymbol param, TypeSymbol concrete)
-    {
-        if(!TryGetSpecialization(param, out var specializedParam)) return false;
-        return IsSameType(specializedParam, concrete);
-    }
-
-    private bool TryGetSpecialization(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? specialized)
-    {
-        specialized = null;
-        if(TryGetTypeInformation(type, out var typeInfo) && typeInfo.SpecializedAs is not null) 
-        {
-            specialized = typeInfo.SpecializedAs;
-        }
-        else if(type is ListTypeSymbol l && TryGetTypeInformation(l.InnerType, out typeInfo) && typeInfo.SpecializedAs is not null) 
-        {
-            specialized = new ListTypeSymbol(typeInfo.SpecializedAs);
-        }
-        return specialized is not null;
     }
 
     public TypeMemberInformation GetTypeMemberInformation()
@@ -258,19 +222,32 @@ public sealed class BinderTypeScope
         if(_scopes.Count != 1) 
             throw new BinderTypeScopeExeception($"Illegal state, expected 1 scope, but had {_scopes.Count}");
         
-        var tmpMembers = new TypeFieldDict();
-        var tmpFuncs = new TypeMethodDict();
-
-        foreach(var (_, info) in _scopes[0])
-        {
-            tmpMembers.Add(info.Type, info.Members);
-            tmpFuncs.Add(info.Type, info.MethodBodies);
-        }
-
-        var members = new ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>>(tmpMembers);
-        var funcs = new ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>(tmpFuncs);
         var declaredTypes = _userDefinedTypes.ToList().AsReadOnly();
-        return new TypeMemberInformation(members, funcs, declaredTypes);
+        return new TypeMemberInformation(_scopes[0].AsReadOnly(), declaredTypes);
+    }
+
+    public bool IsSubscriptable(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? nested)
+    {
+        //I will just assume no type information means no --
+        var info = GetTypeInformation(type);
+        nested = null;
+        if(type == TypeSymbol.String) 
+        {
+            nested = TypeSymbol.Int;
+            return true;
+        }
+        return info is GenericTypeInformation { NestedType: TypeSymbol n } && (nested = n) is not null;
+    }
+
+    public bool IsListTypeAndGetNested(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? nested)
+    {
+        var info = GetTypeAndInformation(type);
+        nested = null;
+        if(info is { Info: GenericTypeInformation gt } && gt.SpecializedFrom == TypeSymbol.List)
+        {
+            nested = gt.NestedType;
+        }
+        return nested is not null;
     }
 
     public void Unify(TypeSymbol _a, TypeSymbol _b)
@@ -295,14 +272,14 @@ public sealed class BinderTypeScope
                 else //neither are null - failure state
                     throw new BinderTypeScopeExeception($"Something is wrong here - neither '{aa}' nor '{bb}' is null");
                 break;
-            case (PlaceholderTypeSymbol aa,_):
-                var updated = UpdateTypeInformation(aa, info => new(info.Type, curB));
-                aa.Union(curB);
-                break;
-            case (_,PlaceholderTypeSymbol bb):
-                UpdateTypeInformation(bb, info => new(info.Type, curA));
-                bb.Union(curA);
-                break;
+            // case (PlaceholderTypeSymbol aa,_):
+            //     var updated = UpdateTypeInformation(aa, info => new(info.Type, curB));
+            //     aa.Union(curB);
+            //     break;
+            // case (_,PlaceholderTypeSymbol bb):
+            //     UpdateTypeInformation(bb, info => new(info.Type, curA));
+            //     bb.Union(curA);
+            //     break;
             case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut1}, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut2}):
                 stack.Push((ut1,ut2));
                 break;
@@ -325,26 +302,9 @@ public sealed class BinderTypeScope
     {
         var ts = new PlaceholderTypeSymbol(_scopes.Count);
         //FIXME: Create the placeholder info at the global level
-        Global.Add(ts.Name, new TypeInformation(ts));
+        Global.Add(ts, new TypeInformation(ts));
         // if(!TryAddType(ts, out var _))
         //     throw new BinderTypeScopeExeception($"{nameof(CreatePlacerHolderType)} couldn't declare placeholder '{ts}'");
         return ts;
     }
-
-    private bool IsSameType(TypeSymbol? a, TypeSymbol? b)
-    {
-        if(a is null) return false;
-        if(b is null) return false;
-        if(IsSpecailizable(a) && TryGetSpecialization(a, out var specializedA)) 
-            return IsSameType(specializedA, b);
-        if(IsSpecailizable(b) && TryGetSpecialization(b, out var specializedB)) 
-            return IsSameType(a, specializedB);
-        if(a is ListTypeSymbol la && b is ListTypeSymbol lb)
-        {
-            return IsSameType(la.InnerType, lb.InnerType);
-        }
-        return a == b;
-    }
-
-    private static bool IsSpecailizable(TypeSymbol? type) => type is TypeParameterSymbol or PlaceholderTypeSymbol;
 }

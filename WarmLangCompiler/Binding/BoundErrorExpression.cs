@@ -9,8 +9,3 @@ public class BoundErrorExpression : BoundExpression
     : base(expr, TypeSymbol.Error)
     { }
 }
-
-public class BoundStatementExpression : BoundStatement
-{
-    public BoundStatementExpression(StatementNode node) : base(node) { }
-}

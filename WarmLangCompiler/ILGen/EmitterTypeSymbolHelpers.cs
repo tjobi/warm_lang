@@ -9,7 +9,7 @@ public static class EmitterTypeSymbolHelpers
     {
         (TypeSymbol.Int, "System.Int32"),       (TypeSymbol.Bool, "System.Boolean"), 
         (TypeSymbol.String, "System.String"),   (TypeSymbol.Void, "System.Void"), 
-        (_cilBaseType, "System.Object"),        (_closureType, "System.ValueType")
+        (_cilBaseType, "System.Object"),        (_closureType, "System.ValueType"),
     }.ToImmutableDictionary(tuple => tuple.Item1, tuple => tuple.Item2);
     private static readonly ImmutableDictionary<string,TypeSymbol> _fromCIL = _toCIL.ToImmutableDictionary(entry => entry.Value, entry => entry.Key);
 

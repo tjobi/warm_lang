@@ -15,6 +15,8 @@ public class BinderTests
     private static readonly TypeSyntaxNode _syntaxInt = new TypeSyntaxInt(new TextLocation(1,1, length:3));
     private static readonly TypeSyntaxNode _syntaxIntList = new TypeSyntaxList(new TextLocation(1,1,length:3+2),_syntaxInt);
 
+    private static readonly TypeSymbol IntList = new ListTypeSymbol("list<int>", TypeSymbol.Int); 
+
     private readonly Binder _binder;
     public BinderTests()
     {
@@ -35,9 +37,15 @@ public class BinderTests
         );
         
         var typeMembers = new ReadOnlyDictionary<TypeSymbol,IList<MemberSymbol>>(BuiltinMembers.CreateMembersForBuiltins());
-        var typeMethods = new ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>(new Dictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>>());
+
+        var typeInfoDict = new Dictionary<TypeSymbol, TypeInformation>();
+        foreach(var (type, fields) in BuiltinMembers.CreateMembersForBuiltins())
+        {
+            typeInfoDict[type] = new TypeInformation(type, fields.ToList(), new());
+        }
+
         var declaredTypes = new List<TypeSymbol>().AsReadOnly();
-        var typeInfo = new TypeMemberInformation(typeMembers, typeMethods, declaredTypes);
+        var typeInfo = new TypeMemberInformation(typeInfoDict.AsReadOnly(), declaredTypes);
 
         return new BoundProgram(null, scriptMain, functions, typeInfo, globals);
     }
@@ -93,12 +101,12 @@ public class BinderTests
             new BoundVarDeclaration(varDecl,new GlobalVariableSymbol("x", TypeSymbol.Int),
                 new BoundListExpression(
                     rhs,
-                    TypeSymbol.IntList,
+                    IntList,
                     new BoundExpression[]{new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)}.ToImmutableArray())
             )
         );
         var expectedErrorBag = new ErrorWarrningBag();
-        expectedErrorBag.ReportCannotConvertToType(rhs.Location, TypeSymbol.Int, TypeSymbol.IntList);
+        expectedErrorBag.ReportCannotConvertToType(rhs.Location, TypeSymbol.Int, IntList);
 
         var boundProgram = _binder.BindProgram(input);
 
@@ -118,7 +126,7 @@ public class BinderTests
         placeholderType.Union(TypeSymbol.Int);
         
         var expected = CreateBoundProgram(
-            new BoundVarDeclaration(varDecl, new GlobalVariableSymbol("x", TypeSymbol.IntList),
+            new BoundVarDeclaration(varDecl, new GlobalVariableSymbol("x", IntList),
                     new BoundListExpression(
                         rhs,
                         new ListTypeSymbol(placeholderType), 
@@ -173,10 +181,10 @@ public class BinderTests
                 exprStatement, 
                 new BoundBinaryExpression(
                     binaryExpression,
-                    new BoundListExpression(left, TypeSymbol.IntList, ImmutableArray<BoundExpression>.Empty),
-                    new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, TypeSymbol.IntList, TypeSymbol.IntList, TypeSymbol.IntList),
+                    new BoundListExpression(left, IntList, ImmutableArray<BoundExpression>.Empty),
+                    new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, IntList, IntList, IntList),
                     new BoundListExpression(
-                        right, TypeSymbol.IntList, 
+                        right, IntList, 
                         new List<BoundExpression>
                         {
                             new BoundConstantExpression(two, TypeSymbol.Int),
@@ -216,15 +224,15 @@ public class BinderTests
                 exprStatement,
                 new BoundBinaryExpression(binaryExpression,
                 new BoundListExpression(left, leftType, ImmutableArray<BoundExpression>.Empty),
-                new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, leftType, TypeSymbol.IntList, leftType),
-                new BoundListExpression(right, TypeSymbol.IntList, 
+                new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, leftType, IntList, leftType),
+                new BoundListExpression(right, IntList, 
                     new List<BoundExpression>{new BoundConstantExpression(two, TypeSymbol.Int)}.ToImmutableArray()
                 )
             )));
         
         var boundProgram = _binder.BindProgram(input);
         // var expectedBag = new ErrorWarrningBag();
-        // expectedBag.ReportBinaryOperatorCannotBeApplied(new TextLocation(1,1), plus, TypeSymbol.EmptyList, TypeSymbol.IntList);
+        // expectedBag.ReportBinaryOperatorCannotBeApplied(new TextLocation(1,1), plus, TypeSymbol.EmptyList, IntList);
         // expectedBag.ReportTypeOfEmptyListMustBeExplicit(new TextLocation(1,1));
 
         boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());

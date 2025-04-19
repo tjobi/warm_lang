@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Binding;
@@ -18,4 +19,13 @@ public sealed class BoundWhileStatement : BoundStatement
     public BoundExpression Condition { get; }
     public BoundStatement Body { get; }
     public ImmutableArray<BoundExpression> Continue { get; }
+
+    public override string ToString()
+    {
+        var sb = new StringBuilder("while ");
+        sb.Append(Condition);
+        if(Continue.Length > 0) sb.Append(':').AppendJoin(",", Continue);
+        sb.Append('{').Append(Body).Append('}');
+        return sb.ToString();
+    }
 }

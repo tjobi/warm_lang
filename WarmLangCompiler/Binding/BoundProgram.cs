@@ -5,8 +5,7 @@ using WarmLangCompiler.Symbols;
 namespace WarmLangCompiler.Binding;
 
 public record TypeMemberInformation(
-    ReadOnlyDictionary<TypeSymbol, IList<MemberSymbol>> Members, 
-    ReadOnlyDictionary<TypeSymbol, Dictionary<FunctionSymbol, BoundBlockStatement>> FunctionBodies,
+    ReadOnlyDictionary<TypeSymbol, TypeInformation> TypeInformation,
     ReadOnlyCollection<TypeSymbol> DeclaredTypes
 );
 
@@ -17,14 +16,16 @@ public sealed class BoundProgram
         MainFunc = mainFunc;
         ScriptMain = scriptMain;
         Functions = functions;
-        TypeMemberInformation = typeMembers;
+        TypeInformation = typeMembers.TypeInformation;
+        DeclaredTypes = typeMembers.DeclaredTypes;
         GlobalVariables = globalVariables;
     }
 
     public FunctionSymbol? MainFunc { get; }
     public FunctionSymbol? ScriptMain { get; }
     public ImmutableDictionary<FunctionSymbol, BoundBlockStatement> Functions { get; }
-    public TypeMemberInformation TypeMemberInformation { get; }
+    public ReadOnlyDictionary<TypeSymbol, TypeInformation> TypeInformation { get; }
+    public ReadOnlyCollection<TypeSymbol> DeclaredTypes { get; }
     public ImmutableArray<BoundVarDeclaration> GlobalVariables { get; }
 
     public bool IsValid => MainFunc is not null || ScriptMain is not null;
@@ -33,8 +34,8 @@ public sealed class BoundProgram
 
     public IEnumerable<(TypeSymbol Type, IList<MemberSymbol> Members)> GetDeclaredTypes()
     {
-        foreach(var t in TypeMemberInformation.DeclaredTypes)
-            yield return (t, TypeMemberInformation.Members[t]);
+        foreach(var t in DeclaredTypes)
+            yield return (t, TypeInformation[t].Members);
     }
 
     public IEnumerable<FunctionSymbol> GetFunctionSymbols()
@@ -45,8 +46,8 @@ public sealed class BoundProgram
 
     public IEnumerable<(FunctionSymbol Func, BoundBlockStatement Body)> GetFunctionSymbolsAndBodies()
     {
-        foreach(var (type, funcitonMembers) in TypeMemberInformation.FunctionBodies)
-            foreach(var (func, body) in funcitonMembers)
+        foreach(var (type, typeInfo) in TypeInformation)
+            foreach(var (func, body) in typeInfo.MethodBodies)
                 yield return (func, body);
 
         foreach(var (func, body) in Functions)

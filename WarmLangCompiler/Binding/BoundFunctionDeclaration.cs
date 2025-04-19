@@ -11,4 +11,6 @@ public sealed class BoundFunctionDeclaration : BoundStatement
     }
 
     public FunctionSymbol Symbol { get; }
+
+    public override string ToString() => $"(function {Symbol})";
 }

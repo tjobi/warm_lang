@@ -13,5 +13,8 @@ public abstract class BoundStatement
     public StatementNode Node { get; }
 
     public TextLocation Location => Node.Location;
-    public override string ToString() => Node.ToString();
+    
+    public string NodeString() => Node.ToString();
+
+    public abstract override string ToString();
 }

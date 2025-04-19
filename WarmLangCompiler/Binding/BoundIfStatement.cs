@@ -15,4 +15,6 @@ public sealed class BoundIfStatement : BoundStatement
     public BoundExpression Condition { get; }
     public BoundStatement Then { get; }
     public BoundStatement? Else { get; }
+
+    public override string ToString() => $$$"""if {{{Condition}}} { {{{Then}}} } else { {{{Else}}} }""";
 }

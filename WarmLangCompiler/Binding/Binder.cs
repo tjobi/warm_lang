@@ -135,10 +135,10 @@ public sealed class Binder
             if (skipTypeDecl.Contains(i)) continue;
 
             var typeDecl = typeDecls[i];
-            var typeSymbol = _typeScope.GetTypeOrCrash(typeDecl.Type);
+            var typeSymbol = _typeScope.GetTypeOrThrow(typeDecl.Type);
             foreach (var member in typeDecl.Members)
             {
-                var memberType = _typeScope.GetTypeOrCrash(member.Type);
+                var memberType = _typeScope.GetTypeOrThrow(member.Type);
                 var memberSymbol = new MemberFieldSymbol(member.Name, memberType);
                 _typeScope.AddMember(typeSymbol, memberSymbol);
             }
@@ -183,9 +183,11 @@ public sealed class Binder
 
     private BoundStatement BindVarDeclaration(VarDeclaration varDecl, bool isGlobalScope)
     {
-        var type = _typeScope.GetTypeOrCrash(varDecl.Type);
+        var type = _typeScope.GetTypeOrThrow(varDecl.Type);
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
+
+        Console.WriteLine(type + " rhs: " + rightHandSide.Type);
 
         VariableSymbol variable = isGlobalScope 
                                 ? new GlobalVariableSymbol(name, rightHandSide.Type)
@@ -213,14 +215,14 @@ public sealed class Binder
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
-        var returnType = _typeScope.GetTypeOrCrash(funcDecl.ReturnType);
+        var returnType = _typeScope.GetTypeOrThrow(funcDecl.ReturnType);
         var function = new FunctionSymbol(nameToken, typeParameters, parameters, returnType);
         
         var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
         
         if(funcDecl.OwnerType is not null)
         {
-            var ownerType = _typeScope.GetTypeOrCrash(funcDecl.OwnerType);
+            var ownerType = _typeScope.GetTypeOrThrow(funcDecl.OwnerType);
             var symbol = new MemberFuncSymbol(function);
             _typeScope.AddMember(ownerType, symbol);
             function.SetOwnerType(ownerType); //TODO: this is quite ugly
@@ -257,12 +259,12 @@ public sealed class Binder
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
-        var returnType = _typeScope.GetTypeOrCrash(funcDecl.ReturnType);
+        var returnType = _typeScope.GetTypeOrThrow(funcDecl.ReturnType);
         var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, returnType);
 
         if(funcDecl.OwnerType is not null)
         {
-            var ownerType = _typeScope.GetTypeOrCrash(funcDecl.OwnerType);
+            var ownerType = _typeScope.GetTypeOrThrow(funcDecl.OwnerType);
             _diag.ReportLocalMemberFuncDeclaration(nameToken, funcDecl.OwnerType.Location, ownerType);
         }
 
@@ -308,7 +310,7 @@ public sealed class Binder
         for (int i = 0; i < func.Params.Count; i++)
         {
             var (type, name) = func.Params[i];
-            var paramType = _typeScope.GetTypeOrCrash(type);
+            var paramType = _typeScope.GetTypeOrThrow(type);
             
             //missing names have been reported by the parser
             var paramName = name.Name ?? "NO_NAME"; 
@@ -467,7 +469,7 @@ public sealed class Binder
         for (int i = 0; i < funcDef.TypeParameters.Length; i++)
         {
             var typeParam = funcDef.TypeParameters[i];
-            var concrete = _typeScope.GetTypeOrCrash(application.TypeParams[i]);
+            var concrete = _typeScope.GetTypeOrThrow(application.TypeParams[i]);
             instantiatedTypeParameters.Add(concrete);
             typeParametersMap[typeParam.Name] = concrete;
         }
@@ -527,7 +529,7 @@ public sealed class Binder
         //We have reached a cast 'bool(25)' or 'int(true)' or 'string(2555)'
         if (ce.Arguments.Count == 1 && ce.Called is AccessPredefinedType predefined)
         {
-            var predefinedType = _typeScope.GetTypeOrCrash(predefined.Syntax);
+            var predefinedType = _typeScope.GetTypeOrThrow(predefined.Syntax);
             return BindTypeConversion(ce.Arguments[0], predefinedType, allowExplicit: true);
         }
         
@@ -620,7 +622,7 @@ public sealed class Binder
                 return new BoundInvalidAccess();
             }
             case AccessPredefinedType predefined: {
-                var type = _typeScope.GetTypeOrCrash(predefined.Syntax);
+                var type = _typeScope.GetTypeOrThrow(predefined.Syntax);
                 return new BoundPredefinedTypeAccess(type);
             }
             case MemberAccess ma:
@@ -644,13 +646,13 @@ public sealed class Binder
             case SubscriptAccess sa:
             {
                 var boundTarget = BindAccess(sa.Target);
-                if(boundTarget.Type is not ListTypeSymbol && boundTarget.Type != TypeSymbol.String)
+                if(_typeScope.IsSubscriptable(boundTarget.Type, out var resultType))
                 {
-                    _diag.ReportCannotSubscriptIntoType(sa.Location, boundTarget.Type);
-                    return new BoundInvalidAccess();
+                    var boundIndexExpr = BindExpression(sa.Index);
+                    return new BoundSubscriptAccess(boundTarget, boundIndexExpr, resultType);
                 }
-                var boundIndexExpr = BindExpression(sa.Index);
-                return new BoundSubscriptAccess(boundTarget, boundIndexExpr);
+                _diag.ReportCannotSubscriptIntoType(sa.Location, boundTarget.Type);
+                return new BoundInvalidAccess();
             }
             case InvalidAccess:
                 return new BoundInvalidAccess();
@@ -686,7 +688,7 @@ public sealed class Binder
         }
         _typeScope.Unify(boundLeft.Type, boundRight.Type);
 
-        var boundOperator = BoundBinaryOperator.Bind(binaryExpr.Operator.Kind, boundLeft, boundRight);
+        var boundOperator = BoundBinaryOperator.Bind(_typeScope, binaryExpr.Operator.Kind, boundLeft, boundRight);
         if(boundOperator is null)
         {
             _diag.ReportBinaryOperatorCannotBeApplied(binaryExpr.Location, binaryExpr.Operator, boundLeft.Type, boundRight.Type);
@@ -702,22 +704,22 @@ public sealed class Binder
             TypeSymbol inner;
             //It was an implicitly typed empty list []
             if(le.ElementType is null) inner = _typeScope.CreatePlacerHolderType();
-            else inner = _typeScope.GetTypeOrCrash(le.ElementType);
+            else inner = _typeScope.GetTypeOrThrow(le.ElementType);
 
-            var type = new ListTypeSymbol(inner);
+            var type = _typeScope.GetOrCreateListType(inner);
             return new BoundListExpression(le, type, ImmutableArray<BoundExpression>.Empty);
         }
 
         var elements = ImmutableArray.CreateBuilder<BoundExpression>(le.Elements.Count);
-        TypeSymbol? listType = null;
+        TypeSymbol? innerType = null;
         foreach(var elm in le.Elements)
         {
             var bound = BindExpression(elm);
-            listType ??= bound.Type;
-            var conversion = BindTypeConversion(bound, listType);
+            innerType ??= bound.Type;
+            var conversion = BindTypeConversion(bound, innerType);
             elements.Add(conversion);
         }
-        var initListType = new ListTypeSymbol(listType!);
+        var initListType = _typeScope.GetOrCreateListType(innerType!);
         return new BoundListExpression(le, initListType, elements.MoveToImmutable());
     }
 

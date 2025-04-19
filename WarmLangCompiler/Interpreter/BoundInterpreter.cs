@@ -230,7 +230,7 @@ public sealed class BoundInterpreter
         if(function.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(call);
         var functionBody = (function.IsMemberFunc 
-                                ? program.TypeMemberInformation.FunctionBodies[function.OwnerType!][function]
+                                ? program.TypeInformation[function.OwnerType!].MethodBodies[function]
                                 : _functionEnvironment.Lookup(function))
                                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'");
         
@@ -402,7 +402,7 @@ public sealed class BoundInterpreter
 
     private Value EvaluateObjectInitExpression(BoundObjectInitExpression bse)
     {
-        var membersOfStruct = program.TypeMemberInformation.Members[bse.Type];
+        var membersOfStruct = program.TypeInformation[bse.Type].Members;
         var strct = new ObjectValue(bse.Type);
         foreach(var initedMember in bse.InitializedMembers)
         {
