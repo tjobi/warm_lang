@@ -222,7 +222,11 @@ public sealed class BoundInterpreter
 
     private Value EvaluateCallExpression(BoundCallExpression call)
     {
-        var function = call.Function;
+        var function = call.Function switch 
+        {
+            SpecializedFunctionSymbol s => s.SpecializedFrom,
+            _ => call.Function,
+        };
         if(function.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(call);
         var functionBody = (function.IsMemberFunc 

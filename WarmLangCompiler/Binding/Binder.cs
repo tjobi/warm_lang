@@ -528,10 +528,14 @@ public sealed class Binder
         if(function is null) return new BoundErrorExpression(ce);
         
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
-        if(function.IsMemberFunc)
+        if(function.IsMemberFunc || function is SpecializedFunctionSymbol { SpecializedFrom.IsMemberFunc: true })
         {
-            if(accessToCall is not BoundMemberAccess bma)
-                throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}");
+            BoundMemberAccess bma = accessToCall switch 
+            {
+                BoundMemberAccess b => b,
+                BoundExprAccess { Expression: BoundTypeApplication { Access: BoundMemberAccess b}} => b,
+                _ => throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}")
+            };
             
             if(bma.Target is not BoundTypeAccess && bma.Member is MemberFuncSymbol)
             {

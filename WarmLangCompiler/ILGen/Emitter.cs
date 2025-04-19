@@ -1000,6 +1000,8 @@ public sealed class Emitter{
             case BoundExprAccess ae:
                 EmitExpression(processor, ae.Expression);
                 break;
+            default:
+                throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't know how to emit access for '{acc}'");
 
         }
     }
