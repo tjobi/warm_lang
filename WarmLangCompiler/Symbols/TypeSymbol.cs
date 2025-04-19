@@ -2,21 +2,25 @@ namespace WarmLangCompiler.Symbols;
 
 public class TypeSymbol : Symbol
 {
+    //FIXME: What if multithreading?
+    private static int NEXT_ID = 0;
+
+    public static readonly TypeSymbol Error = new("err");
+    public static readonly TypeSymbol Null = new("null");
+    public static readonly TypeSymbol Void = new("void");
+
     public static readonly TypeSymbol Int = new("int", isValueType:true);
     public static readonly TypeSymbol Bool = new("bool", isValueType:true);
     public static readonly TypeSymbol String = new("string");
-    public static readonly TypeSymbol Void = new("void");
-    public static readonly TypeSymbol Null = new("null");
-    public static readonly TypeSymbol IntList = new ListTypeSymbol("list<int>", Int); //TODO: how to generic?
-    public static readonly TypeSymbol Error = new("err");
-
-    public static readonly TypeSymbol ListBase = new("only-for-use-by-compiler");
+    public static readonly TypeSymbol List = new("List`");
 
     public bool IsValueType { get; }
+    public int TypeID { get; }
 
     public TypeSymbol(string name, bool isValueType = false) 
     : base(name)
     {
+        TypeID = NEXT_ID++;
         IsValueType = isValueType;
     }
 
@@ -31,14 +35,10 @@ public class TypeSymbol : Symbol
         return this;
     }
 
-    public virtual TypeSymbol Resolve() => this;
-
     public static bool operator ==(TypeSymbol a, TypeSymbol b)
     {
         if(a is null || b is null)
             return false;
-        a = a.Resolve();
-        b = b.Resolve();
         return a.Equals(b);
     }
 
@@ -64,7 +64,7 @@ public class TypeSymbol : Symbol
 
     public override int GetHashCode()
     {
-        int hashCode = Resolve().Name.GetHashCode();
+        int hashCode = Name.GetHashCode();
         return hashCode;
     }
 }

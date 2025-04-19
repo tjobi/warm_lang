@@ -187,8 +187,6 @@ public sealed class Binder
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
 
-        Console.WriteLine(type + " rhs: " + rightHandSide.Type);
-
         VariableSymbol variable = isGlobalScope 
                                 ? new GlobalVariableSymbol(name, rightHandSide.Type)
                                 : new LocalVariableSymbol(name, rightHandSide.Type, _functionStack.Peek());
@@ -687,7 +685,6 @@ public sealed class Binder
             return new BoundErrorExpression(binaryExpr);
         }
         _typeScope.Unify(boundLeft.Type, boundRight.Type);
-
         var boundOperator = BoundBinaryOperator.Bind(_typeScope, binaryExpr.Operator.Kind, boundLeft, boundRight);
         if(boundOperator is null)
         {
@@ -783,7 +780,7 @@ public sealed class Binder
     {
         _typeScope.Unify(expr.Type, to);
         
-        var conversion = Conversion.GetConversion(expr.Type, to);
+        var conversion = Conversion.GetConversion(expr.Type, to, _typeScope.TypeEquality);
         if(!conversion.Exists)
         {
             if(to != TypeSymbol.Error && expr.Type != TypeSymbol.Error)

@@ -4,7 +4,8 @@ using WarmLangLexerParser.AST.TypeSyntax;
 
 namespace WarmLangCompiler.Binding;
 
-using InternalTypeScope = Dictionary<TypeSymbol, TypeInformation>;
+using InternalTypeScope = HashSet<int>;
+using TypeInformationLookup = Dictionary<int, TypeInformation>;
 
 public sealed class BinderTypeScope
 {
@@ -15,30 +16,43 @@ public sealed class BinderTypeScope
 
     private static IEnumerable<TypeSymbol> BuiltinTypes() 
     {
+        yield return TypeSymbol.Error;
+        yield return TypeSymbol.Null;
+        yield return TypeSymbol.Void;
         yield return TypeSymbol.Int;
         yield return TypeSymbol.Bool;
         yield return TypeSymbol.String;
         yield return TypeSymbol.List;
-        yield return TypeSymbol.Void;
     }
 
     private readonly List<InternalTypeScope> _scopes;
     private readonly HashSet<TypeSymbol> _userDefinedTypes;
     private InternalTypeScope Top => _scopes[^1];
     private InternalTypeScope Global => _scopes[0];
+
+    private TypeInformationLookup _idToInformation;
+
+    private UnionFind _typeUnion;
     
+    private static int TypeToId(TypeSymbol t) => t.TypeID;
 
     public BinderTypeScope()
     {
+        _typeUnion = new(TypeToId);
         _scopes = new();
+        _idToInformation = new();
         _userDefinedTypes = new();
         _scopes.Add(new InternalTypeScope());
         foreach(var builtin in BuiltinTypes()) 
-            Global.Add(builtin, new(builtin));
+        {
+            Global.Add(TypeToId(builtin));
+            _idToInformation.Add(TypeToId(builtin), new(builtin));
+            _typeUnion.Add(builtin);
+        }
 
         foreach(var (type, fields) in BuiltinMembers.CreateMembersForBuiltins())
         {
-            Global[type] = new TypeInformation(type, fields.ToList(), new());
+            _idToInformation[TypeToId(type)] = new TypeInformation(type, fields.ToList(), new());
         }
     }
 
@@ -56,7 +70,7 @@ public sealed class BinderTypeScope
         {
             foreach(var scope in _scopes)
             {
-                if(scope.ContainsKey(type)) 
+                if(scope.Contains(TypeToId(type))) 
                     return scope;
             }
         }
@@ -65,24 +79,48 @@ public sealed class BinderTypeScope
 
     private (TypeSymbol Type, TypeInformation Info)? GetTypeAndInformation(TypeSymbol? type)
     {
+
         var scope = GetDefiningScopeOf(type);
         if(scope is null || type is null) return null;
-        if(scope.TryGetValue(type, out var info)) return (info.Type, info);
+        var parentId = _typeUnion.Find(type);
+        if(_idToInformation.TryGetValue(parentId, out var info)) return (info.Type, info);
         return null;
     }
 
     public TypeSymbol GetOrCreateListType(TypeSymbol typeParam)
     {
+        var typeParamParent = _typeUnion.Find(typeParam);
+        var typeParamInfo = _idToInformation[typeParamParent];
+        typeParam = typeParamInfo.Type;
+        //TODO: Is this necessary?
+        var cached = _idToInformation
+                     .Where(kv => kv.Value is ListTypeInformation gt)
+                     .Select(kv => kv.Value)
+                     .FirstOrDefault(info => info is ListTypeInformation gt 
+                                     && gt.SpecializedFrom == TypeSymbol.List 
+                                     && gt.NestedType == typeParam);
+        if(cached is not null) return cached.Type;
+
         //Too many strings?
         var listType = new TypeSymbol($"{TypeSymbol.List}<{typeParam}>");
-        if(TryGetTypeInformation(listType, out var info)) 
-        {
-            //We foudn a cached version of the list
-            return info.Type;
-        }
-        info = new GenericTypeInformation(listType, TypeSymbol.List, typeParam);
-        Top.Add(listType, info);
+        var info = new ListTypeInformation(listType, TypeSymbol.List, typeParam);
+        Global.Add(TypeToId(listType));
+        _idToInformation.Add(TypeToId(listType), info);
+        _typeUnion.Add(listType);
         return listType;
+    }
+
+    public bool TypeEquality(TypeSymbol a, TypeSymbol b)
+    {
+        // Unify(a,b);
+        int parA = _typeUnion.Find(a);
+        int parB = _typeUnion.Find(b);
+        var aInfo = _idToInformation[parA];
+        var bInfo = _idToInformation[parB];
+        //FIXME: Couldn't we somehow do this from the unify?
+        if(aInfo is ListTypeInformation la && bInfo is ListTypeInformation lb)
+            return TypeEquality(la.NestedType, lb.NestedType);
+        return parA == parB;
     }
 
     public bool TryAddType(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? res, TypeInformation? typeInfo = null)
@@ -91,7 +129,8 @@ public sealed class BinderTypeScope
         var knownTypeOrNull = GetType(type); 
         if(knownTypeOrNull is not null) return false;
 
-        Top.Add(type, typeInfo ?? new TypeInformation(type));
+        Top.Add(TypeToId(type));
+        _idToInformation[TypeToId(type)] = typeInfo ?? new TypeInformation(type);
         res = type;
         if(type is not TypeParameterSymbol) _userDefinedTypes.Add(res);
         return true;
@@ -154,8 +193,9 @@ public sealed class BinderTypeScope
         var res = new List<(TypeSymbol,IEnumerable<FunctionSymbol>)>();
         foreach(var scope in _scopes) 
         {
-            foreach(var (_, info) in scope) 
+            foreach(var typeId in scope) 
             {
+                var info = _idToInformation[typeId];
                 res.Add((info.Type, info.GetMethodFunctionSymbols()));
             }
         }
@@ -176,14 +216,6 @@ public sealed class BinderTypeScope
     }
     public bool TryGetTypeInformation(TypeSymbol type, [NotNullWhen(true)] out TypeInformation? typeInfo)
         => (typeInfo = GetTypeInformation(type)) is not null;
-
-    private TypeInformation UpdateTypeInformation(TypeSymbol type, Func<TypeInformation, TypeInformation> f)
-    {
-        var scope = GetDefiningScopeOf(type);
-        if(scope is null || !scope.ContainsKey(type)) 
-            throw new BinderTypeScopeExeception($"{nameof(UpdateTypeInformation)} - compiler bug - where is '{type}' defined?");
-        return scope[type] = f(scope[type]);
-    }
 
     public void AddMethodBody(TypeSymbol type, FunctionSymbol func, BoundBlockStatement body)
     {
@@ -210,7 +242,7 @@ public sealed class BinderTypeScope
         memberSymbol = members.FirstOrDefault(m => m.Name == name);
 
         // if the type is specialized/instantiation of a generic - member may reside on base
-        if(memberSymbol is null && info is GenericTypeInformation gt)
+        if(memberSymbol is null && info is ListTypeInformation gt)
         {
             TryFindMember(gt.SpecializedFrom, name, out memberSymbol);
         }
@@ -223,7 +255,8 @@ public sealed class BinderTypeScope
             throw new BinderTypeScopeExeception($"Illegal state, expected 1 scope, but had {_scopes.Count}");
         
         var declaredTypes = _userDefinedTypes.ToList().AsReadOnly();
-        return new TypeMemberInformation(_scopes[0].AsReadOnly(), declaredTypes);
+        // return new TypeMemberInformation(_scopes[0].AsReadOnly(), declaredTypes);
+        return new TypeMemberInformation(new Dictionary<TypeSymbol, TypeInformation>().AsReadOnly(), declaredTypes);
     }
 
     public bool IsSubscriptable(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? nested)
@@ -236,75 +269,101 @@ public sealed class BinderTypeScope
             nested = TypeSymbol.Int;
             return true;
         }
-        return info is GenericTypeInformation { NestedType: TypeSymbol n } && (nested = n) is not null;
+        return info is ListTypeInformation { NestedType: TypeSymbol n } && (nested = n) is not null;
     }
 
     public bool IsListTypeAndGetNested(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? nested)
     {
+        
         var info = GetTypeAndInformation(type);
         nested = null;
-        if(info is { Info: GenericTypeInformation gt } && gt.SpecializedFrom == TypeSymbol.List)
+        if(info is { Info: ListTypeInformation gt } && gt.SpecializedFrom == TypeSymbol.List)
         {
             nested = gt.NestedType;
         }
         return nested is not null;
     }
 
-    public void Unify(TypeSymbol _a, TypeSymbol _b)
+    public void Unify(TypeSymbol a, TypeSymbol b)
     {
-        
+        var _a = a;
+        var _b = b;
         var stack = new Stack<(TypeSymbol, TypeSymbol)>();
-        stack.Push((_a,_b));
+        //null if nothing, if true then union(a,b) else union(b,a)
+        bool? direction = null;
+        stack.Push((a,b));
+        // Console.WriteLine($"----- unifying ({a},{b}) ----");
+        // PrintUnion();
         while(stack.Count > 0)
         {
-            var (curA,curB) = stack.Peek();
-            
-            switch(stack.Pop())
+            (a, b) = stack.Pop();
+            var aInfo = _idToInformation[_typeUnion.Find(a)];
+            var bInfo = _idToInformation[_typeUnion.Find(b)];
+
+            switch((aInfo, bInfo))
             {
-            case (PlaceholderTypeSymbol aa, PlaceholderTypeSymbol bb):
-                if(aa.ActualType is null && bb.ActualType is null)          
-                {
-                    if(aa.Depth > bb.Depth) bb.Union(aa);
-                    else                    aa.Union(bb);
-                }
-                else if(aa.ActualType is not null && bb.ActualType is null) bb.Union(aa.ActualType);
-                else if(aa.ActualType is null && bb.ActualType is not null) aa.Union(bb.ActualType);
-                else //neither are null - failure state
-                    throw new BinderTypeScopeExeception($"Something is wrong here - neither '{aa}' nor '{bb}' is null");
+                //Do nothing if in the default - we have hit terminals - actual types?
+                default: break;
+
+                case (PlaceHolderInformation pa, PlaceHolderInformation pb):
+                if(pa.Depth > pb.Depth) _typeUnion.Union(b,a);
+                else _typeUnion.Union(a,b);
+                direction = !(pa.Depth > pb.Depth);
                 break;
-            // case (PlaceholderTypeSymbol aa,_):
-            //     var updated = UpdateTypeInformation(aa, info => new(info.Type, curB));
-            //     aa.Union(curB);
-            //     break;
-            // case (_,PlaceholderTypeSymbol bb):
-            //     UpdateTypeInformation(bb, info => new(info.Type, curA));
-            //     bb.Union(curA);
-            //     break;
-            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut1}, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut2}):
-                stack.Push((ut1,ut2));
+
+                case (PlaceHolderInformation, _): 
+                _typeUnion.Union(a, b);
+                direction = true;
                 break;
-            case (ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut}, ListTypeSymbol lb):
-                stack.Push((ut,lb.InnerType));
+
+                case (_, PlaceHolderInformation): 
+                _typeUnion.Union(b, a);
+                direction = false;
                 break;
-            case (ListTypeSymbol la, ListTypeSymbol {InnerType: PlaceholderTypeSymbol ut}):
-                stack.Push((ut, la.InnerType));
-                break;
-            case (ListTypeSymbol la, ListTypeSymbol lb):
-                stack.Push((la.InnerType, lb.InnerType));
+
+                case (ListTypeInformation ga, ListTypeInformation gb): 
+                stack.Push((ga.NestedType, gb.NestedType));
                 break;
             }
         }
-        _a.Resolve();
-        _b.Resolve();
+        /* FIXME: 
+            The idea is to catch cases like List<P0> List<List<int>>
+            Here we could essentially just union(List<P0>, List<List<int>>)
+            So any Find(List<P0>) gives us exactly List<List<int>>.
+        */
+        if(direction.HasValue)
+        {
+            //if direction means we union a side to b
+            if(direction.Value)
+            {
+                _typeUnion.Union(_a, _b);
+            }
+            else
+            {
+                _typeUnion.Union(_b, _a);
+            }
+        }
+        // Console.WriteLine("After");
+        // PrintUnion();
+        // Console.WriteLine($"Are {_a} and {_b} the same? " + TypeEquality(_a,_b));
+        // Console.WriteLine($"----- finished unifying ({a},{b}) ----");
     }
 
-    public PlaceholderTypeSymbol CreatePlacerHolderType()
+    public TypeSymbol CreatePlacerHolderType()
     {
-        var ts = new PlaceholderTypeSymbol(_scopes.Count);
+        // var ts = new PlaceholderTypeSymbol(_scopes.Count);
         //FIXME: Create the placeholder info at the global level
-        Global.Add(ts, new TypeInformation(ts));
-        // if(!TryAddType(ts, out var _))
-        //     throw new BinderTypeScopeExeception($"{nameof(CreatePlacerHolderType)} couldn't declare placeholder '{ts}'");
+        var placeholderInfo = new PlaceHolderInformation(_scopes.Count);
+        var ts = placeholderInfo.Type;
+        Global.Add(TypeToId(ts));
+        _typeUnion.Add(ts);
+        _idToInformation[TypeToId(ts)] = placeholderInfo;
         return ts;
     }
+
+    public void PrintUnion()
+    {
+        Console.WriteLine(_typeUnion);
+        Console.WriteLine("  " + string.Join("\n  ", _idToInformation.Select(kv => kv.Value.Type).Select(t => (t.Name, t.TypeID))));
+    } 
 }

@@ -45,7 +45,7 @@ public sealed class BoundBinaryOperator
         var isRightList = typeScope.IsListTypeAndGetNested(right, out var rightNested);
         if(isLeftList && isRightList)
         {
-            var sameNested = leftNested! == rightNested!;
+            var sameNested = typeScope.TypeEquality(leftNested!,rightNested!);
             return op switch 
             {
                 //List concat '+' operator
@@ -61,7 +61,7 @@ public sealed class BoundBinaryOperator
         return (op,left,right) switch
         {
             //List add '::' operator
-            (TDoubleColon, _, _) when isLeftList && leftNested! == right => new(op, ListAdd, left, right, left), 
+            (TDoubleColon, _, _) when isLeftList && typeScope.TypeEquality(leftNested!, right) => new(op, ListAdd, left, right, left), 
             //Operators on null
             (TEqualEqual, _,_) 
                 when left == Null && !right.IsValueType

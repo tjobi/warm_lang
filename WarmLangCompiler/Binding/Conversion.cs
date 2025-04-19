@@ -27,12 +27,12 @@ public sealed class Conversion
 
     public bool IsNone() => this == None;
 
-    public static Conversion GetConversion(TypeSymbol from, TypeSymbol to)
+    public static Conversion GetConversion(TypeSymbol from, TypeSymbol to, Func<TypeSymbol, TypeSymbol, bool> eql)
     {
         //Any CLI reference type is nullable - for now
         if(from == Null && !to.IsValueType) return Implicit;
 
-        if(from == to)
+        if(from == to || eql(from, to))
             return Identity;
         
         if(from == Int)

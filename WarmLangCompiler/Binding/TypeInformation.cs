@@ -29,17 +29,29 @@ public class TypeInformation
     }
 }
 
-public class GenericTypeInformation : TypeInformation
+public class ListTypeInformation : TypeInformation
 {
     public TypeSymbol SpecializedFrom { get; }
     public TypeSymbol NestedType { get; set; }
 
-    public GenericTypeInformation(TypeSymbol thisType, TypeSymbol baseT, TypeSymbol nestedType, 
+    public ListTypeInformation(TypeSymbol thisType, TypeSymbol baseT, TypeSymbol nestedType, 
                                   List<MemberSymbol>? members = null, 
                                   Dictionary<FunctionSymbol, BoundBlockStatement>? methodBodies = null) 
     : base(thisType, members, methodBodies)
     {
         NestedType = nestedType;
         SpecializedFrom = baseT;
+    }
+}
+
+public sealed class PlaceHolderInformation : TypeInformation
+{
+    private static int P_COUNTER = 0;
+
+    public int Depth { get; }
+    public PlaceHolderInformation(int depth)
+    : base(new TypeSymbol("P"+ P_COUNTER++))
+    { 
+        Depth = depth;
     }
 }
