@@ -15,8 +15,6 @@ public class BinderTests
     private static readonly TypeSyntaxNode _syntaxInt = new TypeSyntaxInt(new TextLocation(1,1, length:3));
     private static readonly TypeSyntaxNode _syntaxIntList = new TypeSyntaxList(new TextLocation(1,1,length:3+2),_syntaxInt);
 
-    private static readonly TypeSymbol IntList = new ListTypeSymbol("list<int>", TypeSymbol.Int); 
-
     private readonly Binder _binder;
     public BinderTests()
     {

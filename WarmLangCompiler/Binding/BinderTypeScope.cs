@@ -256,16 +256,7 @@ public sealed class BinderTypeScope
         
         var declaredTypes = _userDefinedTypes.ToList().AsReadOnly();
         var typeInfoDict = new Dictionary<TypeSymbol, TypeInformation>();
-        
-        bool ContainsTypeParam(TypeInformation info)
-        {
-            return info switch 
-            {
-                ListTypeInformation l => ContainsTypeParam(_idToInformation[_typeUnion.Find(l.NestedType)]),
-                TypeInformation i => i.Type is TypeParameterSymbol,
-            };
-        }
-
+    
         foreach(var (id, info) in _idToInformation)
         {
             var originalType = info.Type;

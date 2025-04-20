@@ -667,7 +667,7 @@ public sealed class Binder
         {
             return new BoundErrorExpression(ue);
         }
-        var boundOperator = BoundUnaryOperator.Bind(ue.Operator.Kind, bound);
+        var boundOperator = BoundUnaryOperator.Bind(_typeScope, ue.Operator.Kind, bound);
         if(boundOperator is null)
         {
             _diag.ReportUnaryOperatorCannotBeApplied(ue.Location, ue.Operator, bound.Type);

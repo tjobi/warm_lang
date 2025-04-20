@@ -48,6 +48,8 @@ public sealed class BoundInterpreter
 
     public Value Run() => EvaluateStatement(_functionEnvironment.Lookup(_entryPoint)!);
 
+    public bool IsListType(TypeSymbol t) => program.TypeInformation[t] is ListTypeInformation;
+
     private Value EvaluateStatement(BoundStatement statement)
     {
         return statement switch 
@@ -159,7 +161,7 @@ public sealed class BoundInterpreter
             return new StrValue(value.StdWriteString());
         }
         //Convert [] when used in variable declaration
-        if(conv.Type is ListTypeSymbol)
+        if(IsListType(conv.Type))
             return value;
         if(conv.Expression.Type == TypeSymbol.Null)
             return Value.Null;
@@ -426,7 +428,7 @@ public sealed class BoundInterpreter
         if(symbol == TypeSymbol.Int) return IntValue.DEFAULT;
         if(symbol == TypeSymbol.Void) return Value.Void;
         //TODO: should we really instantiate the list? or should it default to null?
-        if(symbol is ListTypeSymbol) return ListValue.GET_DEFAULT(); 
+        if(IsListType(symbol)) return ListValue.GET_DEFAULT(); 
 
         return Value.Null;
     }

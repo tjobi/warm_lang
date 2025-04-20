@@ -31,7 +31,7 @@ public sealed class BoundBinaryOperator
         for (int i = 0; i < _definedOperators.Length; i++)
         {
             var dop = _definedOperators[i];
-            if(dop.OpTokenKind == op && left.Type == dop.TypeLeft && right.Type == dop.TypeRight)
+            if(dop.OpTokenKind == op && typeScope.TypeEquality(left.Type, dop.TypeLeft) && typeScope.TypeEquality(right.Type, dop.TypeRight))
             {
                 return dop;
             }

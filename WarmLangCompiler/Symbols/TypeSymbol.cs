@@ -26,15 +26,6 @@ public class TypeSymbol : Symbol
 
     public override string ToString() => Name;
 
-    public TypeSymbol NestedTypeOrThis()
-    {
-        if(this is ListTypeSymbol lts)
-            return lts.InnerType;
-        if(this == String)
-            return Int;
-        return this;
-    }
-
     public static bool operator ==(TypeSymbol a, TypeSymbol b)
     {
         if(a is null || b is null)
