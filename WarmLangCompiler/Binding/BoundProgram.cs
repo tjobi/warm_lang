@@ -46,7 +46,8 @@ public sealed class BoundProgram
 
     public IEnumerable<(FunctionSymbol Func, BoundBlockStatement Body)> GetFunctionSymbolsAndBodies()
     {
-        foreach(var (type, typeInfo) in TypeInformation)
+        //Disintct because multiple typeId may point to the same information ...
+        foreach(var (type, typeInfo) in TypeInformation.DistinctBy(kv => kv.Value))
             foreach(var (func, body) in typeInfo.MethodBodies)
                 yield return (func, body);
 
