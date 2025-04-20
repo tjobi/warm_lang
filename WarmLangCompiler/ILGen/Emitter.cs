@@ -53,7 +53,15 @@ public sealed class Emitter{
         return toRet;
     }
 
-    private Emitter(ErrorWarrningBag diag, bool debug = false)
+    public static void EmitProgram(string outfile, BoundProgram program, ErrorWarrningBag diag, bool debug = false)
+    {
+        var emitter = new Emitter(diag, program, debug);
+        if(emitter._diag.Any())
+            return;
+        emitter.EmitProgram(outfile, program);
+    }
+
+    private Emitter(ErrorWarrningBag diag, BoundProgram program, bool debug = false)
     {
         _debug = debug;
         _diag = diag;
@@ -69,9 +77,8 @@ public sealed class Emitter{
         
         // IL -> ".assembly extern mscorlib {}"
         _mscorlib = ReadMscorlib();
-        _cilTypeManager = new(_mscorlib, _assemblyDef, _diag);
+        _cilTypeManager = new(_assemblyDef, program.TypeInformation ,_diag);
         _listMethods = _cilTypeManager.ListHelper;
-        
         foreach(var type in BuiltInTypes())
         {
             foreach(var module in _mscorlib.Modules)
@@ -189,14 +196,6 @@ public sealed class Emitter{
         globalsType.Methods.Add(globalConstructor);
         return globalsType;
     } 
-   
-    public static void EmitProgram(string outfile, BoundProgram program, ErrorWarrningBag diag, bool debug = false)
-    {
-        var emitter = new Emitter(diag, debug);
-        if(emitter._diag.Any())
-            return;
-        emitter.EmitProgram(outfile, program);
-    }
 
     private void EmitProgram(string outfile, BoundProgram program)
     {
@@ -532,7 +531,7 @@ public sealed class Emitter{
             return;
         }
 
-        if(conv.Type is ListTypeSymbol)
+        if(_cilTypeManager.IsListType(conv.Type))
             return;
         
         if(conv.Expression.Type == TypeSymbol.Null) return; //null is implicit
@@ -586,7 +585,8 @@ public sealed class Emitter{
                 if(isVariableInClosure) EmitLoadAccess(processor, name); //must leave something to pop.
                 break;
             case BoundSubscriptAccess sa:
-                if(sa.Target.Type is ListTypeSymbol lts)
+                var targetType = sa.Target.Type;
+                if(_cilTypeManager.IsListType(targetType))
                 {
                     var rhsType = CilTypeOf(assignment.RightHandSide.Type);
                     //introduces a local variable, because 'System.Void ArrayList::set_Item(int32,object)' eats the right-hand-side
@@ -598,7 +598,7 @@ public sealed class Emitter{
                     EmitExpression(processor, assignment.RightHandSide);
                     processor.Emit(OpCodes.Stloc, tmpVar);
                     processor.Emit(OpCodes.Ldloc, tmpVar);
-                    processor.Emit(OpCodes.Callvirt, _listMethods.Update(lts));
+                    processor.Emit(OpCodes.Callvirt, _listMethods.Update(targetType));
                     processor.Emit(OpCodes.Ldloc, tmpVar);
                     return;
                 }
@@ -747,7 +747,7 @@ public sealed class Emitter{
             return;
         }
 
-        if(leftType is ListTypeSymbol || rightType is ListTypeSymbol)
+        if(_cilTypeManager.IsListType(leftType) || _cilTypeManager.IsListType(rightType))
         {
             if(binary.Operator.Kind != ListConcat)
                 EmitExpression(processor, binary.Left);
@@ -993,19 +993,20 @@ public sealed class Emitter{
                 return;
                 //throw new NotImplementedException($"{nameof(Emitter)} doesn't know how to emit '{access.Type}.{mba.Member}' yet");
             case BoundSubscriptAccess sa:
-                if(sa.Target.Type == TypeSymbol.String || sa.Target.Type is ListTypeSymbol)
+                var targetType = sa.Target.Type;
+                if(targetType == TypeSymbol.String || _cilTypeManager.IsListType(targetType))
                 {
                     EmitLoadAccess(processor, sa.Target);
                     EmitExpression(processor, sa.Index);
-                    if(sa.Target.Type == TypeSymbol.String)
+                    if(targetType == TypeSymbol.String)
                         processor.Emit(OpCodes.Callvirt, _stringSubscript);
-                    else if(sa.Target.Type is ListTypeSymbol lts)
+                    else if(_cilTypeManager.IsListType(targetType))
                     {
-                        processor.Emit(OpCodes.Callvirt, _listMethods.Subscript(lts));
+                        processor.Emit(OpCodes.Callvirt, _listMethods.Subscript(targetType));
                     }
                     return;
                 }
-                throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't do subscripting for '{sa.Target.Type.Name}' yet");
+                throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't do subscripting for '{targetType.Name}' yet");
             case BoundExprAccess ae:
                 EmitExpression(processor, ae.Expression);
                 break;
@@ -1024,7 +1025,7 @@ public sealed class Emitter{
                 processor.Emit(OpCodes.Callvirt, _builtInFunctions[BuiltInFunctions.StrLen]);
                 return;
             }
-            else if(type is ListTypeSymbol)
+            else if(_cilTypeManager.IsListType(type))
             {
                 processor.Emit(OpCodes.Callvirt, _listMethods.Length(type));
                 return;

@@ -1,4 +1,5 @@
 using WarmLangCompiler.Symbols;
+using WarmLangCompiler.Binding;
 using Mono.Cecil;
 using Mono.Cecil.Rocks;
 using WarmLangLexerParser.ErrorReporting;
@@ -10,31 +11,27 @@ public sealed class CilTypeManager
 
     private record CachedSignature(TypeSymbol Type, string Name, int Arity);
     private readonly Dictionary<CachedSignature, MethodReference> methodCache;
-    
-    private readonly TypeReference genericList;
-    private readonly AssemblyDefinition mscorlib, assemblyDef;
+    private readonly AssemblyDefinition assemblyDef;
+    private readonly IReadOnlyDictionary<TypeSymbol, TypeInformation> infoOf;
     private readonly ErrorWarrningBag _diag;
 
     public ListMethodHelper ListHelper { get; }
 
-    public CilTypeManager(AssemblyDefinition mscorlib, AssemblyDefinition programAssembly, ErrorWarrningBag diag)
+    public CilTypeManager(AssemblyDefinition programAssembly, 
+                          IReadOnlyDictionary<TypeSymbol, TypeInformation> infoOf, ErrorWarrningBag diag)
     {
         toCILType = new();
         methodCache = new();
         ListHelper = new(this);
-        this.mscorlib = mscorlib;
         assemblyDef = programAssembly;
+        this.infoOf = infoOf;
         _diag = diag;
-        var baseList = mscorlib.MainModule.GetType("System.Collections.Generic.List`1");
-        genericList = assemblyDef.MainModule.ImportReference(baseList);
     }
 
     public void Add(TypeSymbol key, TypeReference cilType) => toCILType.Add(key, cilType);
-    
 
     public TypeReference GetType(TypeSymbol key) 
     {
-        // key = key.Resolve();
         if(toCILType.ContainsKey(key)) return toCILType[key];
         
         //If it is not there, then we assume it's a generic type - so create it and cache it
@@ -46,19 +43,15 @@ public sealed class CilTypeManager
 
     private TypeReference GetSpecializedTypeDefinition(TypeSymbol type)
     {
-        if(type is PlaceholderTypeSymbol p && p.ActualType is null)
+        var typeInfo = infoOf[type];
+        if(typeInfo is ListTypeInformation lti)
         {
-            
-            throw new Exception("Cannot emit placeholder type that has no actual type!");
+            var listBase = GetType(lti.SpecializedFrom);
+            var concrete = listBase.MakeGenericInstanceType(GetType(lti.NestedType));
+            return toCILType[type] = concrete;
         }
-        if(type is not ListTypeSymbol l) 
-        {
-            var msg = $"'{nameof(CilTypeManager)}.{nameof(GetSpecializedTypeDefinition)}' doesn't know type of '{type}'";
-            throw new NotImplementedException(msg);
-        }
-        
-        var inner = GetType(l.InnerType);
-        return genericList.MakeGenericInstanceType(inner);
+        //FIXME: Should we add some sort of check to make sure only valid "GenericTypeInformation" or "ListTypeInformation" goes here?
+        return toCILType[type];
     }
 
     /* Only needs to provide the arity - since I don't know how to access
@@ -70,15 +63,10 @@ public sealed class CilTypeManager
     {
         var signature = new CachedSignature(type, name, arity);
         if(methodCache.ContainsKey(signature)) return methodCache[signature];
-
-        if(type is not ListTypeSymbol l) 
-        {
-            var msg = $"'{nameof(CilTypeManager)}.{nameof(GetSpecializedTypeDefinition)}' doesn't know type of '{type}'";
-            throw new NotImplementedException(msg);
-        }
         
+        //FIXME: Should we add some sort of check to make sure only valid "GenericTypeInformation" or "ListTypeInformation" goes here?
         MethodReference? genericMethod = null;
-        foreach(var method in genericList.Resolve().Methods)
+        foreach(var method in toCILType[TypeSymbol.List].Resolve().Methods)
         {
             if(method.Name == name && method.Parameters.Count == arity)
             {
@@ -103,6 +91,11 @@ public sealed class CilTypeManager
 
     public MethodReference GetConstructor(TypeSymbol type, int arity = 0) 
         => GetSpecializedMethod(type, ".ctor", arity);
+    
+    public bool IsListType(TypeSymbol type)
+    {
+        return infoOf[type] is ListTypeInformation;
+    }
 }
 public class ListMethodHelper
 {
@@ -113,22 +106,14 @@ public class ListMethodHelper
         this.manager = manager;
     }
 
-    private ListTypeSymbol EnsureList(TypeSymbol t)
-    {
-        if(t is not ListTypeSymbol l) 
-            throw new Exception($"{nameof(ListMethodHelper)} was passed a non-list type!");
-        return l;
-    }
-
     public MethodReference Empty(TypeSymbol t)
     {
-        EnsureList(t);
+        //I mean, it looks unsafe - but we have type checked the program ...
         return manager.GetConstructor(t);
     }
 
     private MethodReference GetMethod(TypeSymbol t, string name, int arity)
     {
-        EnsureList(t);
         return manager.GetSpecializedMethod(t, name, arity);
     }
 
