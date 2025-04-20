@@ -97,16 +97,16 @@ public class BinderTests
                     MakeToken(TBracketRight,1,1));
         var varDecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"),rhs);
         var input = MakeRoot(varDecl);
+        var rhsType = new TypeSymbol($"List`<int>");
         var expected = CreateBoundProgram(
             new BoundVarDeclaration(varDecl,new GlobalVariableSymbol("x", TypeSymbol.Int),
                 new BoundListExpression(
-                    rhs,
-                    IntList,
+                    rhs, rhsType,
                     new BoundExpression[]{new BoundConstantExpression(ConstCreater(5), TypeSymbol.Int)}.ToImmutableArray())
             )
         );
         var expectedErrorBag = new ErrorWarrningBag();
-        expectedErrorBag.ReportCannotConvertToType(rhs.Location, TypeSymbol.Int, IntList);
+        expectedErrorBag.ReportCannotConvertToType(rhs.Location, TypeSymbol.Int, rhsType);
 
         var boundProgram = _binder.BindProgram(input);
 
@@ -118,25 +118,14 @@ public class BinderTests
     public void BindVariableDeclarationOfEmptyList()
     {
         //int[] x = [];
-        var rhs = new ListInitExpression(MakeToken(TBracketLeft,1,1),MakeToken(TBracketRight,1,1), null);
-        var varDecl = new VarDeclaration(_syntaxIntList,MakeVariableToken("x"),rhs);
-        var input = MakeRoot(varDecl);
-        
-        var placeholderType = new PlaceholderTypeSymbol(1);
-        placeholderType.Union(TypeSymbol.Int);
-        
-        var expected = CreateBoundProgram(
-            new BoundVarDeclaration(varDecl, new GlobalVariableSymbol("x", IntList),
-                    new BoundListExpression(
-                        rhs,
-                        new ListTypeSymbol(placeholderType), 
-                        ImmutableArray<BoundExpression>.Empty)
-        ));
-        
-        var boundProgram = _binder.BindProgram(input);
+        string input = "int[] x = [];";
+        var parsed = new Parser(Lexer.FromString(input, _diag).Lex(), _diag).Parse();
 
-        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
-        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
+        //test
+        var bound = _binder.BindProgram(parsed);
+
+        bound.ToString().Should().Be("__wl_script_main() Bound Block: {(List`<P0> x = []), (return)}");
+        _diag.Should().BeEmpty();
         _diag.Should().BeEmpty();
     }
 
@@ -165,37 +154,13 @@ public class BinderTests
     public void BindListConcatenationWithEmptyListWithExplicitType()
     {
         // [] int + [2];
-        var left = new ListInitExpression(MakeToken(TCurLeft,1,1), MakeToken(TCurRight,1,1), _syntaxInt);
-        var plus = MakeToken(TPlus,1,1);
-        var two = new ConstExpression(2, new TextLocation(1,1));
-        var right = new ListInitExpression(
-                MakeToken(TCurLeft,1,1), 
-                new List<ExpressionNode>() { two },
-                MakeToken(TCurRight,1,1));
-        var binaryExpression = new BinaryExpression(left,plus,right);
-        var exprStatement = new ExprStatement(binaryExpression);
-        var input = MakeRoot(exprStatement);
+        string input = "[] int + [2];";
+        var parsed = new Parser(Lexer.FromString(input, _diag).Lex(), _diag).Parse();
 
-        var expected = CreateBoundProgram(
-            new BoundExprStatement(
-                exprStatement, 
-                new BoundBinaryExpression(
-                    binaryExpression,
-                    new BoundListExpression(left, IntList, ImmutableArray<BoundExpression>.Empty),
-                    new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, IntList, IntList, IntList),
-                    new BoundListExpression(
-                        right, IntList, 
-                        new List<BoundExpression>
-                        {
-                            new BoundConstantExpression(two, TypeSymbol.Int),
-                        }.ToImmutableArray())
-                    ))
-        );
-        
-        var boundProgram = _binder.BindProgram(input);
+        //test
+        var bound = _binder.BindProgram(parsed);
 
-        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
-        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
+        bound.ToString().Should().Be("__wl_script_main() Bound Block: {(((int)[] + [Cst 2]);), (return)}");
         _diag.Should().BeEmpty();
     }
 
@@ -203,46 +168,13 @@ public class BinderTests
     public void BindListConcatenationWithEmptyListWithNoExplicitTypeSucceeds()
     {
         // [] + [2];
-        var left = new ListInitExpression(MakeToken(TCurLeft,1,1), MakeToken(TCurRight,1,1), null);
-        var plus = MakeToken(TPlus,1,1);
-        var two = new ConstExpression(2, new TextLocation(1,1));
-        var right = new ListInitExpression(
-                MakeToken(TCurLeft,1,1), 
-                new List<ExpressionNode>() { two },
-                MakeToken(TCurRight,1,1));
-        var binaryExpression = new BinaryExpression(left,plus,right);
-        var exprStatement = new ExprStatement(binaryExpression);
-        var input = MakeRoot(exprStatement);
+        string input = "[] + [2];";
+        var parsed = new Parser(Lexer.FromString(input, _diag).Lex(), _diag).Parse();
 
-        var placeholderType = new PlaceholderTypeSymbol(1);
-        placeholderType.Union(TypeSymbol.Int);
-        
-        var leftType = new ListTypeSymbol(placeholderType);
+        //test
+        var bound = _binder.BindProgram(parsed);
 
-        var expected = CreateBoundProgram(
-            new BoundExprStatement(
-                exprStatement,
-                new BoundBinaryExpression(binaryExpression,
-                new BoundListExpression(left, leftType, ImmutableArray<BoundExpression>.Empty),
-                new BoundBinaryOperator(plus.Kind,BoundBinaryOperatorKind.ListConcat, leftType, IntList, leftType),
-                new BoundListExpression(right, IntList, 
-                    new List<BoundExpression>{new BoundConstantExpression(two, TypeSymbol.Int)}.ToImmutableArray()
-                )
-            )));
-        
-        var boundProgram = _binder.BindProgram(input);
-        // var expectedBag = new ErrorWarrningBag();
-        // expectedBag.ReportBinaryOperatorCannotBeApplied(new TextLocation(1,1), plus, TypeSymbol.EmptyList, IntList);
-        // expectedBag.ReportTypeOfEmptyListMustBeExplicit(new TextLocation(1,1));
-
-        boundProgram.GlobalVariables.Should().BeEquivalentTo(expected.GlobalVariables, opt => opt.RespectingRuntimeTypes());
-        boundProgram.Entry.Should().BeEquivalentTo(expected.Entry, opt => opt.RespectingRuntimeTypes());
-        
-        _diag.Count().Should().Be(0);
-        // _diag.Count().Should().Be(2);
-        // _diag.Should().BeEquivalentTo(
-        //     expectedBag, 
-        //     opt => opt.Including(we => we.Message)
-        //               .Including(we => we.IsError));
+        bound.ToString().Should().Be("__wl_script_main() Bound Block: {(([] + [Cst 2]);), (return)}");
+        _diag.Should().BeEmpty();
     }
 }
