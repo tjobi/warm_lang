@@ -183,6 +183,17 @@ public sealed class BinderTypeScope
     public TypeSymbol GetTypeOrThrow(TypeSymbol? type) 
         => GetType(type) ?? throw new BinderTypeScopeExeception($"{nameof(BinderTypeScope)} - cannot find '{type}'");
 
+    public TypeSymbol GetTypeOrErrorType(TypeSyntaxNode? type)
+    {
+        if(type is null) return TypeSymbol.Void;
+        if(!TryGetType(type, out var res))
+        {
+            _diag.ReportTypeNotFound(type.ToString(), type.Location);
+            res = TypeSymbol.Error;
+        }
+        return res;
+    }
+
     private TypeSymbol AsTypeSymbol(TypeSyntaxNode? typeSyntax) 
     {
         if (typeSyntax is null) return TypeSymbol.Void; //Really?

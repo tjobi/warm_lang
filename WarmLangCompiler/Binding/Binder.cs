@@ -199,7 +199,7 @@ public sealed class Binder
 
     private BoundStatement BindVarDeclaration(VarDeclaration varDecl, bool isGlobalScope)
     {
-        var type = _typeScope.GetTypeOrThrow(varDecl.Type);
+        var type = _typeScope.GetTypeOrErrorType(varDecl.Type);
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
 
@@ -229,17 +229,7 @@ public sealed class Binder
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
-        var returnType = TypeSymbol.Void;
-        if(funcDecl.ReturnType is not null)
-        {
-            if(!_typeScope.TryGetType(funcDecl.ReturnType, out var found))
-            {
-                _typeScope.Pop();
-                _diag.ReportTypeNotFound(funcDecl.ReturnType.ToString(), funcDecl.ReturnType.Location);
-                return new BoundErrorStatement(funcDecl);
-            }
-            returnType = found;
-        } 
+        var returnType = _typeScope.GetTypeOrErrorType(funcDecl.ReturnType);
 
         var function = new FunctionSymbol(nameToken, typeParameters, parameters, returnType);
         
@@ -247,7 +237,7 @@ public sealed class Binder
         
         if(funcDecl.OwnerType is not null)
         {
-            var ownerType = _typeScope.GetTypeOrThrow(funcDecl.OwnerType);
+            var ownerType = _typeScope.GetTypeOrErrorType(funcDecl.OwnerType);
             var symbol = new MemberFuncSymbol(function);
             _typeScope.AddMember(ownerType, symbol);
             function.SetOwnerType(ownerType); //TODO: this is quite ugly
@@ -284,24 +274,13 @@ public sealed class Binder
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
-        
-        var returnType = TypeSymbol.Void;
-        if(funcDecl.ReturnType is not null)
-        {
-            if(!_typeScope.TryGetType(funcDecl.ReturnType, out var found))
-            {
-                _typeScope.Pop();
-                _diag.ReportTypeNotFound(funcDecl.ReturnType.ToString(), funcDecl.ReturnType.Location);
-                return new BoundErrorStatement(funcDecl);
-            }
-            returnType = found;
-        } 
-        
+        var returnType = _typeScope.GetTypeOrErrorType(funcDecl.ReturnType);
+
         var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, returnType);
 
         if(funcDecl.OwnerType is not null)
         {
-            var ownerType = _typeScope.GetTypeOrThrow(funcDecl.OwnerType);
+            var ownerType = _typeScope.GetTypeOrErrorType(funcDecl.OwnerType);
             _diag.ReportLocalMemberFuncDeclaration(nameToken, funcDecl.OwnerType.Location, ownerType);
         }
 
@@ -347,7 +326,7 @@ public sealed class Binder
         for (int i = 0; i < func.Params.Count; i++)
         {
             var (type, name) = func.Params[i];
-            var paramType = _typeScope.GetTypeOrThrow(type);
+            var paramType = _typeScope.GetTypeOrErrorType(type);
             
             //missing names have been reported by the parser
             var paramName = name.Name ?? "NO_NAME"; 
@@ -507,7 +486,7 @@ public sealed class Binder
         for (int i = 0; i < funcDef.TypeParameters.Length; i++)
         {
             var typeParam = funcDef.TypeParameters[i];
-            var concrete = _typeScope.GetTypeOrThrow(application.TypeParams[i]);
+            var concrete = _typeScope.GetTypeOrErrorType(application.TypeParams[i]);
             instantiatedTypeParameters.Add(concrete);
             typeParametersMap[typeParam] = concrete;
         }
@@ -557,7 +536,7 @@ public sealed class Binder
         //We have reached a cast 'bool(25)' or 'int(true)' or 'string(2555)'
         if (ce.Arguments.Count == 1 && ce.Called is AccessPredefinedType predefined)
         {
-            var predefinedType = _typeScope.GetTypeOrThrow(predefined.Syntax);
+            var predefinedType = _typeScope.GetTypeOrErrorType(predefined.Syntax);
             return BindTypeConversion(ce.Arguments[0], predefinedType, allowExplicit: true);
         }
         
@@ -650,7 +629,7 @@ public sealed class Binder
                 return new BoundInvalidAccess();
             }
             case AccessPredefinedType predefined: {
-                var type = _typeScope.GetTypeOrThrow(predefined.Syntax);
+                var type = _typeScope.GetTypeOrErrorType(predefined.Syntax);
                 return new BoundPredefinedTypeAccess(type);
             }
             case MemberAccess ma:
@@ -731,7 +710,7 @@ public sealed class Binder
             TypeSymbol inner;
             //It was an implicitly typed empty list []
             if(le.ElementType is null) inner = _typeScope.CreatePlacerHolderType();
-            else inner = _typeScope.GetTypeOrThrow(le.ElementType);
+            else inner = _typeScope.GetTypeOrErrorType(le.ElementType);
 
             var type = _typeScope.GetOrCreateListType(inner);
             return new BoundListExpression(le, type, ImmutableArray<BoundExpression>.Empty);
