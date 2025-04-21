@@ -746,11 +746,12 @@ public sealed class Binder
             _diag.ReportTypeNotFound(se.Name, se.ObjectType.Location);
             type = TypeSymbol.Error;
         }
-        if(type == TypeSymbol.Int || type == TypeSymbol.Bool || type == TypeSymbol.String)
+        if(type == TypeSymbol.Int || type == TypeSymbol.Bool || type == TypeSymbol.String 
+           || type is TypeParameterSymbol)
         {
             //The "name" part of struct init is not an identifier, for example: "new int {...};"
             //TODO: Do we want to allow "int x = new int{5};"?
-            _diag.ReportCannotInstantiateBuiltinWithNew(type, se.Location);
+            _diag.ReportCannotInstantiateTypeWithNew(type, se.Location);
             return new BoundErrorExpression(se);
         }
         var members = ImmutableArray.CreateBuilder<(MemberSymbol, BoundExpression)>(se.Members.Count);

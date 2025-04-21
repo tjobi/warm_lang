@@ -168,9 +168,9 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, loc);
     }
 
-    internal static void ReportCannotInstantiateBuiltinWithNew(this ErrorWarrningBag bag, TypeSymbol guiltyType, TextLocation loc)
+    internal static void ReportCannotInstantiateTypeWithNew(this ErrorWarrningBag bag, TypeSymbol guiltyType, TextLocation loc)
     {
-        var message = $"The type '{guiltyType}' cannot be instantiated with new, it is a built-in";
+        var message = $"The type '{guiltyType}' cannot be instantiated with 'new' as it is either a primitive or a type parameter";
         bag.Report(message, true, loc);
     }
 
