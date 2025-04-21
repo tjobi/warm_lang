@@ -825,6 +825,7 @@ public sealed class Binder
                 _diag.ReportNameIsNotAFunction(access.Location, bma.Member.Name);
                 break;
             case BoundInvalidAccess:
+            case BoundExprAccess {Expression : BoundErrorExpression}:
                 break;
             default: 
                 //TODO: comeback for higher-order functions
