@@ -419,10 +419,14 @@ public sealed class BoundInterpreter
             var typeArgs = new List<TypeSymbol>();
             foreach(var pt in gt.TypeArguments)
             {
-                foreach(var layer in _typeArgumentEnvironment)
+                //TODO: Let this not be necssary - surely there is some way for the binder to setup us up for success here!
+                var concreteType = pt;
+                while(concreteType is TypeParameterSymbol)
                 {
-                    if(layer.ContainsKey(pt)) typeArgs.Add(layer[pt]);
+                    foreach(var layer in _typeArgumentEnvironment)
+                        if(layer.ContainsKey(concreteType)) concreteType = layer[concreteType];
                 }
+                typeArgs.Add(concreteType);
             }
             var instantiation = program
                                 .TypeInformation
