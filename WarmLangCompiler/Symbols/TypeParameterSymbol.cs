@@ -24,7 +24,6 @@ public sealed class TypeParameterSymbol : TypeSymbol
         Location = location;
     }
 
-
     //TODO: All of these use uniqueName - please do fix - if the ToString is removed
     //      code inside of BoundBinaryOperator will break ... because it uses the overloaded '==' 
     //      operator on typesymbols... What a mess! 

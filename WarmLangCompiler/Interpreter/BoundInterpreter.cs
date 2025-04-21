@@ -14,6 +14,7 @@ public sealed class BoundInterpreter
     private readonly FunctionSymbol _entryPoint;
     private VariableEnv _variableEnvironment;
     private FunctionEnv _functionEnvironment;
+    private Stack<Dictionary<TypeSymbol, TypeSymbol>> _typeArgumentEnvironment;
 
     public BoundInterpreter(BoundProgram program)
     {
@@ -27,6 +28,7 @@ public sealed class BoundInterpreter
         
         _functionEnvironment = new(program.Functions);
         _variableEnvironment = new();
+        _typeArgumentEnvironment = new();
         foreach(var globalVar in program.GlobalVariables)
         {
             EvaluateVarDeclaration(globalVar);
@@ -239,6 +241,12 @@ public sealed class BoundInterpreter
         var callArgs = call.Arguments;
         var funcParams = function.Parameters;
         PushEnvironments();
+        if(call.Function is SpecializedFunctionSymbol f)
+        {
+            var top = _typeArgumentEnvironment.Peek();
+            foreach(var (p, c) in f.TypeParameters.Zip(f.ConcreteTypeParameters)) top.Add(p,c);
+        }
+
         for (int i = 0; i < call.Arguments.Length; i++)
         {
             //var paramType = funcParams[i].Type; //We have checked this type in the binder, should be all good!
@@ -404,8 +412,31 @@ public sealed class BoundInterpreter
 
     private Value EvaluateObjectInitExpression(BoundObjectInitExpression bse)
     {
-        var membersOfStruct = program.TypeInformation[bse.Type].Members;
-        var strct = new ObjectValue(bse.Type);
+        var typeInfo = program.TypeInformation[bse.Type];
+        
+        if(typeInfo is GenericTypeInformation gt)
+        {
+            var typeArgs = new List<TypeSymbol>();
+            foreach(var pt in gt.TypeArguments)
+            {
+                foreach(var layer in _typeArgumentEnvironment)
+                {
+                    if(layer.ContainsKey(pt)) typeArgs.Add(layer[pt]);
+                }
+            }
+            var instantiation = program
+                                .TypeInformation
+                                .Where(ti => ti.Value is GenericTypeInformation gt2 && gt2.SpecializedFrom == gt.SpecializedFrom)
+                                .Select(ti => (GenericTypeInformation) ti.Value)
+                                .FirstOrDefault(gt => gt.TypeArguments.SequenceEqual(typeArgs));
+            if(instantiation is null)
+                throw new Exception($"{nameof(EvaluateObjectInitExpression)} - couldn't find an instance of generic '{bse.Type}' in current typeArgument Environment");
+            typeInfo = instantiation;
+        }
+
+        var membersOfStruct = typeInfo.Members;
+
+        var strct = new ObjectValue(typeInfo.Type);
         foreach(var initedMember in bse.InitializedMembers)
         {
             var fieldName = initedMember.MemberSymbol.Name; 
@@ -437,12 +468,14 @@ public sealed class BoundInterpreter
     {
         _variableEnvironment.Push();
         _functionEnvironment.Push();
+        _typeArgumentEnvironment.Push(new());
     }
 
     private void PopEnvironments()
     {
         _variableEnvironment.Pop();
         _functionEnvironment.Pop();
+        _typeArgumentEnvironment.Pop();
     }
 
     private static void EnsureNotNullValue(Value v, TextLocation? loc, string msg = "Cannot access null")

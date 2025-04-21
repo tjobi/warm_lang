@@ -45,3 +45,21 @@ public sealed class TypeSyntaxParameterType : TypeSyntaxNode
 
     public override string ToString() => Name;
 }
+
+public sealed class TypeSyntaxTypeApplication : TypeSyntaxNode
+{
+    public TypeSyntaxTypeApplication(TypeSyntaxNode genericType, SyntaxToken angleOpen, IList<TypeSyntaxNode> typeArguments, SyntaxToken angleClose ) 
+    : base(TextLocation.FromTo(genericType.Location, angleClose.Location))
+    {
+        GenericType = genericType;
+        TypeArguments = typeArguments;
+    }
+
+    public TypeSyntaxNode GenericType { get; }
+    public IList<TypeSyntaxNode> TypeArguments { get; }
+
+    public override string ToString() 
+    {
+        return $"{GenericType}<{string.Join(",", TypeArguments)}>";
+    }
+}

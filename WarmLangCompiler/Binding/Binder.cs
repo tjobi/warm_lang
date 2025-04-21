@@ -23,7 +23,7 @@ public sealed class Binder
     {
         _diag = bag;
         // _typeHelper = new();
-        _typeScope = new();
+        _typeScope = new(_diag);
         _scope = new(_typeScope);
         _functionStack = new();
         _unBoundBodyOf = new();
@@ -107,6 +107,7 @@ public sealed class Binder
                     if (bound is BoundVarDeclaration var)
                         globalVariables.Add(var);
                     break;
+                case TopLevelError: continue;
                 default: throw new NotImplementedException($"{nameof(Binder)} does not yet allow {toplevel.GetType().Name}");
             }
         }
@@ -123,25 +124,40 @@ public sealed class Binder
         var declaredTypes = new List<(TypeSymbol, TopLevelTypeDeclaration)>();
         for (int i = 0; i < typeDecls.Count; i++)
         {
+            var declaration = typeDecls[i];
             var typeSyntax = typeDecls[i].Type;
-            if (_typeScope.TryAddType(typeSyntax, out var typeSymbol))
+            ImmutableArray<TypeParameterSymbol>? typeParams = null;
+            if(declaration.TypeParameters is not null)
+            {
+                typeParams = CreateTypeParameterSymbols(declaration.TypeParameters);
+            }
+
+            if (_typeScope.TryAddType(declaration.Type, out var typeSymbol, typeParameters: typeParams))
             {
                 declaredTypes.Add((typeSymbol, typeDecls[i]));
             }
             else 
             {
                 _diag.ReportTypeAlreadyDeclared(typeSyntax.Location, typeSyntax.Name);
-                //Skip the declaring it c
+                //Skip the declaring it again
             }
         }
         foreach(var (typeSymbol, decl) in declaredTypes)
         {
+            _typeScope.Push();
+            if(_typeScope.GetTypeInformation(typeSymbol) is {TypeParameters: not null} info)
+            {
+                AddTypeParametersToScope(info.TypeParameters);
+            }
+
             foreach (var member in decl.Members)
             {
                 var memberType = _typeScope.GetTypeOrThrow(member.Type);
                 var memberSymbol = new MemberFieldSymbol(member.Name, memberType);
                 _typeScope.AddMember(typeSymbol, memberSymbol);
             }
+
+            _typeScope.Pop();
         }
     }
 
@@ -203,13 +219,13 @@ public sealed class Binder
     {
         if(!isGlobalScope) return BindLocalFunctionDeclaration(funcDecl);
         var nameToken = funcDecl.NameToken;
-        var typeParameters = CreateTypeParameterSymbols(funcDecl);
+        var typeParameters = CreateTypeParameterSymbols(funcDecl.TypeParams);
 
         _typeScope.Push();
-        foreach(var typeParam in typeParameters) 
+        if(AddTypeParametersToScope(typeParameters))
         {
-            if(!_typeScope.TryAddType(typeParam, out var _))
-                _diag.ReportTypeAlreadyDeclared(typeParam.Location, typeParam.Name);
+            _typeScope.Pop();
+            return new BoundErrorStatement(funcDecl);
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
@@ -248,12 +264,12 @@ public sealed class Binder
     private BoundStatement BindLocalFunctionDeclaration(FuncDeclaration funcDecl)
     {
         var nameToken = funcDecl.NameToken;
-        var typeParameters = CreateTypeParameterSymbols(funcDecl);
+        var typeParameters = CreateTypeParameterSymbols(funcDecl.TypeParams);
         _typeScope.Push();
-        foreach(var typeParam in typeParameters) 
+        if(AddTypeParametersToScope(typeParameters))
         {
-            if(!_typeScope.TryAddType(typeParam, out var _))
-                _diag.ReportTypeAlreadyDeclared(typeParam.Location, typeParam.Name);
+            _typeScope.Pop();
+            return new BoundErrorStatement(funcDecl);
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
@@ -323,10 +339,11 @@ public sealed class Binder
         return parameters.ToImmutable();
     }
 
-    private static ImmutableArray<TypeParameterSymbol> CreateTypeParameterSymbols(FuncDeclaration func) 
+    private static ImmutableArray<TypeParameterSymbol> CreateTypeParameterSymbols(
+        IList<WarmLangLexerParser.AST.TypeSyntax.TypeSyntaxParameterType> syntaxParameterTypes) 
     {
-        var typeParams = ImmutableArray.CreateBuilder<TypeParameterSymbol>(func.TypeParams.Count);
-        foreach(var typeParam in func.TypeParams)
+        var typeParams = ImmutableArray.CreateBuilder<TypeParameterSymbol>(syntaxParameterTypes.Count);
+        foreach(var typeParam in syntaxParameterTypes)
         {
             typeParams.Add(new(typeParam));
         }
@@ -462,22 +479,22 @@ public sealed class Binder
         var instantiatedTypeParameters = new List<TypeSymbol>();
         //FIXME: Honestly, a rewrite from typesymbol to a typeId is due...
         //       => pretty nasty using strings - but type parameters are unique within a function so should be fine... 
-        var typeParametersMap = new Dictionary<string, TypeSymbol>();
+        var typeParametersMap = new Dictionary<TypeSymbol, TypeSymbol>();
         // We have to create a concrete version of the definition. Any TypeParameterSymbol is replaced by its concrete...
         for (int i = 0; i < funcDef.TypeParameters.Length; i++)
         {
             var typeParam = funcDef.TypeParameters[i];
             var concrete = _typeScope.GetTypeOrThrow(application.TypeParams[i]);
             instantiatedTypeParameters.Add(concrete);
-            typeParametersMap[typeParam.Name] = concrete;
+            typeParametersMap[typeParam] = concrete;
         }
 
         //Let's also concretize the actual parameters + return type
-        var concreteReturn = ConcretifyType(funcDef.Type, typeParametersMap);
+        var concreteReturn = _typeScope.MakeConcrete(funcDef.Type, typeParametersMap);
         for (int i = 0; i < funcDef.Parameters.Length; i++)
         {
             var param = funcDef.Parameters[i];
-            var concrete = ConcretifyType(param.Type, typeParametersMap);
+            var concrete = _typeScope.MakeConcrete(param.Type, typeParametersMap);
             instantiatedParameters.Add(new ParameterSymbol(param.Name, concrete, param.Placement));
         }
 
@@ -487,17 +504,6 @@ public sealed class Binder
                                                         application.Location);
 
         return new BoundTypeApplication(application, access, specailized);
-    }
-
-    private TypeSymbol ConcretifyType(TypeSymbol param, Dictionary<string, TypeSymbol> typeParametersMap) 
-    {
-        return param switch
-        {
-            TypeParameterSymbol tp => typeParametersMap[tp.Name],
-            TypeSymbol lst when _typeScope.IsListTypeAndGetNested(lst, out var inner) =>
-                _typeScope.GetOrCreateListType(ConcretifyType(inner, typeParametersMap)),
-            _ => param 
-        };
     }
 
     private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
@@ -735,17 +741,17 @@ public sealed class Binder
 
     private BoundExpression BindObjectInitExpression(ObjectInitExpression se)
     {
-        if(se.NameToken.Kind.ToTypeSymbol() is not null)
+        if(!_typeScope.TryGetType(se.ObjectType, out var type))
+        {
+            _diag.ReportTypeNotFound(se.Name, se.ObjectType.Location);
+            type = TypeSymbol.Error;
+        }
+        if(type == TypeSymbol.Int || type == TypeSymbol.Bool || type == TypeSymbol.String)
         {
             //The "name" part of struct init is not an identifier, for example: "new int {...};"
             //TODO: Do we want to allow "int x = new int{5};"?
-            _diag.ReportCannotInstantiateBuiltinWithNew(se.NameToken);
+            _diag.ReportCannotInstantiateBuiltinWithNew(type, se.Location);
             return new BoundErrorExpression(se);
-        }
-        if(!_typeScope.TryGetType(se.Name!, out var type))
-        {
-            _diag.ReportTypeNotFound(se.NameToken);
-            type = TypeSymbol.Error;
         }
         var members = ImmutableArray.CreateBuilder<(MemberSymbol, BoundExpression)>(se.Members.Count);
         foreach(var (mNameToken, mExpr) in se.Members)
@@ -828,4 +834,17 @@ public sealed class Binder
         return null;
     }
 
+    public bool AddTypeParametersToScope(IEnumerable<TypeParameterSymbol> typeParameters)
+    {
+        bool anyFailed = false;
+        foreach(var typeParam in typeParameters) 
+        {
+            if(!_typeScope.TryAddType(typeParam, out var _))
+            {
+                _diag.ReportTypeAlreadyDeclared(typeParam.Location, typeParam.Name);
+                anyFailed = true;
+            }
+        }
+        return anyFailed;
+    }
 }

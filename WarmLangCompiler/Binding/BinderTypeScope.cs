@@ -1,6 +1,8 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST.TypeSyntax;
+using WarmLangLexerParser.ErrorReporting;
 
 namespace WarmLangCompiler.Binding;
 
@@ -27,6 +29,8 @@ public sealed class BinderTypeScope
 
     private readonly List<InternalTypeScope> _scopes;
     private readonly HashSet<TypeSymbol> _userDefinedTypes;
+    private readonly ErrorWarrningBag _diag;
+
     private InternalTypeScope Top => _scopes[^1];
     private InternalTypeScope Global => _scopes[0];
 
@@ -36,8 +40,9 @@ public sealed class BinderTypeScope
     
     private static int TypeToId(TypeSymbol t) => t.TypeID;
 
-    public BinderTypeScope()
+    public BinderTypeScope(ErrorWarrningBag diag)
     {
+        _diag = diag;
         _typeUnion = new(TypeToId);
         _scopes = new();
         _idToInformation = new();
@@ -54,6 +59,7 @@ public sealed class BinderTypeScope
         {
             _idToInformation[TypeToId(type)] = new TypeInformation(type, fields.ToList(), new());
         }
+
     }
 
     public void Push() => _scopes.Add(new());
@@ -77,12 +83,18 @@ public sealed class BinderTypeScope
         return null;
     }
 
-    private (TypeSymbol Type, TypeInformation Info)? GetTypeAndInformation(TypeSymbol? type)
+    private (TypeSymbol Type, TypeInformation Info)? GetTypeAndInformation(TypeSymbol? type, bool ignoreScoping = false)
     {
-
-        var scope = GetDefiningScopeOf(type);
-        if(scope is null || type is null) return null;
-        var parentId = _typeUnion.Find(scope[type.Name]);
+        if(type is null) return null;
+        
+        int typeId = TypeToId(type);
+        if(!ignoreScoping)
+        {
+            var scope = GetDefiningScopeOf(type);
+            if(scope is null || type is null) return null;
+            typeId = scope[type.Name];
+        }
+        var parentId = _typeUnion.Find(typeId);
         if(_idToInformation.TryGetValue(parentId, out var info)) return (info.Type, info);
         return null;
     }
@@ -123,33 +135,40 @@ public sealed class BinderTypeScope
         return parA == parB;
     }
 
-    public bool TryAddType(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? res, TypeInformation? typeInfo = null)
+    public bool TryAddType(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? res, 
+                           TypeInformation? typeInfo = null, 
+                           ImmutableArray<TypeParameterSymbol>? typeParameters = null)
     {
         res = null;
-        var knownTypeOrNull = GetType(type); 
-        if(knownTypeOrNull is not null) return false;
+        var knownTypeOrNull = GetTypeInformation(type); 
+        if(knownTypeOrNull is not null) 
+        {
+            return false;
+        }
         Top.Add(type.Name, TypeToId(type));
-        _idToInformation[TypeToId(type)] = typeInfo ?? new TypeInformation(type);
+        _idToInformation[TypeToId(type)] = typeInfo ?? new TypeInformation(type, typeParameters: typeParameters);
         _typeUnion.Add(type);
         res = type;
         if(type is not TypeParameterSymbol) _userDefinedTypes.Add(res);
         return true;
     }
 
-    public bool TryAddType(TypeSyntaxNode typeSyntax, [NotNullWhen(true)] out TypeSymbol? res, TypeInformation? typeInfo = null)
-        => TryAddType(AsTypeSymbol(typeSyntax), out res, typeInfo);
+    public bool TryAddType(TypeSyntaxNode typeSyntax, [NotNullWhen(true)] out TypeSymbol? res, 
+                           TypeInformation? typeInfo = null,
+                           ImmutableArray<TypeParameterSymbol>? typeParameters = null)
+        => TryAddType(AsTypeSymbol(typeSyntax), out res, typeInfo, typeParameters);
 
     public bool ContainsTypeWithNameOf(string name) 
         => GetType(new TypeSymbol(name)) is not null;
 
     public bool TryGetType(TypeSyntaxNode type, [NotNullWhen(true)] out TypeSymbol? res) 
-        => TryGetType(AsTypeSymbol(type).Name, out res);
+        => TryGetType(AsTypeSymbol(type), out res);
     
     public bool TryGetType(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? res)
-        => TryGetType(type.Name, out res);
+        => (res = GetType(type)) is not null;
 
     public bool TryGetType(string typeName, [NotNullWhen(true)] out TypeSymbol? res)
-        => (res = GetType(TypeSymbolFromString(typeName))) is not null;
+        => TryGetType(TypeSymbolFromString(typeName), out res);
 
     public TypeSymbol? GetType(TypeSyntaxNode? type) => GetType(AsTypeSymbol(type));
 
@@ -176,7 +195,8 @@ public sealed class BinderTypeScope
                 ContainsTypeParameterWithName(ident, out var typeParam) ? typeParam : TypeSymbolFromString(ident.Name),
             TypeSyntaxList lst => GetOrCreateListType(AsTypeSymbol(lst.InnerType)),
             TypeSyntaxParameterType tv => new TypeParameterSymbol(tv),
-            _ => throw new NotImplementedException($"BinderTypeExntensions doesn't know {typeSyntax}")
+            TypeSyntaxTypeApplication ta => GetOrCreateTypeSymbolFromApplication(ta),
+            _ => throw new NotImplementedException($"{nameof(BinderTypeScope)}.{nameof(AsTypeSymbol)} doesn't know {typeSyntax}")
         };
     }
     
@@ -216,6 +236,12 @@ public sealed class BinderTypeScope
     }
     public bool TryGetTypeInformation(TypeSymbol type, [NotNullWhen(true)] out TypeInformation? typeInfo)
         => (typeInfo = GetTypeInformation(type)) is not null;
+
+    private TypeInformation? GetTypeInformationIgnoringScopingRules(TypeSymbol type)
+    {
+        var res = GetTypeAndInformation(type, ignoreScoping: true);
+        return res?.Info;
+    }
 
     public void AddMethodBody(TypeSymbol type, FunctionSymbol func, BoundBlockStatement body)
     {
@@ -368,6 +394,73 @@ public sealed class BinderTypeScope
         _typeUnion.Add(ts);
         _idToInformation[TypeToId(ts)] = placeholderInfo;
         return ts;
+    }
+
+    public TypeSymbol GetOrCreateTypeSymbolFromApplication(TypeSyntaxTypeApplication ta)
+    {
+        var typeParams = ta.TypeArguments.Select(AsTypeSymbol);
+        return GetOrCreateTypeApplication(AsTypeSymbol(ta.GenericType), typeParams.ToList());
+    }
+
+    public TypeSymbol GetOrCreateTypeApplication(TypeSymbol genericType, IList<TypeSymbol> typeArguments)
+    {
+        var baseInfo = GetTypeInformation(genericType);
+        if(baseInfo is null)
+            throw new Exception($"{nameof(GetOrCreateTypeSymbolFromApplication)} couldn't resolve '{genericType}'");
+        if(baseInfo is { TypeParameters: null })
+            throw new NotImplementedException($"{nameof(GetOrCreateTypeSymbolFromApplication)} - needs some clean way to report non generic");
+        var baseTypeParameters = baseInfo.TypeParameters.Value;
+        if(baseTypeParameters.Length != typeArguments.Count)
+            throw new NotImplementedException($"{nameof(GetOrCreateTypeSymbolFromApplication)} - needs some clean way to report mismatching arguments");
+
+        var typeArgs = new List<TypeSymbol>();
+        var translation = new Dictionary<TypeSymbol, TypeSymbol>();
+
+        for(int i = 0; i < baseTypeParameters.Length ; i++)
+        {
+            var arg = typeArguments[i];
+            if(!TryGetTypeInformation(arg, out var argInfo)) 
+                throw new Exception($"{nameof(GetOrCreateTypeSymbolFromApplication)} - couldn't resolve type argument '{arg}'");
+            typeArgs.Add(argInfo.Type);
+            
+            var paramType = baseTypeParameters[i];
+            translation.Add(paramType, argInfo.Type);
+        }
+        //FIXME - could we move away from creating so many unecessary strings?
+        var typeName = $"{baseInfo.Type}<{string.Join(",", typeArgs)}>";
+        if(Global.TryGetValue(typeName, out var taId)) return _idToInformation[taId].Type;
+
+        var taType = new TypeSymbol(typeName);
+        taId = TypeToId(taType);
+
+        var members = new List<MemberSymbol>();
+        foreach(var member in baseInfo.Members)
+        {
+            //TODO: Fix methods too... Should be very similar to regular generic functions?
+            if(member is MemberFuncSymbol) continue;
+            var concreteMemberType = MakeConcrete(member.Type, translation);
+            members.Add(new MemberFieldSymbol(member.Name, concreteMemberType, member.IsReadOnly, member.IsBuiltin));
+        }
+
+        _idToInformation[taId] = new GenericTypeInformation(taType, baseInfo.Type, typeArgs, members);
+        Global.Add(taType.Name, taId);
+        _typeUnion.Add(taType);
+        return taType;
+    }
+
+    public TypeSymbol MakeConcrete(TypeSymbol param, Dictionary<TypeSymbol, TypeSymbol> concreteOf) 
+    {
+        if(concreteOf.ContainsKey(param)) return concreteOf[param];
+        return _idToInformation[TypeToId(param)] switch
+        {
+            TypeInformation { Type: TypeParameterSymbol tp } => concreteOf[tp],
+            ListTypeInformation lst => 
+                GetOrCreateListType(MakeConcrete(lst.NestedType, concreteOf)),
+            GenericTypeInformation gt => 
+                GetOrCreateTypeApplication(gt.SpecializedFrom, gt.TypeArguments.Select(t => MakeConcrete(t, concreteOf)).ToList()),
+            null => throw new Exception($"{nameof(MakeConcrete)} - tried to concretify '{param}' with no information"),
+            _ => param
+        };
     }
 
     public void PrintUnion()
