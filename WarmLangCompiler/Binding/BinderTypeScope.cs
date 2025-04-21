@@ -161,10 +161,10 @@ public sealed class BinderTypeScope
     public bool ContainsTypeWithNameOf(string name) 
         => GetType(new TypeSymbol(name)) is not null;
 
-    public bool TryGetType(TypeSyntaxNode type, [NotNullWhen(true)] out TypeSymbol? res) 
+    public bool TryGetType(TypeSyntaxNode? type, [NotNullWhen(true)] out TypeSymbol? res) 
         => TryGetType(AsTypeSymbol(type), out res);
     
-    public bool TryGetType(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? res)
+    public bool TryGetType(TypeSymbol? type, [NotNullWhen(true)] out TypeSymbol? res)
         => (res = GetType(type)) is not null;
 
     public bool TryGetType(string typeName, [NotNullWhen(true)] out TypeSymbol? res)

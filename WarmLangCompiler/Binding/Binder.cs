@@ -229,7 +229,18 @@ public sealed class Binder
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
-        var returnType = _typeScope.GetTypeOrThrow(funcDecl.ReturnType);
+        var returnType = TypeSymbol.Void;
+        if(funcDecl.ReturnType is not null)
+        {
+            if(!_typeScope.TryGetType(funcDecl.ReturnType, out var found))
+            {
+                _typeScope.Pop();
+                _diag.ReportTypeNotFound(funcDecl.ReturnType.ToString(), funcDecl.ReturnType.Location);
+                return new BoundErrorStatement(funcDecl);
+            }
+            returnType = found;
+        } 
+
         var function = new FunctionSymbol(nameToken, typeParameters, parameters, returnType);
         
         var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
@@ -273,7 +284,19 @@ public sealed class Binder
         }
 
         var parameters = CreateParameterSymbols(funcDecl);
-        var returnType = _typeScope.GetTypeOrThrow(funcDecl.ReturnType);
+        
+        var returnType = TypeSymbol.Void;
+        if(funcDecl.ReturnType is not null)
+        {
+            if(!_typeScope.TryGetType(funcDecl.ReturnType, out var found))
+            {
+                _typeScope.Pop();
+                _diag.ReportTypeNotFound(funcDecl.ReturnType.ToString(), funcDecl.ReturnType.Location);
+                return new BoundErrorStatement(funcDecl);
+            }
+            returnType = found;
+        } 
+        
         var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, returnType);
 
         if(funcDecl.OwnerType is not null)
@@ -836,7 +859,7 @@ public sealed class Binder
         return null;
     }
 
-    public bool AddTypeParametersToScope(IEnumerable<TypeParameterSymbol> typeParameters)
+    private bool AddTypeParametersToScope(IEnumerable<TypeParameterSymbol> typeParameters)
     {
         bool anyFailed = false;
         foreach(var typeParam in typeParameters) 
