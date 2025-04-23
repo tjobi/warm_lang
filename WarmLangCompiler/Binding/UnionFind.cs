@@ -20,13 +20,29 @@ public class UnionFind
 
     public int Find(TypeSymbol i) => Find(toInt(i));
 
-    public int Find(int i) {
+    public int Find(int i) 
+    {
         int root = _parent[i];
 
         if(_parent[root] != root) {
             return _parent[i] = Find(root);
         }
         return root;
+    }
+
+    public bool TryFind(TypeSymbol t, out int result) =>  TryFind(toInt(t), out result);
+
+    public bool TryFind(int i, out int result)
+    {
+        result = 0;
+        if(!_parent.TryGetValue(i, out var root)) return false;
+        result = root;
+
+        if(_parent[root] != root) {
+            if(TryFind(root, out var parRoot))
+                result = _parent[i] = parRoot;
+        }
+        return true;
     }
 
     public void Union(TypeSymbol a, TypeSymbol b) => Union(toInt(a), toInt(b));

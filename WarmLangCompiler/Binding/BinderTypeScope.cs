@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using Mono.CompilerServices.SymbolWriter;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST.TypeSyntax;
 using WarmLangLexerParser.ErrorReporting;
@@ -50,8 +51,14 @@ public sealed class BinderTypeScope
         _scopes.Add(new InternalTypeScope());
         foreach(var builtin in BuiltinTypes()) 
         {
-            Global.Add(builtin.Name, TypeToId(builtin));
-            _idToInformation.Add(TypeToId(builtin), new(builtin));
+            var id = TypeToId(builtin);
+            Global.Add(builtin.Name, id);
+            ImmutableArray<TypeParameterSymbol>? typeParams = null;
+            if(builtin == TypeSymbol.List)
+            {
+                typeParams = ImmutableArray.Create(new TypeParameterSymbol("T", new WarmLangLexerParser.TextLocation(-1,-1)));
+            }
+            _idToInformation.Add(id, new(builtin, typeParameters: typeParams));
             _typeUnion.Add(builtin);
         }
 
@@ -101,7 +108,11 @@ public sealed class BinderTypeScope
 
     public TypeSymbol GetOrCreateListType(TypeSymbol typeParam)
     {
-        var typeParamParent = _typeUnion.Find(typeParam);
+        // var typeParamParent = _typeUnion.Find(typeParam);
+        if(!_typeUnion.TryFind(typeParam, out var typeParamParent))
+        {
+            throw new Exception($"Compiler bug - couldn't find parent of type parameter '{typeParam}'");
+        }
         var typeParamInfo = _idToInformation[typeParamParent];
         typeParam = typeParamInfo.Type;
         //TODO: Is this necessary?
@@ -245,6 +256,10 @@ public sealed class BinderTypeScope
         if(res is null) return null;
         return res.Value.Info;
     }
+
+    public bool TryGetTypeInformation(TypeSyntaxNode type, [NotNullWhen(true)] out TypeInformation? typeInfo)
+        => TryGetTypeInformation(AsTypeSymbol(type), out typeInfo);
+
     public bool TryGetTypeInformation(TypeSymbol type, [NotNullWhen(true)] out TypeInformation? typeInfo)
         => (typeInfo = GetTypeInformation(type)) is not null;
 
@@ -257,15 +272,29 @@ public sealed class BinderTypeScope
     public void AddMethodBody(TypeSymbol type, FunctionSymbol func, BoundBlockStatement body)
     {
         if(!TryGetTypeInformation(type, out var info)) 
-            throw new BinderTypeScopeExeception($"{AddMethodBody} - compiler bug, no info!");
+            throw new BinderTypeScopeExeception($"{nameof(AddMethodBody)} - compiler bug, no info!");
         info.MethodBodies.Add(func, body);
+    }
+
+    public void AddMember(TypeInformation typeInfo, MemberSymbol member)
+    {
+        if(typeInfo is GenericTypeInformation gt && member is MemberFuncSymbol f)
+        {
+            if(gt.IsPartiallyConcrete) throw new NotImplementedException($"Don't allow on partially generic! '{f}'");
+            else if(!gt.IsFullyConcrete)
+            {
+                if(TryGetTypeInformation(gt.SpecializedFrom, out var baseinfo)) typeInfo = baseinfo;
+                else throw new BinderTypeScopeExeception($"{nameof(AddMember)} - compiler bug, incorrect assumption");
+            }
+        }
+        typeInfo.Members.Add(member);
     }
 
     public void AddMember(TypeSymbol type, MemberSymbol member)
     {
         if(!TryGetTypeInformation(type, out var info)) 
-            throw new BinderTypeScopeExeception($"{AddMember} - compiler bug, no info!");
-        info.Members.Add(member);
+            throw new BinderTypeScopeExeception($"{nameof(AddMember)} - compiler bug, no info!");
+        AddMember(info, member);
     }
 
     public bool TryFindMember(TypeSymbol type, string name, [NotNullWhen(true)] out MemberSymbol? memberSymbol)
@@ -279,7 +308,7 @@ public sealed class BinderTypeScope
         memberSymbol = members.FirstOrDefault(m => m.Name == name);
 
         // if the type is specialized/instantiation of a generic - member may reside on base
-        if(memberSymbol is null && info is ListTypeInformation gt)
+        if(memberSymbol is null && info is GenericTypeInformation gt)
         {
             TryFindMember(gt.SpecializedFrom, name, out memberSymbol);
         }
@@ -338,8 +367,6 @@ public sealed class BinderTypeScope
         //null if nothing, if true then union(a,b) else union(b,a)
         bool? direction = null;
         stack.Push((a,b));
-        // Console.WriteLine($"----- unifying ({a},{b}) ----");
-        // PrintUnion();
         while(stack.Count > 0)
         {
             (a, b) = stack.Pop();
@@ -389,10 +416,6 @@ public sealed class BinderTypeScope
                 _typeUnion.Union(_b, _a);
             }
         }
-        // Console.WriteLine("After");
-        // PrintUnion();
-        // Console.WriteLine($"Are {_a} and {_b} the same? " + TypeEquality(_a,_b));
-        // Console.WriteLine($"----- finished unifying ({a},{b}) ----");
     }
 
     public TypeSymbol CreatePlacerHolderType()
@@ -426,6 +449,7 @@ public sealed class BinderTypeScope
 
         var typeArgs = new List<TypeSymbol>();
         var translation = new Dictionary<TypeSymbol, TypeSymbol>();
+        var cntConcreteTypeParams = baseTypeParameters.Length;
 
         for(int i = 0; i < baseTypeParameters.Length ; i++)
         {
@@ -436,6 +460,7 @@ public sealed class BinderTypeScope
             
             var paramType = baseTypeParameters[i];
             translation.Add(paramType, argInfo.Type);
+            if(argInfo.Type is TypeParameterSymbol) cntConcreteTypeParams--;
         }
         //FIXME - could we move away from creating so many unecessary strings?
         var typeName = $"{baseInfo.Type}<{string.Join(",", typeArgs)}>";
@@ -453,7 +478,10 @@ public sealed class BinderTypeScope
             members.Add(new MemberFieldSymbol(member.Name, concreteMemberType, member.IsReadOnly, member.IsBuiltin));
         }
 
-        _idToInformation[taId] = new GenericTypeInformation(taType, baseInfo.Type, typeArgs, members);
+        _idToInformation[taId] = new GenericTypeInformation(taType, baseInfo.Type, 
+                                                            typeArgs, cntConcreteTypeParams, 
+                                                            members,
+                                                            typeParameters: baseInfo.TypeParameters);
         Global.Add(taType.Name, taId);
         _typeUnion.Add(taType);
         return taType;

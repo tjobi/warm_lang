@@ -233,8 +233,22 @@ public sealed class BoundInterpreter
         };
         if(function.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(call);
+
+        BoundBlockStatement LookupMethod(FunctionSymbol function, TypeSymbol owner)
+        {
+            var ownerInfo = program.TypeInformation[owner];
+            if(!ownerInfo.MethodBodies.TryGetValue(function, out var body))
+            {
+                if(ownerInfo is GenericTypeInformation gt 
+                   && program.TypeInformation[gt.SpecializedFrom].MethodBodies.TryGetValue(function, out body))
+                { }
+                else throw new Exception($"{nameof(EvaluateCallExpression)} couldn't locate '{function}' for type '{owner}'");
+            }
+            return body;
+        }
+
         var functionBody = (function.IsMemberFunc 
-                                ? program.TypeInformation[function.OwnerType!].MethodBodies[function]
+                                ? LookupMethod(function, function.OwnerType)
                                 : _functionEnvironment.Lookup(function))
                                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'");
         

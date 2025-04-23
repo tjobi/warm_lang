@@ -237,9 +237,14 @@ public sealed class Binder
         
         if(funcDecl.OwnerType is not null)
         {
-            var ownerType = _typeScope.GetTypeOrErrorType(funcDecl.OwnerType);
+            if(!_typeScope.TryGetTypeInformation(funcDecl.OwnerType, out var ownerTypeInfo)) 
+            {
+                _diag.ReportTypeNotFound(funcDecl.OwnerType.ToString(), funcDecl.OwnerType.Location);
+                return new BoundErrorStatement(funcDecl);
+            }
+            var ownerType = ownerTypeInfo.Type;
             var symbol = new MemberFuncSymbol(function);
-            _typeScope.AddMember(ownerType, symbol);
+            _typeScope.AddMember(ownerTypeInfo, symbol);
             function.SetOwnerType(ownerType); //TODO: this is quite ugly
             
             if(parameters.Length < 1)

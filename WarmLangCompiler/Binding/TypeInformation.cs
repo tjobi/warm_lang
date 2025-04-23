@@ -38,9 +38,9 @@ public class ListTypeInformation : GenericTypeInformation
     public TypeSymbol NestedType => TypeArguments[0];
 
     public ListTypeInformation(TypeSymbol thisType, TypeSymbol baseT, TypeSymbol nestedType, 
-                                  List<MemberSymbol>? members = null, 
-                                  Dictionary<FunctionSymbol, BoundBlockStatement>? methodBodies = null) 
-    : base(thisType, baseT, new List<TypeSymbol>(){nestedType}, members, methodBodies)
+                               List<MemberSymbol>? members = null,
+                               ImmutableArray<TypeParameterSymbol>? typeParams = null) 
+    : base(thisType, baseT, new List<TypeSymbol>(){nestedType}, 0, members, typeParameters: typeParams)
     { }
 }
 
@@ -58,14 +58,21 @@ public sealed class PlaceHolderInformation : TypeInformation
 
 public class GenericTypeInformation : TypeInformation
 {
-    public GenericTypeInformation(TypeSymbol type, TypeSymbol specializedFrom, List<TypeSymbol> typeArguments, 
-                                  List<MemberSymbol>? members = null, 
-                                  Dictionary<FunctionSymbol, BoundBlockStatement>? methodBodies = null) : base(type, members, methodBodies)
+    public GenericTypeInformation(TypeSymbol type, TypeSymbol specializedFrom, List<TypeSymbol> typeArguments,
+                                  int concreteTypeArguments,
+                                  List<MemberSymbol>? members = null,
+                                  ImmutableArray<TypeParameterSymbol>? typeParameters = null) 
+    : base(type, members, null, typeParameters: typeParameters)
     {
         SpecializedFrom = specializedFrom;
         TypeArguments = typeArguments;
+        ConcreteTypeArguments = concreteTypeArguments;
     }
 
     public TypeSymbol SpecializedFrom { get; }
     public List<TypeSymbol> TypeArguments { get; }
+    public int ConcreteTypeArguments { get; }
+
+    public bool IsPartiallyConcrete => TypeParameters.HasValue && ConcreteTypeArguments > 0 && ConcreteTypeArguments != TypeParameters.Value.Length;
+    public bool IsFullyConcrete => TypeParameters.HasValue && ConcreteTypeArguments == TypeParameters.Value.Length;
 }

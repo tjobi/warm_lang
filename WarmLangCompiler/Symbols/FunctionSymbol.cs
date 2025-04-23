@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using WarmLangLexerParser;
 
@@ -40,6 +41,8 @@ public class FunctionSymbol : EntitySymbol
     public ImmutableArray<ParameterSymbol> Parameters { get; }
     public TextLocation Location { get; }
     public TypeSymbol? OwnerType { get; private set; }
+
+    [MemberNotNullWhen(true, nameof(OwnerType))]
     public bool IsMemberFunc => OwnerType is not null;
 
     //Locals that are shared with any nested functions - could be parameters or local variables
