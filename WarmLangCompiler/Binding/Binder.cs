@@ -477,7 +477,7 @@ public sealed class Binder
         
         if(funcDef.TypeParameters.Length != application.TypeParams.Count) 
         {
-            _diag.ReportMismatchingTypeParameters(application.Location, application.TypeParams.Count, funcDef.TypeParameters.Length, funcDef);
+            _diag.ReportFunctionMismatchingTypeParameters(application.Location, application.TypeParams.Count, funcDef.TypeParameters.Length, funcDef);
             return new BoundErrorExpression(application);
         }
         
@@ -497,11 +497,11 @@ public sealed class Binder
         }
 
         //Let's also concretize the actual parameters + return type
-        var concreteReturn = _typeScope.MakeConcrete(funcDef.Type, typeParametersMap);
+        var concreteReturn = _typeScope.MakeConcrete(funcDef.Type, typeParametersMap, funcDef.Location);
         for (int i = 0; i < funcDef.Parameters.Length; i++)
         {
             var param = funcDef.Parameters[i];
-            var concrete = _typeScope.MakeConcrete(param.Type, typeParametersMap);
+            var concrete = _typeScope.MakeConcrete(param.Type, typeParametersMap, funcDef.Location);
             instantiatedParameters.Add(new ParameterSymbol(param.Name, concrete, param.Placement));
         }
 

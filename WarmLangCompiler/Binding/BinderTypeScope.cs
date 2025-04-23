@@ -111,7 +111,7 @@ public sealed class BinderTypeScope
         // var typeParamParent = _typeUnion.Find(typeParam);
         if(!_typeUnion.TryFind(typeParam, out var typeParamParent))
         {
-            throw new Exception($"Compiler bug - couldn't find parent of type parameter '{typeParam}'");
+            throw new BinderTypeScopeExeception($"Compiler bug - couldn't find parent of type parameter '{typeParam}'");
         }
         var typeParamInfo = _idToInformation[typeParamParent];
         typeParam = typeParamInfo.Type;
@@ -433,19 +433,29 @@ public sealed class BinderTypeScope
     public TypeSymbol GetOrCreateTypeSymbolFromApplication(TypeSyntaxTypeApplication ta)
     {
         var typeParams = ta.TypeArguments.Select(AsTypeSymbol);
-        return GetOrCreateTypeApplication(AsTypeSymbol(ta.GenericType), typeParams.ToList());
+        return GetOrCreateTypeApplication(AsTypeSymbol(ta.GenericType), typeParams.ToList(), ta.Location);
     }
 
-    public TypeSymbol GetOrCreateTypeApplication(TypeSymbol genericType, IList<TypeSymbol> typeArguments)
+    public TypeSymbol GetOrCreateTypeApplication(TypeSymbol genericType, IList<TypeSymbol> typeArguments, WarmLangLexerParser.TextLocation location)
     {
         var baseInfo = GetTypeInformation(genericType);
         if(baseInfo is null)
-            throw new Exception($"{nameof(GetOrCreateTypeSymbolFromApplication)} couldn't resolve '{genericType}'");
+        {
+            _diag.ReportTypeNotFound(genericType.Name, location!);
+            return TypeSymbol.Error;
+        }
         if(baseInfo is { TypeParameters: null })
-            throw new NotImplementedException($"{nameof(GetOrCreateTypeSymbolFromApplication)} - needs some clean way to report non generic");
+        {
+            _diag.ReportNonGenericType(genericType.Name, location);
+            return TypeSymbol.Error;
+        }
         var baseTypeParameters = baseInfo.TypeParameters.Value;
         if(baseTypeParameters.Length != typeArguments.Count)
-            throw new NotImplementedException($"{nameof(GetOrCreateTypeSymbolFromApplication)} - needs some clean way to report mismatching arguments");
+        {
+            var genericTypeName = $"{genericType}<{string.Join(",", baseTypeParameters.Select(t => t.Name))}>";
+            _diag.ReportGenericTypeMismatchingTypeArguments(genericTypeName, typeArguments.Count, baseTypeParameters.Length, location);
+            return TypeSymbol.Error;
+        }
 
         var typeArgs = new List<TypeSymbol>();
         var translation = new Dictionary<TypeSymbol, TypeSymbol>();
@@ -454,13 +464,18 @@ public sealed class BinderTypeScope
         for(int i = 0; i < baseTypeParameters.Length ; i++)
         {
             var arg = typeArguments[i];
+            TypeSymbol argType;
             if(!TryGetTypeInformation(arg, out var argInfo)) 
-                throw new Exception($"{nameof(GetOrCreateTypeSymbolFromApplication)} - couldn't resolve type argument '{arg}'");
-            typeArgs.Add(argInfo.Type);
+            {
+                _diag.ReportTypeNotFound(arg.Name, location);
+                argType = TypeSymbol.Error;
+            } 
+            else argType = argInfo.Type;
             
+            typeArgs.Add(argType);
             var paramType = baseTypeParameters[i];
-            translation.Add(paramType, argInfo.Type);
-            if(argInfo.Type is TypeParameterSymbol) cntConcreteTypeParams--;
+            translation.Add(paramType, argType);
+            if(argType is TypeParameterSymbol) cntConcreteTypeParams--;
         }
         //FIXME - could we move away from creating so many unecessary strings?
         var typeName = $"{baseInfo.Type}<{string.Join(",", typeArgs)}>";
@@ -474,7 +489,7 @@ public sealed class BinderTypeScope
         {
             //TODO: Fix methods too... Should be very similar to regular generic functions?
             if(member is MemberFuncSymbol) continue;
-            var concreteMemberType = MakeConcrete(member.Type, translation);
+            var concreteMemberType = MakeConcrete(member.Type, translation, location);
             members.Add(new MemberFieldSymbol(member.Name, concreteMemberType, member.IsReadOnly, member.IsBuiltin));
         }
 
@@ -487,16 +502,16 @@ public sealed class BinderTypeScope
         return taType;
     }
 
-    public TypeSymbol MakeConcrete(TypeSymbol param, Dictionary<TypeSymbol, TypeSymbol> concreteOf) 
+    public TypeSymbol MakeConcrete(TypeSymbol param, Dictionary<TypeSymbol, TypeSymbol> concreteOf, WarmLangLexerParser.TextLocation location) 
     {
         if(concreteOf.ContainsKey(param)) return concreteOf[param];
         return _idToInformation[TypeToId(param)] switch
         {
             TypeInformation { Type: TypeParameterSymbol tp } => concreteOf[tp],
             ListTypeInformation lst => 
-                GetOrCreateListType(MakeConcrete(lst.NestedType, concreteOf)),
+                GetOrCreateListType(MakeConcrete(lst.NestedType, concreteOf, location)),
             GenericTypeInformation gt => 
-                GetOrCreateTypeApplication(gt.SpecializedFrom, gt.TypeArguments.Select(t => MakeConcrete(t, concreteOf)).ToList()),
+                GetOrCreateTypeApplication(gt.SpecializedFrom, gt.TypeArguments.Select(t => MakeConcrete(t, concreteOf, location)).ToList(), location),
             null => throw new Exception($"{nameof(MakeConcrete)} - tried to concretify '{param}' with no information"),
             _ => param
         };

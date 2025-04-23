@@ -168,6 +168,12 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, loc);
     }
 
+    internal static void ReportNonGenericType(this ErrorWarrningBag bag, string name, TextLocation loc)
+    {
+        var message = $"The non-generic type '{name}' can not be used with type arguments";
+        bag.Report(message, true, loc);
+    }
+
     internal static void ReportCannotInstantiateTypeWithNew(this ErrorWarrningBag bag, TypeSymbol guiltyType, TextLocation loc)
     {
         var message = $"The type '{guiltyType}' cannot be instantiated with 'new' as it is either a primitive or a type parameter";
@@ -186,9 +192,15 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int receieved, int expected, FunctionSymbol func)
+    internal static void ReportFunctionMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int received, int expected, FunctionSymbol func)
     {
-        var message = $"Received {receieved} type arguements but required {expected} for function '{func.Name}'";
+        var message = $"Using generic '{func.Name}' requires {expected} type arguments but got {received}";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportGenericTypeMismatchingTypeArguments(this ErrorWarrningBag bag, string name, int received, int expected, TextLocation location)
+    {
+        var message = $"Using the generic type '{name}' requires {expected} type arguments but got {received}";
         bag.Report(message, true, location);
     }
 }
