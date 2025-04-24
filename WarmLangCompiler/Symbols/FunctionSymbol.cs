@@ -91,7 +91,7 @@ public class FunctionSymbol : EntitySymbol
 
 public sealed class SpecializedFunctionSymbol : FunctionSymbol
 {
-    public List<TypeSymbol> ConcreteTypeParameters { get; }
+    public List<TypeSymbol> TypeArguments { get; }
     public FunctionSymbol SpecializedFrom { get; }
 
     private static string FuncName(FunctionSymbol func, List<TypeSymbol> typeParams)
@@ -102,13 +102,13 @@ public sealed class SpecializedFunctionSymbol : FunctionSymbol
         sb.Append('>');
         return sb.ToString();
     }
-    public SpecializedFunctionSymbol(FunctionSymbol func, List<TypeSymbol> concreteTypeParameters,
+    public SpecializedFunctionSymbol(FunctionSymbol func, List<TypeSymbol> typeArguments,
                                      ImmutableArray<ParameterSymbol> parameters, TypeSymbol returnType,
                                      TextLocation location) 
-    : base(FuncName(func, concreteTypeParameters), func.TypeParameters, 
+    : base(FuncName(func, typeArguments), func.TypeParameters, 
            parameters, returnType, location)
     {
-        ConcreteTypeParameters = concreteTypeParameters;
+        TypeArguments = typeArguments;
         SpecializedFrom = func;
     }
 

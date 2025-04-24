@@ -5,7 +5,8 @@ namespace WarmLangCompiler.Binding;
 
 public sealed class BoundTypeConversionExpression : BoundExpression
 {
-    public BoundTypeConversionExpression(ExpressionNode node, TypeSymbol type, BoundExpression expression) : base(node, type)
+    public BoundTypeConversionExpression(ExpressionNode node, TypeSymbol type, BoundExpression expression) 
+    : base(node, type)
     {
         Expression = expression;
     }

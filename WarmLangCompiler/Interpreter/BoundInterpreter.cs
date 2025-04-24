@@ -258,7 +258,7 @@ public sealed class BoundInterpreter
         if(call.Function is SpecializedFunctionSymbol f)
         {
             var top = _typeArgumentEnvironment.Peek();
-            foreach(var (p, c) in f.TypeParameters.Zip(f.ConcreteTypeParameters)) top.Add(p,c);
+            foreach(var (p, c) in f.TypeParameters.Zip(f.TypeArguments)) top.Add(p,c);
         }
 
         for (int i = 0; i < call.Arguments.Length; i++)

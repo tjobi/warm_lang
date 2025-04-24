@@ -3,6 +3,7 @@ using WarmLangCompiler.Binding;
 using Mono.Cecil;
 using Mono.Cecil.Rocks;
 using WarmLangLexerParser.ErrorReporting;
+using System.Diagnostics.CodeAnalysis;
 namespace WarmLangCompiler.ILGen;
 
 public sealed class CilTypeManager 
@@ -44,11 +45,12 @@ public sealed class CilTypeManager
     private TypeReference GetSpecializedTypeDefinition(TypeSymbol type)
     {
         var typeInfo = infoOf[type];
-        if(typeInfo is ListTypeInformation lti)
+        if(typeInfo is GenericTypeInformation gt)
         {
-            var listBase = GetType(lti.SpecializedFrom);
-            var concrete = listBase.MakeGenericInstanceType(GetType(lti.NestedType));
-            return toCILType[type] = concrete;
+            var genericBase = GetType(gt.SpecializedFrom);
+            var typeParameters = gt.TypeArguments.Select(GetType).ToArray();
+            var genericInstance = genericBase.MakeGenericInstanceType(typeParameters);
+            return toCILType[type] = genericInstance;
         }
         //FIXME: Should we add some sort of check to make sure only valid "GenericTypeInformation" or "ListTypeInformation" goes here?
         return toCILType[type];
@@ -89,12 +91,24 @@ public sealed class CilTypeManager
         return methodCache[signature] = specializedMethod;
     }
 
-    public MethodReference GetConstructor(TypeSymbol type, int arity = 0) 
-        => GetSpecializedMethod(type, ".ctor", arity);
+    public MethodReference GetSpecializedConstructor(TypeSymbol type, MethodReference ctor, IEnumerable<TypeSymbol> typeArgs)
+    {
+        var specializedType = GetType(type);
+        var specializedMethod = new MethodReference(ctor.Name, ctor.ReturnType, specializedType)
+        {
+            HasThis = true
+        };
+        return specializedMethod;
+    }
     
     public bool IsListType(TypeSymbol type)
     {
         return infoOf[type] is ListTypeInformation;
+    }
+
+    public bool TryGetTypeInformation(TypeSymbol type, [NotNullWhen(true)] out TypeInformation? result)
+    {
+        return infoOf.TryGetValue(type, out result);
     }
 }
 public class ListMethodHelper
@@ -109,7 +123,7 @@ public class ListMethodHelper
     public MethodReference Empty(TypeSymbol t)
     {
         //I mean, it looks unsafe - but we have type checked the program ...
-        return manager.GetConstructor(t);
+        return manager.GetSpecializedMethod(t, ".ctor", 0);
     }
 
     private MethodReference GetMethod(TypeSymbol t, string name, int arity)

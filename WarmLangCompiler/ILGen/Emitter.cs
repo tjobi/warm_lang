@@ -201,7 +201,7 @@ public sealed class Emitter{
     {
         if(_diag.Any())
             return; //something went wrong in constructor
-        
+
         foreach(var (type, _) in program.GetDeclaredTypes()) EmitTypeDeclaration(type);
         
         foreach(var (type, members) in program.GetDeclaredTypes()) EmitTypeMembers(type, members);
@@ -210,6 +210,8 @@ public sealed class Emitter{
         {
             EmitFunctionDeclaration(func);
         }
+
+        EmitGenericTypeInstancesFromProgram(program);
 
         var globalsProcessor = _globalsType.Methods[0].Body.GetILProcessor();
         foreach(var globalVar in program.GlobalVariables)
@@ -232,6 +234,34 @@ public sealed class Emitter{
         _assemblyDef.Write(outfile);
     }
 
+    private void EmitGenericTypeInstancesFromProgram(BoundProgram program)
+    {
+        var genericTypeInstances = program.TypeInformation
+                                          .Where(t => t.Value is GenericTypeInformation and not ListTypeInformation)
+                                          .Select(t => (GenericTypeInformation) t.Value);
+        foreach(var genericInstanceInfo in genericTypeInstances)
+        {
+            var type = genericInstanceInfo.Type;
+            var genericType = genericInstanceInfo.SpecializedFrom;
+            if(!_typeInfoOf.TryGetValue(genericType, out var emittedTypeInformation) 
+               || !_cilTypeManager.TryGetTypeInformation(genericType, out var binderInfo))
+            {
+                throw new Exception($"Compiler bug - couldn't find {genericType}");
+            }
+            var instanceType = _cilTypeManager.GetType(type);
+            var ctor = _cilTypeManager.GetSpecializedConstructor(type, emittedTypeInformation.Constructor, genericInstanceInfo.TypeArguments);
+            var instanceMembers = binderInfo
+                                  .Members
+                                  .Where(s => s is MemberFieldSymbol)
+                                  .Select(m => {
+                                    var genericMember = emittedTypeInformation.SymbolToField[m.Name];
+                                    return (m.Name, new FieldReference(m.Name, genericMember.FieldType, instanceType));
+                                   })
+                                  .ToDictionary(t => t.Name, t => t.Item2);
+            _typeInfoOf[type] = new WLTypeInformation(type, ctor, instanceMembers);
+        }
+    }
+
     //Attaches the members, fields + ctor to a type - must be preceeded by a EmitTypeDeclaration call to the same type
     private void EmitTypeMembers(TypeSymbol type, IList<MemberSymbol> members) 
     {
@@ -250,16 +280,25 @@ public sealed class Emitter{
         ctor.Body.OptimizeMacros();
 
         const FieldAttributes FIELD_ATTRIBUTES = FieldAttributes.Public;
-        var memberFields = new Dictionary<MemberSymbol, FieldReference>();
+        var memberFields = new Dictionary<string, FieldReference>();
         foreach(var member in members)
         {
             //TODO: Revisit when member functions can be declared on the type declaration
             if(member is not MemberFieldSymbol f) continue;
             var fieldDef = new FieldDefinition(f.Name, FIELD_ATTRIBUTES, CilTypeOf(member.Type));
-            memberFields[member] = fieldDef;
+            memberFields[member.Name] = fieldDef;
             typeDef.Fields.Add(fieldDef);
         }
         _typeInfoOf[type] = new WLTypeInformation(type, typeDef, ctor, memberFields);
+        if(_debug)
+        {
+            Console.WriteLine($"-- TYPE '{type}<{string.Join(",", typeDef.GenericParameters)}>'");
+            foreach(var (_, fieldRef) in memberFields)
+            {
+                Console.WriteLine($"  {fieldRef}");
+            }
+            Console.WriteLine("--  END");
+        }
     }
     
     // Creates the type actual IL type and ONLY the type. So it can later be used for types using this type
@@ -270,6 +309,20 @@ public sealed class Emitter{
                               | TypeAttributes.Sealed | TypeAttributes.AutoLayout
                               | TypeAttributes.BeforeFieldInit;
         var typeDef = new TypeDefinition(WARM_LANG_NAMESPACE, type.Name, TYPE_ATTRIBUTES, CilTypeOf(CILBaseTypeSymbol));
+        
+        if(!_cilTypeManager.TryGetTypeInformation(type, out var info))
+            throw new Exception($"Compiler bug - couldn't find type information of '{type}'");
+        
+        if(info.HasTypeParameters)
+        {
+            foreach(var t in info.TypeParameters)
+            {
+                var genericParam = new GenericParameter(t.Name, typeDef);
+                _cilTypeManager.Add(t, genericParam);
+                typeDef.GenericParameters.Add(genericParam);
+            }
+        }
+
         _assemblyDef.MainModule.Types.Add(typeDef);
         _cilTypeManager.Add(type, typeDef);
     }
@@ -300,7 +353,6 @@ public sealed class Emitter{
     private void EmitFunctionBody(FunctionSymbol func, BoundBlockStatement body)
     {
         var sharedLocals = new HashSet<ScopedVariableSymbol>(func.SharedLocals);
-
 
         var thisState = new FunctionBodyState(func, sharedLocals);
         _bodyStateStack.Push(thisState);
@@ -526,7 +578,8 @@ public sealed class Emitter{
         if(conv.Type == TypeSymbol.String)
         {
             var convExprType = conv.Expression.Type;
-            EmitBoxIfNeeded(processor, convExprType);
+            //TODO: H
+            if(convExprType.NeedsBoxing()) EmitBoxing(processor, convExprType);
             processor.Emit(OpCodes.Call, _wlToString);
             return;
         }
@@ -554,17 +607,33 @@ public sealed class Emitter{
 
     private void EmitObjectExpression(ILProcessor processor, BoundObjectInitExpression init)
     {
-        if (!_typeInfoOf.TryGetValue(init.Type, out var typeInfo))
-            throw new Exception($"{nameof(Emitter)} - Something went wrong, there was no type information for '{init.Type}'");
-        
-        processor.Emit(OpCodes.Newobj, typeInfo.Constructor);
-        foreach(var (mSymbol, expr) in init.InitializedMembers)
+        if(!_cilTypeManager.TryGetTypeInformation(init.Type, out var binderInfo)) { }
+        if(binderInfo is GenericTypeInformation gt)
         {
-            processor.Emit(OpCodes.Dup);
-            EmitExpression(processor, expr);
-            processor.Emit(OpCodes.Stfld, typeInfo.SymbolToField[mSymbol]);
+            if (!_typeInfoOf.TryGetValue(gt.SpecializedFrom, out var typeInfo))
+                throw new Exception($"{nameof(Emitter)} - Something went wrong, there was no type information for '{init.Type}'");
+            var ctor = _cilTypeManager.GetSpecializedConstructor(init.Type, typeInfo.Constructor, gt.TypeArguments);
+            processor.Emit(OpCodes.Newobj, ctor);
+            foreach(var (mSymbol, expr) in init.InitializedMembers)
+            {
+                processor.Emit(OpCodes.Dup);
+                EmitExpression(processor, expr);
+                processor.Emit(OpCodes.Stfld, typeInfo.SymbolToField[mSymbol.Name]);
+            }
         }
-
+        else 
+        {
+            if (!_typeInfoOf.TryGetValue(init.Type, out var typeInfo))
+                throw new Exception($"{nameof(Emitter)} - Something went wrong, there was no type information for '{init.Type}'");
+            
+            processor.Emit(OpCodes.Newobj, typeInfo.Constructor);
+            foreach(var (mSymbol, expr) in init.InitializedMembers)
+            {
+                processor.Emit(OpCodes.Dup);
+                EmitExpression(processor, expr);
+                processor.Emit(OpCodes.Stfld, typeInfo.SymbolToField[mSymbol.Name]);
+            }
+        }
     }
 
     private void EmitAssignmentExpression(ILProcessor processor, BoundAssignmentExpression assignment)
@@ -605,7 +674,7 @@ public sealed class Emitter{
                 throw new NotImplementedException($"{nameof(EmitAssignmentExpression)} doesn't allow assignments into type '{assignment.Access.Type}'");
             case BoundMemberAccess bma and {Member: MemberFieldSymbol fSymbol}:
                 var typeInfo = _typeInfoOf[bma.Target.Type];
-                var fieldRef = typeInfo.SymbolToField[fSymbol];
+                var fieldRef = typeInfo.SymbolToField[fSymbol.Name];
                 //TODO: can we avoid the temporary variable, or is it possible to reuse them?
                 tmpVar = new VariableDefinition(CilTypeOf(assignment.RightHandSide.Type));
                 processor.Body.Variables.Add(tmpVar);
@@ -654,7 +723,7 @@ public sealed class Emitter{
         if(call.Function is SpecializedFunctionSymbol sp) 
         {
             var generic = new GenericInstanceMethod(_funcs[sp.SpecializedFrom]);
-            foreach(var typeParam in sp.ConcreteTypeParameters)
+            foreach(var typeParam in sp.TypeArguments)
             {
                 generic.GenericArguments.Add(CilTypeOf(typeParam));
             }
@@ -987,7 +1056,7 @@ public sealed class Emitter{
                     EmitBuiltinTypeMember(processor, access.Type, mba.Member);
                     return;
                 }
-                if(!_typeInfoOf[access.Type].SymbolToField.TryGetValue(mba.Member, out var @field))
+                if(!_typeInfoOf[access.Type].SymbolToField.TryGetValue(mba.Member.Name, out var @field))
                     throw new Exception($"{nameof(Emitter)} - Something went wrong, could not find field definition for '{access.Type}.{mba.Member}'");
                 processor.Emit(OpCodes.Ldfld, @field);
                 return;
@@ -1034,10 +1103,9 @@ public sealed class Emitter{
         throw new NotImplementedException($"{nameof(Emitter)}-{nameof(EmitBuiltinTypeMember)} doesn't know '{type}.{member}'");
     }
 
-    private void EmitBoxIfNeeded(ILProcessor processor, TypeSymbol previousExprType)
+    private void EmitBoxing(ILProcessor processor, TypeSymbol boxType)
     {
-        if(previousExprType.NeedsBoxing())
-            processor.Emit(OpCodes.Box, CilTypeOf(previousExprType));
+        processor.Emit(OpCodes.Box, CilTypeOf(boxType));
     }
 
     private Instruction GetLastInstruction(ILProcessor processor)

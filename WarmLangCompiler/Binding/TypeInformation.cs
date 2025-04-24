@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Symbols;
 
 namespace WarmLangCompiler.Binding;
@@ -8,6 +9,9 @@ public class TypeInformation
     public TypeSymbol Type { get; }
     public List<MemberSymbol> Members { get; }
     public Dictionary<FunctionSymbol, BoundBlockStatement> MethodBodies { get; }
+
+    [MemberNotNullWhen(true, nameof(TypeParameters))]
+    public bool HasTypeParameters => TypeParameters.HasValue;
     public ImmutableArray<TypeParameterSymbol>? TypeParameters { get; }
 
     public TypeInformation(TypeSymbol type, List<MemberSymbol>? members = null, 

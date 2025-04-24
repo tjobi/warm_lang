@@ -5,6 +5,7 @@ using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
+using System.Runtime.CompilerServices;
 
 var DEFAULT_PROGRAM = "SyntaxTest/test.wl";
 
@@ -72,10 +73,7 @@ if(pArgs.BinderDebug)
 if(diagnostics.Any())
 {
     Console.WriteLine("--Compilation failed on: --");
-    foreach(var err in diagnostics)
-    {
-        Console.WriteLine(err);
-    }
+    DisplayErrorWarnings();
     Console.WriteLine("Exitting...");
     return 1;
 }
@@ -89,6 +87,12 @@ if(pArgs.Evaluate)
 
 File.WriteAllText(outfile, string.Empty);
 Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
+if(diagnostics.Any(reported => reported.IsError))
+{
+    DisplayErrorWarnings();
+    Console.WriteLine("Exitting...");
+    return 1;
+}
 DefaultRuntimeConfig.Write(outfile);
 foreach(var err in diagnostics)
 {
@@ -96,5 +100,9 @@ foreach(var err in diagnostics)
 }
 
 Console.WriteLine($"Compiled '{program}' to '{Path.GetFileName(outfile)}' with {diagnostics.Count()} errors");
-
 return 0;
+
+void DisplayErrorWarnings()
+{
+    foreach(var err in diagnostics) Console.WriteLine(err);
+}

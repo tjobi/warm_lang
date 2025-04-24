@@ -157,10 +157,10 @@ public sealed class BinderTypeScope
             return false;
         }
         Top.Add(type.Name, TypeToId(type));
-        _idToInformation[TypeToId(type)] = typeInfo ?? new TypeInformation(type, typeParameters: typeParameters);
+        typeInfo = _idToInformation[TypeToId(type)] = typeInfo ?? new TypeInformation(type, typeParameters: typeParameters);
         _typeUnion.Add(type);
         res = type;
-        if(type is not TypeParameterSymbol) _userDefinedTypes.Add(res);
+        if(type is not TypeParameterSymbol || typeInfo is GenericTypeInformation) _userDefinedTypes.Add(res);
         return true;
     }
 
