@@ -218,10 +218,13 @@ public class WLRuntimeFunctionHelper
         var wlToString = new MethodDefinition("__wl_tostring", 
                                               MethodAttributes.Public | MethodAttributes.Static, 
                                               typeManager.GetType(TypeSymbol.String));
-        _program.Methods.Add(wlToString);
-        var dotnetObject = typeManager.GetType(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
-        var arg = new ParameterDefinition("arg", ParameterAttributes.None, dotnetObject);
+        var wlT = new GenericParameter("T", wlToString);
+        wlToString.GenericParameters.Add(wlT);
+        var arg = new ParameterDefinition("arg", ParameterAttributes.None, wlT);
         wlToString.Parameters.Add(arg);
+        _program.Methods.Add(wlToString);
+
+        var dotnetObject = typeManager.GetType(EmitterTypeSymbolHelpers.CILBaseTypeSymbol);
 
         var body = wlToString.Body;
         body.InitLocals = true;
@@ -235,6 +238,7 @@ public class WLRuntimeFunctionHelper
         body.Variables.Add(outString);
 
         processor.Emit(OpCodes.Ldarg, arg);
+        processor.Emit(OpCodes.Box, wlT);
         processor.Emit(OpCodes.Isinst, _listType);
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Cgt_Un);
@@ -270,7 +274,11 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Ldloc, asList);
         processor.Emit(OpCodes.Ldloc, i);
         processor.Emit(OpCodes.Callvirt, _listSubscript);
-        processor.Emit(OpCodes.Call, wlToString);
+
+        //wlToString<!!T>(elm[i])
+        var wlToStringBangT = new GenericInstanceMethod(wlToString);
+        wlToStringBangT.GenericArguments.Add(dotnetObject);
+        processor.Emit(OpCodes.Call, wlToStringBangT);
 
         processor.Emit(OpCodes.Call, _stringConcat);  //string.Concat(outString, wlToString(arg[i]));
         processor.Emit(OpCodes.Stloc, outString);     //outstring = ^
@@ -305,8 +313,9 @@ public class WLRuntimeFunctionHelper
         processor.Emit(OpCodes.Br, returnInstr);        //made it all the way through the loop, return true
 
         //else use Convert.ToString(object)
-        //It will try to use in order: IConvertible.ToString -> IFormattable.ToString -> object.ToString 
+        //It will try to use in order: IConvertible.ToString -> IFormattable.ToString -> object.ToString
         processor.Append(convertStart);
+        processor.Emit(OpCodes.Box, wlT);
         processor.Emit(OpCodes.Call, _toStringConvert);
         processor.Append(returnInstr);
 
@@ -314,7 +323,7 @@ public class WLRuntimeFunctionHelper
 
         if(_debug)
         {
-            Console.WriteLine("---- START WLToString -----");
+            Console.WriteLine("---- START WLToString<T> -----");
             foreach(var instr in body.Instructions)
                 Console.WriteLine(instr);
             Console.WriteLine("---- END WLToString -----");

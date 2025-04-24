@@ -578,9 +578,10 @@ public sealed class Emitter{
         if(conv.Type == TypeSymbol.String)
         {
             var convExprType = conv.Expression.Type;
-            //TODO: H
-            if(convExprType.NeedsBoxing()) EmitBoxing(processor, convExprType);
-            processor.Emit(OpCodes.Call, _wlToString);
+            var wlToStringInstace = new GenericInstanceMethod(_wlToString);
+            wlToStringInstace.GenericArguments.Add(CilTypeOf(convExprType));
+            // if(convExprType.NeedsBoxing()) EmitBoxing(processor, convExprType);
+            processor.Emit(OpCodes.Call, wlToStringInstace);
             return;
         }
 
@@ -1101,11 +1102,6 @@ public sealed class Emitter{
             }
         }
         throw new NotImplementedException($"{nameof(Emitter)}-{nameof(EmitBuiltinTypeMember)} doesn't know '{type}.{member}'");
-    }
-
-    private void EmitBoxing(ILProcessor processor, TypeSymbol boxType)
-    {
-        processor.Emit(OpCodes.Box, CilTypeOf(boxType));
     }
 
     private Instruction GetLastInstruction(ILProcessor processor)
