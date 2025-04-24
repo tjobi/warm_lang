@@ -22,7 +22,7 @@ if(pArgs.Interactive)
 }
 
 var program = pArgs.Program;
-var outfile = pArgs.OutPath ?? Path.Combine(Directory.GetCurrentDirectory(), "out.dll");
+var outfile = pArgs.OutPath ?? Path.Combine(Directory.GetCurrentDirectory(), Path.GetFileName(program));
 if(Path.GetExtension(outfile) != ".dll")
 {
     outfile = Path.ChangeExtension(outfile, ".dll");
@@ -66,14 +66,12 @@ if(pArgs.ParserDebug)
 
 var binder = new Binder(diagnostics);
 var boundProgram = binder.BindProgram(root);
-if(pArgs.BinderDebug)
-{
-    Console.WriteLine($"Bound: {boundProgram}");
-}
-if(diagnostics.Any())
+if(pArgs.BinderDebug) Console.WriteLine($"Bound: {boundProgram}");
+
+if(ContainsErrors())
 {
     Console.WriteLine("--Compilation failed on: --");
-    DisplayErrorWarnings();
+    DisplayErrorsAndWarnings();
     Console.WriteLine("Exitting...");
     return 1;
 }
@@ -87,22 +85,22 @@ if(pArgs.Evaluate)
 
 File.WriteAllText(outfile, string.Empty);
 Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
-if(diagnostics.Any(reported => reported.IsError))
+if(ContainsErrors())
 {
-    DisplayErrorWarnings();
+    DisplayErrorsAndWarnings();
     Console.WriteLine("Exitting...");
     return 1;
 }
 DefaultRuntimeConfig.Write(outfile);
-foreach(var err in diagnostics)
-{
-    Console.WriteLine(err);
-}
 
-Console.WriteLine($"Compiled '{program}' to '{Path.GetFileName(outfile)}' with {diagnostics.Count()} errors");
+DisplayErrorsAndWarnings();
+
+Console.WriteLine($"Compiled '{program}' to '{outfile}'");
 return 0;
 
-void DisplayErrorWarnings()
+void DisplayErrorsAndWarnings()
 {
     foreach(var err in diagnostics) Console.WriteLine(err);
 }
+
+bool ContainsErrors() => diagnostics.Any(reported => reported.IsError);
