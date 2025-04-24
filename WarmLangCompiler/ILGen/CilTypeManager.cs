@@ -106,6 +106,7 @@ public sealed class CilTypeManager
     
     public bool IsListType(TypeSymbol type)
     {
+        if(type == TypeSymbol.Null || type == TypeSymbol.Error) return false;
         return infoOf[type] is ListTypeInformation;
     }
 

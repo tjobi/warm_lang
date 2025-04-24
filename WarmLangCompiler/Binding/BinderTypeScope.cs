@@ -483,8 +483,14 @@ public sealed class BinderTypeScope
 
         var taType = new TypeSymbol(typeName);
         taId = TypeToId(taType);
-
         var members = new List<MemberSymbol>();
+        _idToInformation[taId] = new GenericTypeInformation(taType, baseInfo.Type, 
+                                                            typeArgs, cntConcreteTypeParams, 
+                                                            members,
+                                                            typeParameters: baseInfo.TypeParameters);
+        Global.Add(taType.Name, taId);
+        _typeUnion.Add(taType);
+
         foreach(var member in baseInfo.Members)
         {
             //TODO: Fix methods too... Should be very similar to regular generic functions?
@@ -493,12 +499,6 @@ public sealed class BinderTypeScope
             members.Add(new MemberFieldSymbol(member.Name, concreteMemberType, member.IsReadOnly, member.IsBuiltin));
         }
 
-        _idToInformation[taId] = new GenericTypeInformation(taType, baseInfo.Type, 
-                                                            typeArgs, cntConcreteTypeParams, 
-                                                            members,
-                                                            typeParameters: baseInfo.TypeParameters);
-        Global.Add(taType.Name, taId);
-        _typeUnion.Add(taType);
         return taType;
     }
 
