@@ -31,29 +31,32 @@ public sealed class CilTypeManager
 
     public void Add(TypeSymbol key, TypeReference cilType) => toCILType.Add(key, cilType);
 
-    public TypeReference GetType(TypeSymbol key) 
-    {
-        if(toCILType.ContainsKey(key)) return toCILType[key];
-        
-        //If it is not there, then we assume it's a generic type - so create it and cache it
-        var typeDef = GetSpecializedTypeDefinition(key);
-        return toCILType[key] = typeDef;
-    }
-
     public TypeDefinition GetTypeDefinition(TypeSymbol type) => GetType(type).Resolve();
 
-    private TypeReference GetSpecializedTypeDefinition(TypeSymbol type)
+    public TypeReference GetType(TypeSymbol type)
     {
+        if(toCILType.TryGetValue(type, out var typeRef)) return typeRef;
+        
         var typeInfo = infoOf[type];
-        if(typeInfo is GenericTypeInformation gt)
+        switch(typeInfo)
         {
-            var genericBase = GetType(gt.SpecializedFrom);
-            var typeParameters = gt.TypeArguments.Select(GetType).ToArray();
-            var genericInstance = genericBase.MakeGenericInstanceType(typeParameters);
-            return toCILType[type] = genericInstance;
+            default: 
+            {
+                throw new NotImplementedException($"{nameof(GetType)} - doesn't know what to do with {type}");
+            }
+            case GenericTypeInformation gt:
+            {
+                var genericBase = GetType(gt.SpecializedFrom);
+                var typeParameters = gt.TypeArguments.Select(GetType).ToArray();
+                var genericInstance = genericBase.MakeGenericInstanceType(typeParameters);
+                return toCILType[type] = genericInstance;
+            }
+            case PlaceHolderInformation:
+            {
+                //the binder never hit this placeholder with a union... so failback to mscorlib.Object
+                return toCILType[EmitterTypeSymbolHelpers.CILBaseTypeSymbol];
+            }
         }
-        //FIXME: Should we add some sort of check to make sure only valid "GenericTypeInformation" or "ListTypeInformation" goes here?
-        return toCILType[type];
     }
 
     /* Only needs to provide the arity - since I don't know how to access
@@ -77,7 +80,7 @@ public sealed class CilTypeManager
             }
         }
         if(genericMethod is null) 
-            throw new Exception($"'{nameof(CilTypeManager)}.{nameof(GetSpecializedTypeDefinition)}' found nothing for '{type}'.'{name}'({arity})");
+            throw new Exception($"'{nameof(CilTypeManager)}.{nameof(GetSpecializedMethod)}' found nothing for '{type}'.'{name}'({arity})");
         var specializedType = GetType(type);
         //TODO: Figure out why the HasThis is required.
         var specializedMethod = new MethodReference(genericMethod.Name, genericMethod.ReturnType, specializedType)
