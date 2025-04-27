@@ -66,15 +66,7 @@ public class FunctionSymbol : EntitySymbol
             sb.Append(string.Join(", ", TypeParameters));
             sb.Append('>');
         }
-        sb.Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
-        {
-            var parm = Parameters[i];
-            sb.Append(parm.Type.Name);
-            if(i < Parameters.Length-1)
-                sb.Append(", ");   
-        }
-        return sb.Append(')').ToString();
+        return sb.Append('(').AppendJoin(", ", Parameters.Select(p => p.Type.Name)).Append(')').ToString();
     }
 
     public static FunctionSymbol CreateMain(string name = "wl_main")

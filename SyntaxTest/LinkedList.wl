@@ -2,15 +2,17 @@ type LinkedListNode<T> = { LinkedListNode<T> next; T value; }
 type LinkedList<T> = { LinkedListNode<T> head; }
 
 function main() {
-    LinkedList<int> q = createLinkedList<int>();
-    q.enqueue<int>(1);
-    q.enqueue<int>(2);
-    stdWriteLine(q.toString<int>());
-    stdWriteLine("dequeued: " + string(q.dequeue<int>()));
-    stdWriteLine(q.toString<int>());
+    LinkedList<int> q = createLinkedList();
+    q.enqueue(1);
+    q.enqueue(2);
+    stdWriteLine(q.toString());
+    stdWriteLine("dequeued: " + string(q.dequeue()));
+    stdWriteLine(q.toString());
 
-    int x = createLinkedList<int>().popEnd<int>();
+    int x = createLinkedList().popEnd();
     stdWriteLine(string(x));
+
+    stdWriteLine(fromList([1,2,3,4]).toString());
 }
 
 function LinkedListNode<T>.toString<T>(LinkedListNode<T> self) string {
@@ -19,7 +21,16 @@ function LinkedListNode<T>.toString<T>(LinkedListNode<T> self) string {
 
 function createLinkedList<T>() LinkedList<T> {
     return new LinkedList<T>{ head = null };
-} 
+}
+
+function fromList<T>(T[] ts) LinkedList<T> {
+    LinkedList<T> lst = createLinkedList();
+    int i = 0;
+    while i < ts.len : i = i + 1 {
+        lst.push(ts[i]);
+    }
+    return lst;
+}
 
 function LinkedList<T>.push<T>(LinkedList<T> self, T e) LinkedList<T> {
     LinkedListNode<T> newHead = new LinkedListNode<T>{ next = self.head, value = e };
@@ -49,7 +60,7 @@ function LinkedList<T>.pop<T>(LinkedList<T> self) T {
 }
 
 function LinkedList<T>.dequeue<T>(LinkedList<T> self) T {
-    return self.pop<T>();
+    return self.pop();
 }
 
 function LinkedList<T>.popEnd<T>(LinkedList<T> self) T {

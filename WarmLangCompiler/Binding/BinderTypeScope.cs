@@ -77,6 +77,25 @@ public sealed class BinderTypeScope
         return popped;
     }
 
+    public TypeMemberInformation ToProgramTypeMemberInformation()
+    {
+        if(_scopes.Count != 1) 
+            throw new BinderTypeScopeExeception($"Illegal state, expected 1 scope, but had {_scopes.Count}");
+        
+        var declaredTypes = _userDefinedTypes.ToList().AsReadOnly();
+        var typeInfoDict = new Dictionary<TypeSymbol, TypeInformation>();
+    
+        foreach(var (id, info) in _idToInformation)
+        {
+            var originalType = info.Type;
+            if(originalType == TypeSymbol.Error || originalType == TypeSymbol.Null ) continue;
+            var unifiedInfo = _idToInformation[_typeUnion.Find(id)];
+            typeInfoDict.Add(originalType, unifiedInfo);
+        }
+        return new TypeMemberInformation(typeInfoDict.AsReadOnly(), declaredTypes);
+    }
+
+
     private InternalTypeScope? GetDefiningScopeOf(TypeSymbol? type)
     {
         if(type is not null)
@@ -315,25 +334,6 @@ public sealed class BinderTypeScope
         return memberSymbol is not null;
     }
 
-    public TypeMemberInformation GetTypeMemberInformation()
-    {
-        if(_scopes.Count != 1) 
-            throw new BinderTypeScopeExeception($"Illegal state, expected 1 scope, but had {_scopes.Count}");
-        
-        var declaredTypes = _userDefinedTypes.ToList().AsReadOnly();
-        var typeInfoDict = new Dictionary<TypeSymbol, TypeInformation>();
-    
-        foreach(var (id, info) in _idToInformation)
-        {
-            var originalType = info.Type;
-            if(originalType == TypeSymbol.Error || originalType == TypeSymbol.Null ) continue;
-
-            var unifiedInfo = _idToInformation[_typeUnion.Find(id)];
-            typeInfoDict.Add(originalType, unifiedInfo);
-        }
-        return new TypeMemberInformation(typeInfoDict.AsReadOnly(), declaredTypes);
-    }
-
     public bool IsSubscriptable(TypeSymbol type, [NotNullWhen(true)] out TypeSymbol? nested)
     {
         //I will just assume no type information means no --
@@ -396,6 +396,14 @@ public sealed class BinderTypeScope
 
                 case (ListTypeInformation ga, ListTypeInformation gb): 
                 stack.Push((ga.NestedType, gb.NestedType));
+                break;
+
+                case (GenericTypeInformation gt1, GenericTypeInformation gt2) 
+                    when gt1.SpecializedFrom == gt2.SpecializedFrom: //TODO: TypeEquality here?
+                foreach(var (t1, t2) in gt1.TypeArguments.Zip(gt2.TypeArguments))
+                {
+                    stack.Push( (t1,t2) );
+                }
                 break;
             }
         }
@@ -515,6 +523,14 @@ public sealed class BinderTypeScope
             null => throw new Exception($"{nameof(MakeConcrete)} - tried to concretify '{param}' with no information"),
             _ => param
         };
+    }
+
+    //Actual as in - that one it has been unified with!
+    public TypeSymbol GetActualType(TypeSymbol t)
+    {
+        if(!_typeUnion.TryFind(t, out var res)) 
+            throw new BinderTypeScopeExeception($"Compiler bug - retrieving parent of unknown '{t}'");
+        return _idToInformation[res].Type;
     }
 
     public void PrintUnion()

@@ -42,7 +42,11 @@ public sealed class CilTypeManager
         {
             default: 
             {
-                throw new NotImplementedException($"{nameof(GetType)} - doesn't know what to do with {type}");
+                //May happen that an inferred type wasn't in toCILTYPE - let's see if it is there now
+                // or then just add it
+                if(!toCILType.TryGetValue(typeInfo.Type, out typeRef))
+                    throw new NotImplementedException($"{nameof(GetType)} - compiler bug know what to do with {type}");
+                return toCILType[type] = typeRef;
             }
             case GenericTypeInformation gt:
             {

@@ -79,7 +79,7 @@ public sealed class Binder
             functions[scriptMain] = scriptMainBody;
         }
 
-        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeScope.GetTypeMemberInformation(), globalVariables);
+        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
     }
 
     private (BoundBlockStatement boundRoot, ImmutableArray<BoundVarDeclaration> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
@@ -482,35 +482,50 @@ public sealed class Binder
         }
         
         // TypeParameters of the original function can be retrieved from the BoundTypeApplication
-        var instantiatedParameters     = ImmutableArray.CreateBuilder<ParameterSymbol>(funcDef.Parameters.Length);
+        var typeArgs = application.TypeParams.Select(_typeScope.GetTypeOrErrorType).ToList();
+        var specailized = CreateSpecializedFunction(funcDef, application.Location, typeArgs);
+
+        return new BoundTypeApplication(application, access, specailized);
+    }
+
+    //Nullable typeArguments because you may want to call a generic function "id<T>(T t)" by doing just "id(1)"
+    //  which is then inferred to id<int>(1);
+    private SpecializedFunctionSymbol CreateSpecializedFunction(
+        FunctionSymbol func, 
+        WarmLangLexerParser.TextLocation location,
+        List<TypeSymbol>? typeArguments = null
+    )
+    {
+        if(typeArguments is not null && func.TypeParameters.Length != typeArguments.Count)
+            throw new Exception($"Compiler bug - do not allow inferring parameters when any are explicitly defined");
+        
+        var instantiatedParameters     = ImmutableArray.CreateBuilder<ParameterSymbol>(func.Parameters.Length);
         var instantiatedTypeParameters = new List<TypeSymbol>();
         //FIXME: Honestly, a rewrite from typesymbol to a typeId is due...
         //       => pretty nasty using strings - but type parameters are unique within a function so should be fine... 
         var typeParametersMap = new Dictionary<TypeSymbol, TypeSymbol>();
         // We have to create a concrete version of the definition. Any TypeParameterSymbol is replaced by its concrete...
-        for (int i = 0; i < funcDef.TypeParameters.Length; i++)
+        for (int i = 0; i < func.TypeParameters.Length; i++)
         {
-            var typeParam = funcDef.TypeParameters[i];
-            var concrete = _typeScope.GetTypeOrErrorType(application.TypeParams[i]);
+            var typeParam = func.TypeParameters[i];
+            var concrete = typeArguments?[i] ?? _typeScope.CreatePlacerHolderType();
             instantiatedTypeParameters.Add(concrete);
             typeParametersMap[typeParam] = concrete;
         }
 
         //Let's also concretize the actual parameters + return type
-        var concreteReturn = _typeScope.MakeConcrete(funcDef.Type, typeParametersMap, funcDef.Location);
-        for (int i = 0; i < funcDef.Parameters.Length; i++)
+        var concreteReturn = _typeScope.MakeConcrete(func.Type, typeParametersMap, location);
+        for (int i = 0; i < func.Parameters.Length; i++)
         {
-            var param = funcDef.Parameters[i];
-            var concrete = _typeScope.MakeConcrete(param.Type, typeParametersMap, funcDef.Location);
+            var param = func.Parameters[i];
+            var concrete = _typeScope.MakeConcrete(param.Type, typeParametersMap, location);
             instantiatedParameters.Add(new ParameterSymbol(param.Name, concrete, param.Placement));
         }
 
-
-        var specailized = new SpecializedFunctionSymbol(funcDef, instantiatedTypeParameters, 
+        var specailized = new SpecializedFunctionSymbol(func, instantiatedTypeParameters, 
                                                         instantiatedParameters.MoveToImmutable(), concreteReturn,
-                                                        application.Location);
-
-        return new BoundTypeApplication(application, access, specailized);
+                                                        location);
+        return specailized;
     }
 
     private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
@@ -548,6 +563,11 @@ public sealed class Binder
         var function = BindAccessCallExpression(ce.Called, out var accessToCall);
         
         if(function is null) return new BoundErrorExpression(ce);
+
+        if(function.TypeParameters.Length > 0 && function is not SpecializedFunctionSymbol)
+        {
+            function = CreateSpecializedFunction(function, ce.Location);
+        }
         
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
         if(function.IsMemberFunc || function is SpecializedFunctionSymbol { SpecializedFrom.IsMemberFunc: true })
@@ -800,7 +820,9 @@ public sealed class Binder
         {
             if(to != TypeSymbol.Error && expr.Type != TypeSymbol.Error)
             {
-                _diag.ReportCannotConvertToType(expr.Location, to,expr.Type);
+                var actualTo = _typeScope.GetActualType(to);
+                var actualFrom = _typeScope.GetActualType(expr.Type);
+                _diag.ReportCannotConvertToType(expr.Location, actualTo, actualFrom);
             }
             return new BoundErrorExpression(expr.Node);
         }

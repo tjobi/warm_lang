@@ -674,7 +674,11 @@ public sealed class Emitter{
                 }
                 throw new NotImplementedException($"{nameof(EmitAssignmentExpression)} doesn't allow assignments into type '{assignment.Access.Type}'");
             case BoundMemberAccess bma and {Member: MemberFieldSymbol fSymbol}:
-                var typeInfo = _typeInfoOf[bma.Target.Type];
+                if(!_cilTypeManager.TryGetTypeInformation(bma.Target.Type, out var binderInfo)) 
+                {
+                    throw new Exception($"Compiler bug - {bma.Target.Type} has no information from the binder");
+                }
+                var typeInfo = _typeInfoOf[binderInfo.Type];
                 var fieldRef = typeInfo.SymbolToField[fSymbol.Name];
                 //TODO: can we avoid the temporary variable, or is it possible to reuse them?
                 tmpVar = new VariableDefinition(CilTypeOf(assignment.RightHandSide.Type));
@@ -1057,7 +1061,9 @@ public sealed class Emitter{
                     EmitBuiltinTypeMember(processor, access.Type, mba.Member);
                     return;
                 }
-                if(!_typeInfoOf[access.Type].SymbolToField.TryGetValue(mba.Member.Name, out var @field))
+                if(!_cilTypeManager.TryGetTypeInformation(access.Type, out var binderInfo))
+                    throw new Exception($"Compiler bug, assumption broken - {access.Type} has no type information from binder");
+                if(!_typeInfoOf[binderInfo.Type].SymbolToField.TryGetValue(mba.Member.Name, out var @field))
                     throw new Exception($"{nameof(Emitter)} - Something went wrong, could not find field definition for '{access.Type}.{mba.Member}'");
                 processor.Emit(OpCodes.Ldfld, @field);
                 return;
