@@ -15,10 +15,6 @@ function main() {
     stdWriteLine(fromList([1,2,3,4]).toString());
 }
 
-function LinkedListNode<T>.toString<T>(LinkedListNode<T> self) string {
-    return "LinkedListNode { " + string(self.value) + ", " + self.next.toString<T>() + " }";   
-}
-
 function createLinkedList<T>() LinkedList<T> {
     return new LinkedList<T>{ head = null };
 }
