@@ -12,7 +12,11 @@ function main() {
     int x = createLinkedList().popEnd();
     stdWriteLine(string(x));
 
-    stdWriteLine(fromList([1,2,3,4]).toString());
+    //TODO: why does this need an explicit int - hmm
+    LinkedList<int> someInts = fromList<int>([1,2,3,4]);
+    stdWriteLine(someInts.toString());
+    someInts.reverse();
+    stdWriteLine(someInts.toString());
 }
 
 function createLinkedList<T>() LinkedList<T> {
@@ -26,6 +30,19 @@ function fromList<T>(T[] ts) LinkedList<T> {
         lst.push(ts[i]);
     }
     return lst;
+}
+
+function LinkedList<T>.reverse<T>(LinkedList<T> self) {
+    LinkedListNode<T> w = null;
+    LinkedListNode<T> t = null;
+    LinkedListNode<T> v = self.head;
+    while v != null {
+        t = v.next;
+        v.next = w;
+        w = v;
+        v = t;
+    }
+    self.head = w;
 }
 
 function LinkedList<T>.push<T>(LinkedList<T> self, T e) LinkedList<T> {
