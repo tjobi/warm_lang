@@ -144,7 +144,7 @@ public sealed class BinderTypeScope
         if(cached is not null) return cached.Type;
 
         //Too many strings?
-        var listType = new TypeSymbol($"{TypeSymbol.List}<{typeParam}>");
+        var listType = new TypeSymbol($"{TypeSymbol.List}{_idToInformation.Count}<{typeParam}>");
         var info = new ListTypeInformation(listType, TypeSymbol.List, typeParam);
         Global.Add(listType.Name, TypeToId(listType));
         _idToInformation.Add(TypeToId(listType), info);
