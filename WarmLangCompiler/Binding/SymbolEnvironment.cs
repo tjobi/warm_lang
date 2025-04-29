@@ -6,16 +6,17 @@ namespace WarmLangCompiler.Binding;
 public sealed class SymbolEnvironment
 {
     private readonly List<Dictionary<string,EntitySymbol>> _scopeStack;
-    private readonly BinderTypeHelper _typeManager;
+    // private readonly BinderTypeHelper _typeManagerGlobal;
+    private readonly BinderTypeScope _typeManagerGlobal;
 
     public Dictionary<string, EntitySymbol> GlobalScope => _scopeStack[0];
 
     public int Depth => _scopeStack.Count;
 
-    public SymbolEnvironment(BinderTypeHelper typeHelper)
+    public SymbolEnvironment(BinderTypeScope typeHelper)
     {
         _scopeStack = new();
-        _typeManager = typeHelper;
+        _typeManagerGlobal = typeHelper;
     }
 
     public void PushScope()
@@ -77,7 +78,7 @@ public sealed class SymbolEnvironment
 
     private bool AnyScopeContainsOrIsAType(string name) 
     {
-        if(_typeManager.ContainsTypeWithNameOf(name)) return true;
+        if(_typeManagerGlobal.ContainsTypeWithNameOf(name)) return true;
 
         foreach(var scope in _scopeStack)
             if(scope.ContainsKey(name)) return true;

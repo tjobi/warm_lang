@@ -26,37 +26,42 @@ public sealed class BoundBinaryOperator
     public TypeSymbol TypeRight { get; }
     public TypeSymbol Type { get; } //ResultType
 
-    public static BoundBinaryOperator? Bind(TokenKind op, BoundExpression left, BoundExpression right)
+    public static BoundBinaryOperator? Bind(BinderTypeScope typeScope, TokenKind op, BoundExpression left, BoundExpression right)
     {
         for (int i = 0; i < _definedOperators.Length; i++)
         {
             var dop = _definedOperators[i];
-            if(dop.OpTokenKind == op && left.Type == dop.TypeLeft && right.Type == dop.TypeRight)
+            if(dop.OpTokenKind == op && typeScope.TypeEquality(left.Type, dop.TypeLeft) && typeScope.TypeEquality(right.Type, dop.TypeRight))
             {
                 return dop;
             }
         }
-        return OperatorOnGenericType(op, left.Type, right.Type);
+        return OperatorOnGenericType(typeScope, op, left.Type, right.Type);
     }
 
-    private static BoundBinaryOperator? OperatorOnGenericType(TokenKind op, TypeSymbol left, TypeSymbol right)
+    private static BoundBinaryOperator? OperatorOnGenericType(BinderTypeScope typeScope, TokenKind op, TypeSymbol left, TypeSymbol right)
     {
+        var isLeftList = typeScope.IsListTypeAndGetNested(left, out var leftNested);
+        var isRightList = typeScope.IsListTypeAndGetNested(right, out var rightNested);
+        if(isLeftList && isRightList)
+        {
+            var sameNested = typeScope.TypeEquality(leftNested!,rightNested!);
+            return op switch 
+            {
+                //List concat '+' operator
+                TPlus when sameNested => new(op, ListConcat, left, right, left),
+                //List equality '==' & '!=' operator
+                TEqualEqual when sameNested => new(op, BoundBinaryOperatorKind.Equals, left, right, Bool),
+                TBangEqual when sameNested => new(op, NotEquals, left, right, Bool),
+                _ => null,
+            };
+        }
+
         //TODO: Should we cache these?
         return (op,left,right) switch
         {
-            //List concat '+' operator
-            (TPlus, ListTypeSymbol lts1, ListTypeSymbol lts2) when lts1.InnerType == lts2.InnerType
-                => new BoundBinaryOperator(op, ListConcat, left, right, left),
-
             //List add '::' operator
-            (TDoubleColon, ListTypeSymbol lts1, _) when lts1.InnerType == right => new BoundBinaryOperator(op, ListAdd, left, right, left),
-            
-            //List equality '==' & '!=' operator
-            (TEqualEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) 
-                when lts1.InnerType == lts2.InnerType => new(op, BoundBinaryOperatorKind.Equals, left, right, Bool),
-            (TBangEqual, ListTypeSymbol lts1, ListTypeSymbol lts2) 
-                when lts1.InnerType == lts2.InnerType => new(op, NotEquals, left, right, Bool),
-            
+            (TDoubleColon, _, _) when isLeftList && typeScope.TypeEquality(leftNested!, right) => new(op, ListAdd, left, right, left), 
             //Operators on null
             (TEqualEqual, _,_) 
                 when left == Null && !right.IsValueType

@@ -134,7 +134,7 @@ internal static class BinderErrorWarnings
 
     internal static void ReportExpectedFunctionName(this ErrorWarrningBag bag, TextLocation location)
     {
-        var message = "Expected a function name";
+        var message = "Expected a function or a callable expression";
         bag.Report(message, true, location);
     }
 
@@ -162,16 +162,22 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, funcLocation);
     }
 
-    internal static void ReportTypeNotFound(this ErrorWarrningBag bag, SyntaxToken typeNameToken)
+    internal static void ReportTypeNotFound(this ErrorWarrningBag bag, string name, TextLocation loc)
     {
-        var message = $"The type '{typeNameToken.Name}' could not be found (are you sure it is spelt right?)";
-        bag.Report(message, true, typeNameToken.Location);
+        var message = $"The type '{name}' could not be found (are you sure it is spelt right?)";
+        bag.Report(message, true, loc);
     }
 
-    internal static void ReportCannotInstantiateBuiltinWithNew(this ErrorWarrningBag bag, SyntaxToken guiltyToken)
+    internal static void ReportNonGenericType(this ErrorWarrningBag bag, string name, TextLocation loc)
     {
-        var message = $"The type '{guiltyToken.Kind.ToTypeSymbol()}' cannot be instantiated with new, it is a built-in";
-        bag.Report(message, true, guiltyToken.Location);
+        var message = $"The non-generic type '{name}' can not be used with type arguments";
+        bag.Report(message, true, loc);
+    }
+
+    internal static void ReportCannotInstantiateTypeWithNew(this ErrorWarrningBag bag, TypeSymbol guiltyType, TextLocation loc)
+    {
+        var message = $"The type '{guiltyType}' cannot be instantiated with 'new' as it is either a primitive or a type parameter";
+        bag.Report(message, true, loc);
     }
 
     internal static void ReportTypeHasNoSuchMember(this ErrorWarrningBag bag, TypeSymbol type, SyntaxToken member)
@@ -183,6 +189,18 @@ internal static class BinderErrorWarnings
     internal static void ReportCannotAssignToReadonlyMember(this ErrorWarrningBag bag, TypeSymbol type, string memberName, TextLocation location)
     {
         var message = $"Cannot assign to field '{type}.{memberName}' -- it is readonly";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportFunctionMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int received, int expected, FunctionSymbol func)
+    {
+        var message = $"Using generic '{func.Name}' requires {expected} type arguments but got {received}";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportGenericTypeMismatchingTypeArguments(this ErrorWarrningBag bag, string name, int received, int expected, TextLocation location)
+    {
+        var message = $"Using the generic type '{name}' requires {expected} type arguments but got {received}";
         bag.Report(message, true, location);
     }
 }

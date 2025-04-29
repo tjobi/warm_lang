@@ -1,9 +1,9 @@
 namespace WarmLangLexerParser.AST.TypeSyntax;
 
-public sealed class TypeSyntaxUserDefined : TypeSyntaxNode
+public sealed class TypeSyntaxIdentifier : TypeSyntaxNode
 {
     public string Name { get; }
-    public TypeSyntaxUserDefined(SyntaxToken name)
+    public TypeSyntaxIdentifier(SyntaxToken name)
     :base(name.Location)
     {
         Name = name.Name!;

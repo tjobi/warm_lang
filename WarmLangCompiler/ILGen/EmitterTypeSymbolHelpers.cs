@@ -9,7 +9,8 @@ public static class EmitterTypeSymbolHelpers
     {
         (TypeSymbol.Int, "System.Int32"),       (TypeSymbol.Bool, "System.Boolean"), 
         (TypeSymbol.String, "System.String"),   (TypeSymbol.Void, "System.Void"), 
-        (_cilBaseType, "System.Object"),        (_closureType, "System.ValueType")
+        (_cilBaseType, "System.Object"),        (_closureType, "System.ValueType"),
+        (TypeSymbol.List, "System.Collections.Generic.List`1")
     }.ToImmutableDictionary(tuple => tuple.Item1, tuple => tuple.Item2);
     private static readonly ImmutableDictionary<string,TypeSymbol> _fromCIL = _toCIL.ToImmutableDictionary(entry => entry.Value, entry => entry.Key);
 
@@ -34,7 +35,7 @@ public static class EmitterTypeSymbolHelpers
 
     public static string ToCilName(this TypeSymbol type) => _toCIL[type.AsRecognisedType()];
 
-    public static TypeSymbol AsRecognisedType(this TypeSymbol type) => type.Resolve();
+    public static TypeSymbol AsRecognisedType(this TypeSymbol type) => type;
     public static bool NeedsBoxing(this TypeSymbol type) => type == TypeSymbol.Bool || type == TypeSymbol.Int; 
 
 }

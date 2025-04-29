@@ -15,4 +15,6 @@ public sealed class BoundCallExpression : BoundExpression
 
     public FunctionSymbol Function { get; }
     public ImmutableArray<BoundExpression> Arguments { get; }
+
+    public override string ToString() => $"(Call {Function}({string.Join(",", Arguments)}))";
 }

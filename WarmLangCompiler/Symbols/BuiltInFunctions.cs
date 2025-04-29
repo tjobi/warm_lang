@@ -6,7 +6,8 @@ using WarmLangLexerParser;
 public static class BuiltInFunctions
 {
     private static readonly TextLocation BUILT_IN_LOCATION = new(0,0);
-    private static FunctionSymbol MakeFunction(string name, TypeSymbol type, ImmutableArray<ParameterSymbol> parameters) => new(name, parameters, type, BUILT_IN_LOCATION);
+    private static FunctionSymbol MakeFunction(string name, TypeSymbol type, ImmutableArray<ParameterSymbol> parameters) 
+        => new(name, ImmutableArray<TypeSymbol>.Empty, parameters, type, BUILT_IN_LOCATION);
 
     public static readonly FunctionSymbol StdWrite = MakeFunction("stdWrite", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.String,0)));
     public static readonly FunctionSymbol StdWriteC = MakeFunction("stdWritec", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.Int,0)));

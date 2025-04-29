@@ -7,7 +7,7 @@ public static class BuiltinMembers
         var members = new Dictionary<TypeSymbol, IList<MemberSymbol>>
         {
             [TypeSymbol.String]   = StringMembers().ToList(),
-            [TypeSymbol.ListBase] = ListMembers().ToList(),
+            [TypeSymbol.List] = ListMembers().ToList(),
         };
         return members;
     }
