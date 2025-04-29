@@ -78,7 +78,6 @@ public sealed class Binder
             var scriptMainBody = Lowerer.LowerBody(scriptMain, bound);
             functions[scriptMain] = scriptMainBody;
         }
-
         return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
     }
 
@@ -126,10 +125,10 @@ public sealed class Binder
         {
             var declaration = typeDecls[i];
             var typeSyntax = typeDecls[i].Type;
-            ImmutableArray<TypeParameterSymbol>? typeParams = null;
+            ImmutableArray<TypeSymbol>? typeParams = null;
             if(declaration.TypeParameters is not null)
             {
-                typeParams = CreateTypeParameterSymbols(declaration.TypeParameters);
+                typeParams = _typeScope.CreateTypeParameterSymbols(declaration.TypeParameters);
             }
 
             if (_typeScope.TryAddType(declaration.Type, out var typeSymbol, typeParameters: typeParams))
@@ -147,7 +146,7 @@ public sealed class Binder
             _typeScope.Push();
             if(_typeScope.GetTypeInformation(typeSymbol) is {TypeParameters: not null} info)
             {
-                AddTypeParametersToScope(info.TypeParameters);
+                _typeScope.AddTypeParametersToScope(info.TypeParameters);
             }
 
             foreach (var member in decl.Members)
@@ -219,10 +218,10 @@ public sealed class Binder
     {
         if(!isGlobalScope) return BindLocalFunctionDeclaration(funcDecl);
         var nameToken = funcDecl.NameToken;
-        var typeParameters = CreateTypeParameterSymbols(funcDecl.TypeParams);
-
+        var typeParameters = _typeScope.CreateTypeParameterSymbols(funcDecl.TypeParams);
+        
         _typeScope.Push();
-        if(AddTypeParametersToScope(typeParameters))
+        if(_typeScope.AddTypeParametersToScope(typeParameters))
         {
             _typeScope.Pop();
             return new BoundErrorStatement(funcDecl);
@@ -240,6 +239,7 @@ public sealed class Binder
             if(!_typeScope.TryGetTypeInformation(funcDecl.OwnerType, out var ownerTypeInfo)) 
             {
                 _diag.ReportTypeNotFound(funcDecl.OwnerType.ToString(), funcDecl.OwnerType.Location);
+                _typeScope.Pop();
                 return new BoundErrorStatement(funcDecl);
             }
             var ownerType = ownerTypeInfo.Type;
@@ -251,7 +251,7 @@ public sealed class Binder
             {
                 _diag.ReportMemberFuncNoParameters(function.Location, function.Name, ownerType);
             }
-            else if(parameters[0].Type is TypeSymbol t && t != ownerType)
+            else if(parameters[0].Type is TypeSymbol t && t != ownerType && ownerType != TypeSymbol.Error)
             {
                 _diag.ReportMemberFuncFirstParameterMustMatchOwner(function.Location, function.Name, ownerType, t);
             }
@@ -270,9 +270,9 @@ public sealed class Binder
     private BoundStatement BindLocalFunctionDeclaration(FuncDeclaration funcDecl)
     {
         var nameToken = funcDecl.NameToken;
-        var typeParameters = CreateTypeParameterSymbols(funcDecl.TypeParams);
+        var typeParameters = _typeScope.CreateTypeParameterSymbols(funcDecl.TypeParams);
         _typeScope.Push();
-        if(AddTypeParametersToScope(typeParameters))
+        if(_typeScope.AddTypeParametersToScope(typeParameters))
         {
             _typeScope.Pop();
             return new BoundErrorStatement(funcDecl);
@@ -292,6 +292,7 @@ public sealed class Binder
         if(!_scope.TryDeclareFunction(symbol))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
+            _typeScope.Pop();
             return new BoundErrorStatement(funcDecl);
         }
         
@@ -344,17 +345,6 @@ public sealed class Binder
             }
         }
         return parameters.ToImmutable();
-    }
-
-    private static ImmutableArray<TypeParameterSymbol> CreateTypeParameterSymbols(
-        IList<WarmLangLexerParser.AST.TypeSyntax.TypeSyntaxParameterType> syntaxParameterTypes) 
-    {
-        var typeParams = ImmutableArray.CreateBuilder<TypeParameterSymbol>(syntaxParameterTypes.Count);
-        foreach(var typeParam in syntaxParameterTypes)
-        {
-            typeParams.Add(new(typeParam));
-        }
-        return typeParams.MoveToImmutable();
     }
 
     private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body)
@@ -503,14 +493,14 @@ public sealed class Binder
         var instantiatedTypeParameters = new List<TypeSymbol>();
         //FIXME: Honestly, a rewrite from typesymbol to a typeId is due...
         //       => pretty nasty using strings - but type parameters are unique within a function so should be fine... 
-        var typeParametersMap = new Dictionary<TypeSymbol, TypeSymbol>();
+        var typeParametersMap = new Dictionary<string, TypeSymbol>();
         // We have to create a concrete version of the definition. Any TypeParameterSymbol is replaced by its concrete...
         for (int i = 0; i < func.TypeParameters.Length; i++)
         {
             var typeParam = func.TypeParameters[i];
             var concrete = typeArguments?[i] ?? _typeScope.CreatePlacerHolderType();
             instantiatedTypeParameters.Add(concrete);
-            typeParametersMap[typeParam] = concrete;
+            typeParametersMap[typeParam.Name] = concrete;
         }
 
         //Let's also concretize the actual parameters + return type
@@ -768,13 +758,16 @@ public sealed class Binder
 
     private BoundExpression BindObjectInitExpression(ObjectInitExpression se)
     {
-        if(!_typeScope.TryGetType(se.ObjectType, out var type))
+        TypeSymbol type;
+        if(!_typeScope.TryGetTypeInformation(se.ObjectType, out var typeInfo))
         {
             _diag.ReportTypeNotFound(se.Name, se.ObjectType.Location);
             type = TypeSymbol.Error;
         }
+        else type = typeInfo.Type;
+        
         if(type == TypeSymbol.Int || type == TypeSymbol.Bool || type == TypeSymbol.String 
-           || type is TypeParameterSymbol)
+           || typeInfo is TypeParamaterInformation)
         {
             //The "name" part of struct init is not an identifier, for example: "new int {...};"
             //TODO: Do we want to allow "int x = new int{5};"?
@@ -863,19 +856,5 @@ public sealed class Binder
                 break;
         }
         return null;
-    }
-
-    private bool AddTypeParametersToScope(IEnumerable<TypeParameterSymbol> typeParameters)
-    {
-        bool anyFailed = false;
-        foreach(var typeParam in typeParameters) 
-        {
-            if(!_typeScope.TryAddType(typeParam, out var _))
-            {
-                _diag.ReportTypeAlreadyDeclared(typeParam.Location, typeParam.Name);
-                anyFailed = true;
-            }
-        }
-        return anyFailed;
     }
 }

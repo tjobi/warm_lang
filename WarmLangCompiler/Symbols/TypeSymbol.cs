@@ -15,12 +15,12 @@ public class TypeSymbol : Symbol
     public static readonly TypeSymbol List = new("List`");
 
     public bool IsValueType { get; }
-    public int TypeID { get; }
+    public int ID { get; }
 
     public TypeSymbol(string name, bool isValueType = false) 
     : base(name)
     {
-        TypeID = NEXT_ID++;
+        ID = NEXT_ID++;
         IsValueType = isValueType;
     }
 
@@ -49,13 +49,14 @@ public class TypeSymbol : Symbol
             return true;
         }
         if(obj is TypeSymbol ts)
-            return Name == ts.Name;
+            return ID == ts.ID;
         return false;
     }
 
     public override int GetHashCode()
     {
-        int hashCode = Name.GetHashCode();
+        // int hashCode = Name.GetHashCode();
+        int hashCode = ID.GetHashCode();
         return hashCode;
     }
 }

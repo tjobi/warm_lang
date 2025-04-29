@@ -9,13 +9,13 @@ public class FunctionSymbol : EntitySymbol
 {
     //Function symbol contains: name, parameters, returnType
     public FunctionSymbol(SyntaxToken nameToken, 
-                          ImmutableArray<TypeParameterSymbol> typeParameters,
+                          ImmutableArray<TypeSymbol> typeParameters,
                           ImmutableArray<ParameterSymbol> parameters, 
                           TypeSymbol type)
     :this(nameToken.Name!, typeParameters, parameters, type, nameToken.Location) { }
 
     internal FunctionSymbol(string name, 
-                            ImmutableArray<TypeParameterSymbol> typeParameters,
+                            ImmutableArray<TypeSymbol> typeParameters,
                             ImmutableArray<ParameterSymbol> parameters, 
                             TypeSymbol type, TextLocation location, bool connectParams = true) 
     : base(name, type)
@@ -29,7 +29,7 @@ public class FunctionSymbol : EntitySymbol
     }
 
     public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken, 
-                          ImmutableArray<TypeParameterSymbol> typeParameters, 
+                          ImmutableArray<TypeSymbol> typeParameters, 
                           ImmutableArray<ParameterSymbol> parameters, 
                           TypeSymbol type)
     :this(nameToken.Name!, typeParameters, parameters, type, nameToken.Location)
@@ -37,7 +37,7 @@ public class FunctionSymbol : EntitySymbol
         OwnerType = ownerType;
     }
 
-    public ImmutableArray<TypeParameterSymbol> TypeParameters { get; }
+    public ImmutableArray<TypeSymbol> TypeParameters { get; }
     public ImmutableArray<ParameterSymbol> Parameters { get; }
     public TextLocation Location { get; }
     public TypeSymbol? OwnerType { get; private set; }
@@ -72,7 +72,7 @@ public class FunctionSymbol : EntitySymbol
     public static FunctionSymbol CreateMain(string name = "wl_main")
      => new(
             name,
-            ImmutableArray<TypeParameterSymbol>.Empty,
+            ImmutableArray<TypeSymbol>.Empty,
             ImmutableArray<ParameterSymbol>.Empty,
             TypeSymbol.Void,
             new TextLocation(0,0)

@@ -8,7 +8,7 @@ namespace WarmLangCompiler.Symbols;
 public sealed class LocalFunctionSymbol : FunctionSymbol
 {
     public LocalFunctionSymbol(SyntaxToken nameToken,
-                               ImmutableArray<TypeParameterSymbol> typeParameters, 
+                               ImmutableArray<TypeSymbol> typeParameters, 
                                ImmutableArray<ParameterSymbol> parameters, 
                                TypeSymbol returnType)
     : base(nameToken, typeParameters, parameters, returnType)  { }

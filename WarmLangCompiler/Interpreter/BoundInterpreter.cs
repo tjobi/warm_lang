@@ -435,11 +435,23 @@ public sealed class BoundInterpreter
             {
                 //TODO: Let this not be necssary - surely there is some way for the binder to setup us up for success here!
                 var concreteType = pt;
-                while(concreteType is TypeParameterSymbol)
+                var makingProgress = true;
+                while(program.TypeInformation[concreteType] is TypeParamaterInformation && makingProgress)
                 {
+                    makingProgress = false;
                     foreach(var layer in _typeArgumentEnvironment)
-                        if(layer.ContainsKey(concreteType)) concreteType = layer[concreteType];
+                    {
+                        if(layer.ContainsKey(concreteType)) 
+                        {
+                            concreteType = layer[concreteType];
+                            makingProgress = true;
+                        }
+                    }
                 }
+                // if(program.TypeInformation[concreteType] is TypeParamaterInformation)
+                // {
+                //     Console.WriteLine($"finished with typeparamer for {pt} => {concreteType}");
+                // }
                 typeArgs.Add(concreteType);
             }
             var instantiation = program

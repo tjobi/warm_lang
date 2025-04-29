@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using WarmLangCompiler.Symbols;
+using WarmLangLexerParser;
 
 namespace WarmLangCompiler.Binding;
 
@@ -12,11 +13,11 @@ public class TypeInformation
 
     [MemberNotNullWhen(true, nameof(TypeParameters))]
     public bool HasTypeParameters => TypeParameters.HasValue;
-    public ImmutableArray<TypeParameterSymbol>? TypeParameters { get; }
+    public ImmutableArray<TypeSymbol>? TypeParameters { get; }
 
     public TypeInformation(TypeSymbol type, List<MemberSymbol>? members = null, 
                            Dictionary<FunctionSymbol, BoundBlockStatement>? methodBodies = null,
-                           ImmutableArray<TypeParameterSymbol>? typeParameters = null)  
+                           ImmutableArray<TypeSymbol>? typeParameters = null)  
     {
         Type = type;
         Members = members ?? new();
@@ -43,7 +44,7 @@ public class ListTypeInformation : GenericTypeInformation
 
     public ListTypeInformation(TypeSymbol thisType, TypeSymbol baseT, TypeSymbol nestedType, 
                                List<MemberSymbol>? members = null,
-                               ImmutableArray<TypeParameterSymbol>? typeParams = null) 
+                               ImmutableArray<TypeSymbol>? typeParams = null) 
     : base(thisType, baseT, new List<TypeSymbol>(){nestedType}, 0, members, typeParameters: typeParams)
     { }
 }
@@ -65,7 +66,7 @@ public class GenericTypeInformation : TypeInformation
     public GenericTypeInformation(TypeSymbol type, TypeSymbol specializedFrom, List<TypeSymbol> typeArguments,
                                   int concreteTypeArguments,
                                   List<MemberSymbol>? members = null,
-                                  ImmutableArray<TypeParameterSymbol>? typeParameters = null) 
+                                  ImmutableArray<TypeSymbol>? typeParameters = null) 
     : base(type, members, null, typeParameters: typeParameters)
     {
         SpecializedFrom = specializedFrom;
@@ -79,4 +80,15 @@ public class GenericTypeInformation : TypeInformation
 
     public bool IsPartiallyConcrete => TypeParameters.HasValue && ConcreteTypeArguments > 0 && ConcreteTypeArguments != TypeParameters.Value.Length;
     public bool IsFullyConcrete => TypeParameters.HasValue && ConcreteTypeArguments == TypeParameters.Value.Length;
+}
+
+public class TypeParamaterInformation : TypeInformation
+{
+    public TextLocation Location { get; }
+
+    public TypeParamaterInformation(TypeSymbol tp, TextLocation location) 
+    : base(tp)
+    {
+        Location = location;
+    }
 }
