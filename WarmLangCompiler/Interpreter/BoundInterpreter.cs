@@ -427,7 +427,6 @@ public sealed class BoundInterpreter
     private Value EvaluateObjectInitExpression(BoundObjectInitExpression bse)
     {
         var typeInfo = program.TypeInformation[bse.Type];
-        
         if(typeInfo is GenericTypeInformation gt)
         {
             var typeArgs = new List<TypeSymbol>();
@@ -443,24 +442,20 @@ public sealed class BoundInterpreter
                     {
                         if(layer.ContainsKey(concreteType)) 
                         {
-                            concreteType = layer[concreteType];
+                            concreteType = program.TypeInformation[layer[concreteType]].Type;
                             makingProgress = true;
                         }
                     }
                 }
-                // if(program.TypeInformation[concreteType] is TypeParamaterInformation)
-                // {
-                //     Console.WriteLine($"finished with typeparamer for {pt} => {concreteType}");
-                // }
                 typeArgs.Add(concreteType);
             }
             var instantiation = program
-                                .TypeInformation
-                                .Where(ti => ti.Value is GenericTypeInformation gt2 && gt2.SpecializedFrom == gt.SpecializedFrom)
-                                .Select(ti => (GenericTypeInformation) ti.Value)
-                                .FirstOrDefault(gt => gt.TypeArguments.SequenceEqual(typeArgs));
+                            .TypeInformation
+                            .Where(ti => ti.Value is GenericTypeInformation gt2 && gt2.SpecializedFrom == gt.SpecializedFrom)
+                            .Select(ti => (GenericTypeInformation) ti.Value)
+                            .FirstOrDefault(gt => gt.TypeArguments.SequenceEqual(typeArgs));
             if(instantiation is null)
-                throw new Exception($"{nameof(EvaluateObjectInitExpression)} - couldn't find an instance of generic '{bse.Type}' in current typeArgument Environment");
+                throw new Exception($"{nameof(EvaluateObjectInitExpression)} - {bse.Location} couldn't find an instance of generic '{bse.Type}' in current typeArgument Environment");
             typeInfo = instantiation;
         }
 
