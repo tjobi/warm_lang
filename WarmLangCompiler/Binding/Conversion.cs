@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using WarmLangCompiler.Symbols;
 using static WarmLangCompiler.Symbols.TypeSymbol;
@@ -6,18 +7,23 @@ namespace WarmLangCompiler.Binding;
 
 public sealed class Conversion
 {
-    public static readonly Conversion None = new(false, false, false);
-    public static readonly Conversion Implicit = new (true, false, false);
-    public static readonly Conversion Explicit = new (true, true, false);
-    public static readonly Conversion Identity = new(true, false, true);
+    private static readonly Conversion None = new(false, false, false);
+    private static readonly Conversion Implicit = new (true, false, false);
+    private static readonly Conversion Explicit = new (true, true, false);
 
-    public static readonly TypeSymbol WLString = TypeSymbol.String; 
+    private static readonly Conversion ExplicitWithBoxInt = new (true, true, false, Int);
+    private static readonly Conversion ExplicitWithBoxBool = new (true, true, false, Bool);
+    
+    private static readonly Conversion Identity = new(true, false, true);
 
-    public Conversion(bool exists, bool isExplicit, bool isIdentity)
+    private static readonly TypeSymbol WLString = TypeSymbol.String; 
+
+    private Conversion(bool exists, bool isExplicit, bool isIdentity, TypeSymbol? boxType = null)
     {
         Exists = exists;
         IsExplicit = isExplicit;
         IsIdentity = isIdentity;
+        BoxType = boxType;
     }
 
     public bool Exists { get; }
@@ -25,23 +31,31 @@ public sealed class Conversion
     public bool IsImplicit => Exists && !IsExplicit;
     public bool IsIdentity { get; }
 
+    [MemberNotNullWhen(true, nameof(BoxType))]
+    public bool RequiresBoxing => BoxType is not null;
+    public TypeSymbol? BoxType { get; }
+
     public bool IsNone() => this == None;
 
-    public static Conversion GetConversion(TypeSymbol from, TypeSymbol to)
+    public static Conversion GetConversion(TypeSymbol from, TypeSymbol to, Func<TypeSymbol, TypeSymbol, bool> eql)
     {
         //Any CLI reference type is nullable - for now
         if(from == Null && !to.IsValueType) return Implicit;
 
-        if(from == to)
+        if(from == to || eql(from, to))
             return Identity;
         
-        if(from == Int)
-            if(to == WLString || to == Bool)
-                return Explicit;
+        if(eql(Int, from))
+        {
+            if(eql(WLString, to))  return ExplicitWithBoxInt;
+            if(to == Bool)         return Explicit;
+        }
         
-        if(from == Bool)
-            if(to == WLString || to == Int)
-                return Explicit;
+        if(eql(Bool, from))
+        {
+            if(to == Int)       return Explicit;
+            if(eql(WLString, to))  return ExplicitWithBoxBool;
+        }
 
         if(from == WLString)
         {
@@ -50,7 +64,7 @@ public sealed class Conversion
         }
 
         //Everything is explicitly convertible to a string - Could even remove the checks for Int and Bool above 
-        if(from != WLString && from != Error && to == WLString)
+        if(from != WLString && from != Error && from != TypeSymbol.Void && to == WLString)
             return Explicit;
 
         return None;

@@ -16,16 +16,16 @@ public static class ArgsParser
     private static void Help()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("\tprogram            - path to a .test file to lex, parse, and evaluate");
+        Console.WriteLine("\tinput file         - path to a .wl file");
         Console.WriteLine("\t-o, --out          - specifies the outpath of compiled dll");
         Console.WriteLine("\t-lh, --lang-help   - Show command line help");
         Console.WriteLine("\t--lex-debug        - enables debug information for lexer");
         Console.WriteLine("\t--parser-debug     - enables debug information for parser");
         Console.WriteLine("\t--binder-debug     - enables debug information for binder");
-        Console.WriteLine("\t--emitter-debug    - enables debug information from emitter - prints the instructions of function bodies");
+        Console.WriteLine("\t--emitter-debug    - enables debug information from emitter");
         Console.WriteLine("\t--trace            - prints a stacktrace if an exception goes uncaught");
         Console.WriteLine("\t-is,--interactive  - enables interactive mode");
-        Console.WriteLine("\t--eval             - evaluates the code without compiling");
+        Console.WriteLine("\t--eval             - evaluates the compiled program used the interpreter");
     }
 
     public static ParsedArgs DefaultArgs(string program) => new(program);
@@ -33,9 +33,7 @@ public static class ArgsParser
     public static ParsedArgs? ParseArgs(string[] args, string defaultProgram)
     {
         var parsedArgs = new ParsedArgs(defaultProgram);
-
         var isLookingForFile = true;
-        var argsContainedProgram = false;
         for (int i = 0; i < args.Length; i++)
         {
             var arg = args[i];
@@ -50,12 +48,13 @@ public static class ArgsParser
                 case "-o":
                 case "--out":
                 {
-                    if(i < args.Length)
+                    if(i+1 < args.Length)
                     {
                         i++;
                         parsedArgs.OutPath = args[i];
                     } else
                     {
+                        ReportError($"Must provide an output path when using \"{arg}\"");
                         Help();
                         return null;
                     }
@@ -91,26 +90,31 @@ public static class ArgsParser
                 } break;
                 default: 
                 {
-                    if(File.Exists(arg) && isLookingForFile)
+                    if(arg.StartsWith("-"))
                     {
-                        parsedArgs.Program = arg;
-                        isLookingForFile = false;
-                        argsContainedProgram = true;
-                    } else 
-                    {
-                        Console.WriteLine($"INFO ARGS: Invalid arg \"{arg}\"");
+                        ReportError($"Unrecognized command-line option \"{arg}\"");
                         Help();
                         return null;
                     }
+                    if(!isLookingForFile)
+                    {
+                        ReportError($"At most 1 input file may be provided");
+                        return null;
+                    }
+                    parsedArgs.Program = arg;
+                    isLookingForFile = false;
                 } break;
             }
         }
-        if(parsedArgs.Program == defaultProgram && !argsContainedProgram)
+        if(isLookingForFile)
         {
-            Console.WriteLine("INFO ARGS: No program provided, using default: \"" + defaultProgram + "\"");
+            ReportError("No input file provided");
+            return null;
         }
         return parsedArgs;
     }
+
+    public static void ReportError(string msg) => Console.WriteLine("ERROR: " + msg);
 
     public static void Deconstruct(this ParsedArgs args, out string program, out bool parserDebug,
                                    out bool lexerDebug, out bool binderDebug,

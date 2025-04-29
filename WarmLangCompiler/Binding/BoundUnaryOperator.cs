@@ -19,24 +19,25 @@ public sealed class BoundUnaryOperator
     public TypeSymbol TypeLeft { get; }
     public TypeSymbol Type { get; }
 
-    public static BoundUnaryOperator? Bind(TokenKind op, BoundExpression left)
+    public static BoundUnaryOperator? Bind(BinderTypeScope typeScope, TokenKind op, BoundExpression left)
     {
         foreach (var dop in _definedOperators)
         {
-            if(dop.Operator == op && left.Type == dop.TypeLeft)
+            if(dop.Operator == op && typeScope.TypeEquality(left.Type, dop.TypeLeft))
             {
                 return dop;
             }
         }
-        return OperatorOnGenericType(op, left.Type);
+        return OperatorOnGenericType(typeScope, op, left.Type);
     }
 
-    private static BoundUnaryOperator? OperatorOnGenericType(TokenKind op, TypeSymbol left)
+    private static BoundUnaryOperator? OperatorOnGenericType(BinderTypeScope typeScope, TokenKind op, TypeSymbol left)
     {
         //TODO: Should we cache these?
         return (op,left) switch
         {
-            (TLeftArrow, ListTypeSymbol lts) => new BoundUnaryOperator(BoundUnaryOperatorKind.ListRemoveLast,op, left, lts.InnerType),
+            (TLeftArrow, _) when typeScope.IsListTypeAndGetNested(left, out var inner)
+                => new BoundUnaryOperator(BoundUnaryOperatorKind.ListRemoveLast,op, left, inner),
             _ => null, 
         };
     }

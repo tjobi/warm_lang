@@ -14,6 +14,7 @@ public sealed class BoundInterpreter
     private readonly FunctionSymbol _entryPoint;
     private VariableEnv _variableEnvironment;
     private FunctionEnv _functionEnvironment;
+    private Stack<Dictionary<TypeSymbol, TypeSymbol>> _typeArgumentEnvironment;
 
     public BoundInterpreter(BoundProgram program)
     {
@@ -27,6 +28,7 @@ public sealed class BoundInterpreter
         
         _functionEnvironment = new(program.Functions);
         _variableEnvironment = new();
+        _typeArgumentEnvironment = new();
         foreach(var globalVar in program.GlobalVariables)
         {
             EvaluateVarDeclaration(globalVar);
@@ -47,6 +49,8 @@ public sealed class BoundInterpreter
     }
 
     public Value Run() => EvaluateStatement(_functionEnvironment.Lookup(_entryPoint)!);
+
+    public bool IsListType(TypeSymbol t) => program.TypeInformation[t] is ListTypeInformation;
 
     private Value EvaluateStatement(BoundStatement statement)
     {
@@ -159,7 +163,7 @@ public sealed class BoundInterpreter
             return new StrValue(value.StdWriteString());
         }
         //Convert [] when used in variable declaration
-        if(conv.Type is ListTypeSymbol)
+        if(IsListType(conv.Type))
             return value;
         if(conv.Expression.Type == TypeSymbol.Null)
             return Value.Null;
@@ -222,17 +226,41 @@ public sealed class BoundInterpreter
 
     private Value EvaluateCallExpression(BoundCallExpression call)
     {
-        var function = call.Function;
+        var function = call.Function switch 
+        {
+            SpecializedFunctionSymbol s => s.SpecializedFrom,
+            _ => call.Function,
+        };
         if(function.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(call);
+
+        BoundBlockStatement LookupMethod(FunctionSymbol function, TypeSymbol owner)
+        {
+            var ownerInfo = program.TypeInformation[owner];
+            if(!ownerInfo.MethodBodies.TryGetValue(function, out var body))
+            {
+                if(ownerInfo is GenericTypeInformation gt 
+                   && program.TypeInformation[gt.SpecializedFrom].MethodBodies.TryGetValue(function, out body))
+                { }
+                else throw new Exception($"{nameof(EvaluateCallExpression)} couldn't locate '{function}' for type '{owner}'");
+            }
+            return body;
+        }
+
         var functionBody = (function.IsMemberFunc 
-                                ? program.TypeMemberInformation.FunctionBodies[function.OwnerType!][function]
+                                ? LookupMethod(function, function.OwnerType)
                                 : _functionEnvironment.Lookup(function))
                                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'");
         
         var callArgs = call.Arguments;
         var funcParams = function.Parameters;
         PushEnvironments();
+        if(call.Function is SpecializedFunctionSymbol f)
+        {
+            var top = _typeArgumentEnvironment.Peek();
+            foreach(var (p, c) in f.TypeParameters.Zip(f.TypeArguments)) top.Add(p,c);
+        }
+
         for (int i = 0; i < call.Arguments.Length; i++)
         {
             //var paramType = funcParams[i].Type; //We have checked this type in the binder, should be all good!
@@ -398,8 +426,42 @@ public sealed class BoundInterpreter
 
     private Value EvaluateObjectInitExpression(BoundObjectInitExpression bse)
     {
-        var membersOfStruct = program.TypeMemberInformation.Members[bse.Type];
-        var strct = new ObjectValue(bse.Type);
+        var typeInfo = program.TypeInformation[bse.Type];
+        if(typeInfo is GenericTypeInformation gt)
+        {
+            var typeArgs = new List<TypeSymbol>();
+            foreach(var pt in gt.TypeArguments)
+            {
+                //TODO: Let this not be necssary - surely there is some way for the binder to setup us up for success here!
+                var concreteType = pt;
+                var makingProgress = true;
+                while(program.TypeInformation[concreteType] is TypeParamaterInformation && makingProgress)
+                {
+                    makingProgress = false;
+                    foreach(var layer in _typeArgumentEnvironment)
+                    {
+                        if(layer.ContainsKey(concreteType)) 
+                        {
+                            concreteType = program.TypeInformation[layer[concreteType]].Type;
+                            makingProgress = true;
+                        }
+                    }
+                }
+                typeArgs.Add(concreteType);
+            }
+            var instantiation = program
+                            .TypeInformation
+                            .Where(ti => ti.Value is GenericTypeInformation gt2 && gt2.SpecializedFrom == gt.SpecializedFrom)
+                            .Select(ti => (GenericTypeInformation) ti.Value)
+                            .FirstOrDefault(gt => gt.TypeArguments.SequenceEqual(typeArgs));
+            if(instantiation is null)
+                throw new Exception($"{nameof(EvaluateObjectInitExpression)} - {bse.Location} couldn't find an instance of generic '{bse.Type}' in current typeArgument Environment");
+            typeInfo = instantiation;
+        }
+
+        var membersOfStruct = typeInfo.Members;
+
+        var strct = new ObjectValue(typeInfo.Type);
         foreach(var initedMember in bse.InitializedMembers)
         {
             var fieldName = initedMember.MemberSymbol.Name; 
@@ -422,7 +484,7 @@ public sealed class BoundInterpreter
         if(symbol == TypeSymbol.Int) return IntValue.DEFAULT;
         if(symbol == TypeSymbol.Void) return Value.Void;
         //TODO: should we really instantiate the list? or should it default to null?
-        if(symbol is ListTypeSymbol) return ListValue.GET_DEFAULT(); 
+        if(IsListType(symbol)) return ListValue.GET_DEFAULT(); 
 
         return Value.Null;
     }
@@ -431,12 +493,14 @@ public sealed class BoundInterpreter
     {
         _variableEnvironment.Push();
         _functionEnvironment.Push();
+        _typeArgumentEnvironment.Push(new());
     }
 
     private void PopEnvironments()
     {
         _variableEnvironment.Pop();
         _functionEnvironment.Pop();
+        _typeArgumentEnvironment.Pop();
     }
 
     private static void EnsureNotNullValue(Value v, TextLocation? loc, string msg = "Cannot access null")

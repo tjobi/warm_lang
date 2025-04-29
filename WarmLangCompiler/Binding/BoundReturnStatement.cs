@@ -1,3 +1,4 @@
+using System.Text;
 using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Binding;
@@ -14,4 +15,6 @@ public sealed class BoundReturnStatement : BoundStatement
     }
 
     public BoundExpression? Expression { get; }
+
+    public override string ToString() => "(return" + (Expression is not null ? " " + Expression : ")");
 }

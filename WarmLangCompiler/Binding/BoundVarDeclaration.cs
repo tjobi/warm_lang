@@ -16,4 +16,6 @@ public sealed class BoundVarDeclaration : BoundStatement
     public BoundExpression RightHandSide { get; }
 
     public TypeSymbol Type => Symbol.Type;
+
+    public override string ToString() => $"({Type} {Symbol.Name} = {RightHandSide})";
 }
