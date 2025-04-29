@@ -111,6 +111,11 @@ public static class ArgsParser
             ReportError("No input file provided");
             return null;
         }
+        if(!File.Exists(parsedArgs.Program)) 
+        {
+            ReportError($"No such file '{parsedArgs.Program}'");
+            return null;
+        }
         return parsedArgs;
     }
 
