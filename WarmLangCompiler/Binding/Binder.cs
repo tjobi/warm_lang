@@ -7,6 +7,7 @@ using WarmLangCompiler.Binding.BoundAccessing;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
+using System.Security.Principal;
 
 public sealed class Binder
 {
@@ -198,9 +199,13 @@ public sealed class Binder
 
     private BoundStatement BindVarDeclaration(VarDeclaration varDecl, bool isGlobalScope)
     {
-        var type = _typeScope.GetTypeOrErrorType(varDecl.Type);
         var name = varDecl.Identifier.Name!;
-        var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
+        var rightHandSide = BindExpression(varDecl.RightHandSide);
+        if (varDecl.Type is not null)
+        {
+            var type = _typeScope.GetTypeOrErrorType(varDecl.Type);
+            rightHandSide = BindTypeConversion(rightHandSide, type);
+        }
 
         VariableSymbol variable = isGlobalScope 
                                 ? new GlobalVariableSymbol(name, rightHandSide.Type)

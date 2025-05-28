@@ -138,6 +138,7 @@ public class Parser
             TWhile => ParseWhileStatement(),
             TReturn => ParseReturnStatement(),
             TFunc =>  ParseFunctionDeclaration(),
+            TVar => ParseVariableDeclaration(null),
             _ when IsStartOfVariableDeclaration(out var type) => ParseVariableDeclaration(type),
             TType => ParseStatementError(),
             _ => ParseExpressionStatement()
@@ -222,14 +223,23 @@ public class Parser
         return new BlockStatement(open, statements, close);
     }
 
-    private StatementNode ParseVariableDeclaration(TypeSyntaxNode type)
+    private StatementNode ParseVariableDeclaration(TypeSyntaxNode? type)
     {
-        //var type = ParseType();
+        TextLocation loc;
+        if (type is null)
+        {
+            var varToken = NextToken();
+            loc = varToken.Location;
+        }
+        else
+        {
+            loc = type.Location;
+        }
         var name = MatchKind(TIdentifier);
         var equal = NextToken(); // throw away the '='
         var rhs = ParseExpression(); //Parse the right hand side of a "int x = rhs"
         var semicolon = MatchKind(TSemiColon);
-        return new VarDeclaration(type, name, equal, rhs);
+        return new VarDeclaration(loc, type, name, equal, rhs);
     }
 
 

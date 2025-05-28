@@ -304,7 +304,7 @@ public class Lexer
             "else" => TElse,
             "int" => TInt,
             "while" => TWhile,
-            //"var" => TVar,
+            "var" => TVar,
             "return" => TReturn,
             "false" => TFalse,
             "true" => TTrue,
