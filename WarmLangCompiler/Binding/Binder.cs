@@ -459,6 +459,7 @@ public sealed class Binder
             ObjectInitExpression se => BindObjectInitExpression(se),
             NullExpression @null => BindNullExpression(@null),
             TypeApplication application => BindTypeApplication(application),
+            LambdaExpression expr => BindLambdaExpression(expr),
             ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
@@ -799,8 +800,14 @@ public sealed class Binder
         }
         return new BoundObjectInitExpression(se, type, members.MoveToImmutable());
     }
+    
+    private BoundExpression BindLambdaExpression(LambdaExpression expr)
+    {
+        _diag.ReportFeatureNotImplemented(expr.Location, "Lambda (arrow) expressions are not implemented");
+        return new BoundErrorExpression(expr);
+    }
 
-    private static BoundExpression BindNullExpression(NullExpression @null) 
+    private static BoundExpression BindNullExpression(NullExpression @null)
         => new BoundNullExpression(@null);
 
     private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowExplicit = false)

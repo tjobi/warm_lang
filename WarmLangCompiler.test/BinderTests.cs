@@ -95,7 +95,7 @@ public class BinderTests
                     MakeToken(TBracketRight,1,1));
         var varDecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"),rhs);
         var input = MakeRoot(varDecl);
-        var rhsType = new TypeSymbol($"List`<int>");
+        var rhsType = new TypeSymbol($"List`7<int>");
         var expected = CreateBoundProgram(
             new BoundVarDeclaration(varDecl,new GlobalVariableSymbol("x", TypeSymbol.Int),
                 new BoundListExpression(
@@ -122,7 +122,7 @@ public class BinderTests
         //test
         var bound = _binder.BindProgram(parsed);
 
-        bound.ToString().Should().Be("__wl_script_main() Bound Block: {(List`<P0> x = []), (return)}");
+        bound.ToString().Should().Be("__wl_script_main() Bound Block: {(List`8<P0> x = []), (return)}");
         _diag.Should().BeEmpty();
         _diag.Should().BeEmpty();
     }

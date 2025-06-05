@@ -25,7 +25,7 @@ internal static class BinderErrorWarnings
     }
 
     internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, SyntaxToken token)
-    => ReportNameAlreadyDeclared(bag,token.Location, token.Name!);
+    => ReportNameAlreadyDeclared(bag, token.Location, token.Name!);
 
     internal static void ReportTypeAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
     {
@@ -76,7 +76,7 @@ internal static class BinderErrorWarnings
     {
         var message = $"The name '{name}' is not a function and cannot be called";
         bag.Report(message, true, location);
-    }    
+    }
 
     internal static void ReportCannotReturnOutsideFunction(this ErrorWarrningBag bag, SyntaxToken retToken)
     {
@@ -149,7 +149,7 @@ internal static class BinderErrorWarnings
         var message = $"Function members cannot be declared in a local scope, move '{type}.{funcNameToken.Name}' outside of function body";
         bag.Report(message, true, TextLocation.FromTo(typeLocation, funcNameToken.Location));
     }
-    
+
     internal static void ReportMemberFuncFirstParameterMustMatchOwner(this ErrorWarrningBag bag, TextLocation funcLocation, string name, TypeSymbol owner, TypeSymbol paramType)
     {
         var message = $"The first parameter of member function '{name}' must same as the owner type '{owner}' and not '{paramType}'. Did you forgot the owner?";
@@ -202,5 +202,10 @@ internal static class BinderErrorWarnings
     {
         var message = $"Using the generic type '{name}' requires {expected} type arguments but got {received}";
         bag.Report(message, true, location);
+    }
+
+    internal static void ReportFeatureNotImplemented(this ErrorWarrningBag bag, TextLocation location, string msg)
+    {
+        bag.Report(msg, true, location);
     }
 }

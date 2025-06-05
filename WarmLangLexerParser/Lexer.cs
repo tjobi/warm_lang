@@ -74,6 +74,10 @@ public class Lexer
                             token.Extend(TEqualEqual, Line, Column);
                             AdvanceText();
                         } break;
+                        case '>': { //hit a =>
+                            token.Extend(TArrow, Line, Column);
+                            AdvanceText();
+                        } break;
                     }
                 } break;
                 case '<': {
