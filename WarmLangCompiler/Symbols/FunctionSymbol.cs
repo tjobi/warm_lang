@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using WarmLangCompiler.Binding;
 using WarmLangLexerParser;
 
 namespace WarmLangCompiler.Symbols;
@@ -8,31 +9,34 @@ namespace WarmLangCompiler.Symbols;
 public class FunctionSymbol : EntitySymbol
 {
     //Function symbol contains: name, parameters, returnType
-    public FunctionSymbol(SyntaxToken nameToken, 
+    public FunctionSymbol(SyntaxToken nameToken,
                           ImmutableArray<TypeSymbol> typeParameters,
-                          ImmutableArray<ParameterSymbol> parameters, 
-                          TypeSymbol type)
-    :this(nameToken.Name!, typeParameters, parameters, type, nameToken.Location) { }
+                          ImmutableArray<ParameterSymbol> parameters,
+                          TypeSymbol type, TypeSymbol returnType)
+    : this(nameToken.Name!, typeParameters, parameters, type, returnType, nameToken.Location) { }
 
-    internal FunctionSymbol(string name, 
+    internal FunctionSymbol(string name,
                             ImmutableArray<TypeSymbol> typeParameters,
-                            ImmutableArray<ParameterSymbol> parameters, 
-                            TypeSymbol type, TextLocation location, bool connectParams = true) 
-    : base(name, type)
+                            ImmutableArray<ParameterSymbol> parameters,
+                            TypeSymbol functionType, TypeSymbol returnType,
+                            TextLocation location,
+                            bool connectParams = true)
+    : base(name, functionType)
     {
         TypeParameters = typeParameters;
         Parameters = parameters;
         Location = location;
+        ReturnType = returnType;
         SharedLocals = new HashSet<ScopedVariableSymbol>();
-        if(connectParams) foreach(var p in parameters) p.BelongsTo = this;
+        if (connectParams) foreach (var p in parameters) p.BelongsTo = this;
         //^^ TODO: object publication - could see a function symbol where the parameters aren't all updated. 
     }
 
-    public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken, 
-                          ImmutableArray<TypeSymbol> typeParameters, 
-                          ImmutableArray<ParameterSymbol> parameters, 
-                          TypeSymbol type)
-    :this(nameToken.Name!, typeParameters, parameters, type, nameToken.Location)
+    public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken,
+                          ImmutableArray<TypeSymbol> typeParameters,
+                          ImmutableArray<ParameterSymbol> parameters,
+                          TypeSymbol type, TypeSymbol returnType)
+    : this(nameToken.Name!, typeParameters, parameters, type, returnType, nameToken.Location)
     {
         OwnerType = ownerType;
     }
@@ -40,6 +44,7 @@ public class FunctionSymbol : EntitySymbol
     public ImmutableArray<TypeSymbol> TypeParameters { get; }
     public ImmutableArray<ParameterSymbol> Parameters { get; }
     public TextLocation Location { get; }
+    public TypeSymbol ReturnType { get; }
     public TypeSymbol? OwnerType { get; private set; }
 
     [MemberNotNullWhen(true, nameof(OwnerType))]
@@ -48,19 +53,19 @@ public class FunctionSymbol : EntitySymbol
     //Locals that are shared with any nested functions - could be parameters or local variables
     public ISet<ScopedVariableSymbol> SharedLocals { get; set; }
 
-    public void SetOwnerType(TypeSymbol type) 
+    public void SetOwnerType(TypeSymbol type)
     {
         OwnerType ??= type;
     }
     public override string ToString()
     {
         var sb = new StringBuilder();
-        if(IsMemberFunc)
+        if (IsMemberFunc)
         {
             sb.Append($"{OwnerType}.");
         }
         sb.Append(Name);
-        if(TypeParameters.Length > 0)
+        if (TypeParameters.Length > 0)
         {
             sb.Append('<');
             sb.Append(string.Join(", ", TypeParameters));
@@ -74,38 +79,23 @@ public class FunctionSymbol : EntitySymbol
             name,
             ImmutableArray<TypeSymbol>.Empty,
             ImmutableArray<ParameterSymbol>.Empty,
+            TypeSymbol.Void, //TODO: fix function type
             TypeSymbol.Void,
-            new TextLocation(0,0)
+            new TextLocation(0, 0)
         );
-    
+
 }
 
-
-public sealed class SpecializedFunctionSymbol : FunctionSymbol
+public sealed class LambdaFunctionSymbol : FunctionSymbol
 {
-    public List<TypeSymbol> TypeArguments { get; }
-    public FunctionSymbol SpecializedFrom { get; }
+    //TODO: Remember to change EntitySymbol.Type to not have a setter!
+    public LambdaFunctionSymbol(TextLocation location, ImmutableArray<ParameterSymbol> parameters, TypeSymbol funcType, TypeSymbol returnType)
+    : base($"__#$lambda_at_{location}", ImmutableArray<TypeSymbol>.Empty, parameters, funcType, returnType, location)
+    { }
 
-    private static string FuncName(FunctionSymbol func, List<TypeSymbol> typeParams)
-    {
-        var sb = new StringBuilder(func.Name);
-        sb.Append('<');
-        sb.AppendJoin(", ", typeParams);
-        sb.Append('>');
-        return sb.ToString();
-    }
-    public SpecializedFunctionSymbol(FunctionSymbol func, List<TypeSymbol> typeArguments,
-                                     ImmutableArray<ParameterSymbol> parameters, TypeSymbol returnType,
-                                     TextLocation location) 
-    : base(FuncName(func, typeArguments), func.TypeParameters, 
-           parameters, returnType, location)
-    {
-        TypeArguments = typeArguments;
-        SpecializedFrom = func;
-    }
+    [MemberNotNullWhen(true, nameof(Body))]
+    public bool IsComplete => Body is not null;
+    public BoundBlockStatement? Body { get; private set; } = null;
 
-    public override string ToString()
-    {
-        return Name;
-    }
+    public void SetBody(BoundBlockStatement body) => Body = body;
 }

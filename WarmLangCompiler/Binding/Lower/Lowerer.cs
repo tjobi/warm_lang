@@ -46,7 +46,7 @@ public static class Lowerer
         if(function is not null)
         {
             var last = flatStatements.LastOrDefault();
-            if(function.Type == TypeSymbol.Void && 
+            if(function.ReturnType == TypeSymbol.Void && 
                last is null or not BoundReturnStatement)
             {
                 flatStatements.Add(new BoundReturnStatement(statement.Node));

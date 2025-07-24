@@ -10,8 +10,8 @@ public sealed class LocalFunctionSymbol : FunctionSymbol
     public LocalFunctionSymbol(SyntaxToken nameToken,
                                ImmutableArray<TypeSymbol> typeParameters, 
                                ImmutableArray<ParameterSymbol> parameters, 
-                               TypeSymbol returnType)
-    : base(nameToken, typeParameters, parameters, returnType)  { }
+                               TypeSymbol funcType, TypeSymbol returnType)
+    : base(nameToken, typeParameters, parameters, funcType, returnType)  { }
 
     public BoundBlockStatement? Body { get; set; }
     public HashSet<ScopedVariableSymbol>? Closure { get; set; }

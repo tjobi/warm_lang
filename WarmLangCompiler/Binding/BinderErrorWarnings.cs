@@ -72,9 +72,9 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportNameIsNotAFunction(this ErrorWarrningBag bag, TextLocation location, string name)
+    internal static void ReportNameIsNotAFunction(this ErrorWarrningBag bag, TextLocation location, string name, TypeSymbol type)
     {
-        var message = $"The name '{name}' is not a function and cannot be called";
+        var message = $"The name '{name}' of type '{type}' cannot be called";
         bag.Report(message, true, location);
     }
 
@@ -92,7 +92,7 @@ internal static class BinderErrorWarnings
 
     internal static void ReportNotAllCodePathsReturn(this ErrorWarrningBag bag, FunctionSymbol function)
     {
-        var message = $"All code paths of '{function}' must return value of type '{function.Type}'";
+        var message = $"All code paths of '{function}' must return value of type '{function.ReturnType}'";
         bag.Report(message, true, function.Location);
     }
 
@@ -192,9 +192,9 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportFunctionMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int received, int expected, FunctionSymbol func)
+    internal static void ReportFunctionMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int received, int expected)
     {
-        var message = $"Using generic '{func.Name}' requires {expected} type arguments but got {received}";
+        var message = $"Generic function required {expected} type arguments but got {received}";
         bag.Report(message, true, location);
     }
 

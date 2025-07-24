@@ -31,9 +31,9 @@ public sealed class Binder
         _closureStack = new();
 
         _scope.PushScope(); //Push scope to contain builtin stuff
-        foreach(var func in BuiltInFunctions.GetBuiltInFunctions())
+        foreach (var func in BuiltInFunctions.GetBuiltInFunctions())
         {
-            if(!_scope.TryDeclareFunction(func))
+            if (!_scope.TryDeclareFunction(func))
                 throw new Exception($"Couldn't push built in {func}");
         }
     }
@@ -177,7 +177,7 @@ public sealed class Binder
             WhileStatement wile => BindWhileStatement(wile),
             ReturnStatement ret => BindReturnStatement(ret),
             ExprStatement expr => BindExprStatement(expr),
-            ErrorStatement error => new BoundStatementExpression(error),
+            ErrorStatement error => new BoundErrorStatement(error),
             _ => throw new NotImplementedException($"Bind statement for {statement}"),
         };
     }
@@ -232,10 +232,11 @@ public sealed class Binder
             return new BoundErrorStatement(funcDecl);
         }
 
-        var parameters = CreateParameterSymbols(funcDecl);
+        var parameters = _typeScope.CreateParameterSymbols(funcDecl.Params);
         var returnType = _typeScope.GetTypeOrErrorType(funcDecl.ReturnType);
+        var (functionType,_) = _typeScope.CreateFunctionType(parameters, returnType, typeParameters);
 
-        var function = new FunctionSymbol(nameToken, typeParameters, parameters, returnType);
+        var function = new FunctionSymbol(nameToken, typeParameters, parameters, functionType, returnType);
         
         var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
         
@@ -283,10 +284,10 @@ public sealed class Binder
             return new BoundErrorStatement(funcDecl);
         }
 
-        var parameters = CreateParameterSymbols(funcDecl);
+        var parameters = _typeScope.CreateParameterSymbols(funcDecl.Params);
         var returnType = _typeScope.GetTypeOrErrorType(funcDecl.ReturnType);
 
-        var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, returnType);
+        var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, null, returnType);
 
         if(funcDecl.OwnerType is not null)
         {
@@ -327,29 +328,6 @@ public sealed class Binder
         }  
 
         return new BoundFunctionDeclaration(funcDecl, symbol);
-    }
-
-    private ImmutableArray<ParameterSymbol> CreateParameterSymbols(FuncDeclaration func)
-    {
-        var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
-        var uniqueParameterNames = new HashSet<string>();
-        
-        for (int i = 0; i < func.Params.Count; i++)
-        {
-            var (type, name) = func.Params[i];
-            var paramType = _typeScope.GetTypeOrErrorType(type);
-            
-            //missing names have been reported by the parser
-            var paramName = name.Name ?? "NO_NAME"; 
-            if(uniqueParameterNames.Contains(paramName))
-            {
-                _diag.ReportParameterDuplicateName(name);
-            } else
-            {
-                parameters.Add(new ParameterSymbol(paramName, paramType, i));
-            }
-        }
-        return parameters.ToImmutable();
     }
 
     private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body)
@@ -428,10 +406,10 @@ public sealed class Binder
             //we're in a function that returns some value
             if(ret.Expression is null) //if the return does not contain such a value uh oh
             {
-                _diag.ReportReturnIsMissingExpression(ret.ReturnToken, function.Type);
+                _diag.ReportReturnIsMissingExpression(ret.ReturnToken, function.ReturnType);
                 return new BoundErrorStatement(ret);
             }
-            expr = BindTypeConversion(ret.Expression, function.Type);
+            expr = BindTypeConversion(ret.Expression, function.ReturnType);
         }
         return new BoundReturnStatement(ret, expr);
     }
@@ -467,21 +445,28 @@ public sealed class Binder
 
     private BoundExpression BindTypeApplication(TypeApplication application)
     {
-        var funcDef = BindAccessCallExpression(application.AppliedOn, out var access);
-        
-        if(funcDef is null) return new BoundErrorExpression(application);
-        
-        if(funcDef.TypeParameters.Length != application.TypeParams.Count) 
-        {
-            _diag.ReportFunctionMismatchingTypeParameters(application.Location, application.TypeParams.Count, funcDef.TypeParameters.Length, funcDef);
-            return new BoundErrorExpression(application);
-        }
-        
-        // TypeParameters of the original function can be retrieved from the BoundTypeApplication
-        var typeArgs = application.TypeParams.Select(_typeScope.GetTypeOrErrorType).ToList();
-        var specailized = CreateSpecializedFunction(funcDef, application.Location, typeArgs);
+        throw new NotImplementedException();
+        // var funcType = BindAccessCallExpression(application.AppliedOn, out var access);
 
-        return new BoundTypeApplication(application, access, specailized);
+        // if(funcType is null) return new BoundErrorExpression(application);
+
+
+
+        // if (!funcType.HasTypeParameters
+        //     || funcType.HasTypeParameters && funcType.TypeParameters.Value.Length != application.TypeParams.Count)
+        // {
+        //     var received = !funcType.HasTypeParameters ? 0 : funcType.TypeParameters.Value.Length; 
+        //     _diag.ReportFunctionMismatchingTypeParameters(application.Location,
+        //                                                   application.TypeParams.Count,
+        //                                                   received);
+        //     return new BoundErrorExpression(application);
+        // }
+
+        // // TypeParameters of the original function can be retrieved from the BoundTypeApplication
+        // var typeArgs = application.TypeParams.Select(_typeScope.GetTypeOrErrorType).ToList();
+        // var specailized = CreateSpecializedFunction(funcType, application.Location, typeArgs);
+
+        // return new BoundTypeApplication(application, access, specailized);
     }
 
     //Nullable typeArguments because you may want to call a generic function "id<T>(T t)" by doing just "id(1)"
@@ -519,7 +504,8 @@ public sealed class Binder
         }
 
         var specailized = new SpecializedFunctionSymbol(func, instantiatedTypeParameters, 
-                                                        instantiatedParameters.MoveToImmutable(), concreteReturn,
+                                                        instantiatedParameters.MoveToImmutable(),
+                                                        null, concreteReturn,
                                                         location);
         return specailized;
     }
@@ -555,53 +541,73 @@ public sealed class Binder
             var predefinedType = _typeScope.GetTypeOrErrorType(predefined.Syntax);
             return BindTypeConversion(ce.Arguments[0], predefinedType, allowExplicit: true);
         }
-        
-        var function = BindAccessCallExpression(ce.Called, out var accessToCall);
-        
-        if(function is null) return new BoundErrorExpression(ce);
 
-        if(function.TypeParameters.Length > 0 && function is not SpecializedFunctionSymbol)
+        var funcTypeInfo = BindAccessCallExpression(ce.Called, out var accessToCall);
+
+        if (funcTypeInfo is null) return new BoundErrorExpression(ce);
+
+        var argsSize = ce.Arguments.Count + (funcTypeInfo.IsMemberFunc ? 1 : 0);
+        if (argsSize != funcTypeInfo.Parameters.Count)
         {
-            function = CreateSpecializedFunction(function, ce.Location);
+            _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, ce.Called.ToString(), funcTypeInfo.Parameters.Count, argsSize);
+            return new BoundErrorExpression(ce);
         }
-        
-        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
-        if(function.IsMemberFunc || function is SpecializedFunctionSymbol { SpecializedFrom.IsMemberFunc: true })
+
+        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(argsSize);
+        if (funcTypeInfo.IsMemberFunc)
         {
-            BoundMemberAccess bma = accessToCall switch 
+            BoundMemberAccess bma = accessToCall switch
             {
                 BoundMemberAccess b => b,
-                BoundExprAccess { Expression: BoundTypeApplication { Access: BoundMemberAccess b}} => b,
-                _ => throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}")
+                BoundExprAccess { Expression: BoundTypeApplication { Access: BoundMemberAccess b } } => b,
+                _ => throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call '{accessToCall}' on non-member-access")
             };
-            
-            if(bma.Target is not BoundTypeAccess && bma.Member is MemberFuncSymbol)
+
+            if (bma.Target is not BoundTypeAccess && bma.Member is MemberFuncSymbol)
             {
                 arguments.Add(new BoundAccessExpression(ce, bma.Target));
-            }   
-        }
-
-        foreach (var arg in ce.Arguments)
-        {
-            var bound = BindExpression(arg);
-            arguments.Add(bound);
-        }
-
-        if(arguments.Count != function.Parameters.Length)
-        {
-            _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, function.Name, function.Parameters.Length, arguments.Count);
-        } 
-        else
-        {
-            for (int i = 0; i < arguments.Count; i++)
-            {
-                var boundArg = arguments[i];
-                var functionParameter = function.Parameters[i];
-                arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
             }
-        } 
-        
-        return new BoundCallExpression(ce, function, arguments.ToImmutable());
+        }
+
+        for (int i = 0; i < argsSize; i++)
+        {
+            var boundArg = BindTypeConversion(ce.Arguments[i], funcTypeInfo.Parameters[i]);
+            arguments.Add(boundArg);
+        }
+        return new BoundCallExpression2(ce, accessToCall, arguments.MoveToImmutable(), funcTypeInfo.ReturnType);
+
+        // if(funcTypeInfo..TypeParameters.Length > 0 && function is not SpecializedFunctionSymbol)
+        // {
+        //     function = CreateSpecializedFunction(function, ce.Location);
+        // }
+
+        // var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
+        // if(function.IsMemberFunc || function is SpecializedFunctionSymbol { SpecializedFrom.IsMemberFunc: true })
+        // {
+        //... 
+        // }
+
+        // foreach (var arg in ce.Arguments)
+        // {
+        //     var bound = BindExpression(arg);
+        //     arguments.Add(bound);
+        // }
+
+        // if(arguments.Count != function.Parameters.Length)
+        // {
+        //     _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, function.Name, function.Parameters.Length, arguments.Count);
+        // } 
+        // else
+        // {
+        //     for (int i = 0; i < arguments.Count; i++)
+        //     {
+        //         var boundArg = arguments[i];
+        //         var functionParameter = function.Parameters[i];
+        //         arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
+        //     }
+        // } 
+
+        // return new BoundCallExpression(ce, function, arguments.ToImmutable());
     }
 
     private BoundExpression BindAccessExpression(AccessExpression ae)
@@ -803,8 +809,35 @@ public sealed class Binder
     
     private BoundExpression BindLambdaExpression(LambdaExpression expr)
     {
-        _diag.ReportFeatureNotImplemented(expr.Location, "Lambda (arrow) expressions are not implemented");
-        return new BoundErrorExpression(expr);
+        var parameters = _typeScope.CreateParameterSymbols(expr.Parameters!);
+        var returnType = _typeScope.CreatePlacerHolderType();
+        var (lambdaType, _) = _typeScope.CreateFunctionType(parameters, returnType);
+        var lambdaSymbol = new LambdaFunctionSymbol(expr.Location, parameters, lambdaType, returnType);
+
+        _functionStack.Push(lambdaSymbol);
+        _scope.PushScope();
+        _closureStack.Push(new());
+        {
+            foreach (var @param in parameters) { _scope.TryDeclareVariable(@param); }
+            var boundExpr = BindTypeConversion(BindExpression(expr.Body), returnType);
+            var synthStatement = new ExprStatement(expr);
+            var synthReturn = new BoundReturnStatement(synthStatement, boundExpr);
+            var synthBody = new BoundBlockStatement(
+                synthStatement,
+                ImmutableArray.Create<BoundStatement>(synthReturn)
+            );
+            lambdaSymbol.SetBody(synthBody);
+        }
+        _ = _functionStack.Pop();
+        _ = _scope.PopScope();
+        var closure = _closureStack.Pop();
+        if (closure.Count > 0)
+        {
+            _diag.ReportFeatureNotImplemented(expr.Location, "Lambda expressions do not allow closures");
+            return new BoundErrorExpression(expr);
+        }
+
+        return new BoundLambdaExpression(expr, lambdaSymbol);;
     }
 
     private static BoundExpression BindNullExpression(NullExpression @null)
@@ -841,32 +874,39 @@ public sealed class Binder
         return new BoundTypeConversionExpression(expr.Node, to, expr);
     }
 
-    private FunctionSymbol? BindAccessCallExpression(Access access, out BoundAccess accessSymbol)
+    private FunctionTypeInformation? BindAccessCallExpression(Access access, out BoundAccess accessSymbol)
     {
         accessSymbol = BindAccess(access, expectFunc: true);
-        switch(accessSymbol)
+        if (_typeScope.GetTypeInformation(accessSymbol.Type) is not FunctionTypeInformation funcInfo)
         {
-            case BoundFuncAccess acc:
-                return acc.Func;
-            case BoundMemberAccess { Member: MemberFuncSymbol acc}:
-                return acc.Function;
-            case BoundExprAccess { Expression: BoundTypeApplication app}:
-                return app.Specialized;
-
-            case BoundNameAccess acc:
-                _diag.ReportNameIsNotAFunction(access.Location, acc.Symbol.Name);
-                break;
-            case BoundMemberAccess bma:
-                _diag.ReportNameIsNotAFunction(access.Location, bma.Member.Name);
-                break;
-            case BoundInvalidAccess:
-            case BoundExprAccess {Expression : BoundErrorExpression}:
-                break;
-            default: 
-                //TODO: comeback for higher-order functions
-                _diag.ReportExpectedFunctionName(access.Location);
-                break;
+            _diag.ReportExpectedFunctionName(access.Location);
+            return null;
         }
-        return null;
+        return funcInfo;
+        // switch(accessSymbol)
+        // {
+        //     case BoundFuncAccess acc:
+        //         return acc.Func;
+        //     case BoundMemberAccess { Member: MemberFuncSymbol acc}:
+        //         return acc.Function;
+        //     case BoundExprAccess { Expression: BoundTypeApplication app}:
+        //         return app.Specialized;
+
+        //     case BoundNameAccess acc:
+        //     //TODO:
+        //         _diag.ReportNameIsNotAFunction(access.Location, acc.Symbol.Name, acc.Type);
+        //         break;
+        //     case BoundMemberAccess bma:
+        //         _diag.ReportNameIsNotAFunction(access.Location, bma.Member.Name, bma.Type);
+        //         break;
+        //     case BoundInvalidAccess:
+        //     case BoundExprAccess {Expression : BoundErrorExpression}:
+        //         break;
+        //     default: 
+        //         //TODO: comeback for higher-order functions
+        //         _diag.ReportExpectedFunctionName(access.Location);
+        //         break;
+        // }
+        // return null;
     }
 }
