@@ -1443,7 +1443,7 @@ h"";";
         );
 
         var expectedBag = new ErrorWarrningBag();
-        expectedBag.ReportUnexpectedToken(TIdentifier, TParRight, new TextLocation(1, 12));
+        expectedBag.ReportTrailingCommaInParameterList(new TextLocation(1, 12));
 
         var result = GetParser(GetLexer(input)).Parse();
 

@@ -737,16 +737,24 @@ public class Parser
         //We could probably split here into specified vs. not, but let's just use null for that ?
         var parameters = new List<(TypeSyntaxNode?, SyntaxToken)>();
         var openPar = MatchKind(TParLeft);
+        var depth = 1;
         var isReading = true;
         while (isReading && NotEndOfFile)
         {
+            if (Current.Kind is TParLeft) depth++;
+            if (Current.Kind is TParRight && --depth == 0) break;
+
             //Provide a prettier error message here - if a user puts (a,b,c,) => ... 
             TypeSyntaxNode? type = null;
             if (Peek(1).Kind is not TComma and not TParRight && TryParseType(out type)) { }
             var name = MatchKind(TIdentifier);
             if(name.Kind is not TBadToken) parameters.Add((type, name));
             if (Current.Kind is not TComma) isReading = false;
-            else NextToken(); //Consume the comma
+            else
+            {
+                NextToken(); //Consume the comma
+                if (Current.Kind is TParRight) _diag.ReportTrailingCommaInParameterList(Current.Location);
+            }
         }
 
         _ = MatchKind(TParRight);

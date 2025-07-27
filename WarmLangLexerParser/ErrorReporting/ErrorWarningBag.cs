@@ -25,7 +25,7 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
 
     public void Report(string message, bool isError, int line, int col)
     {
-        if(!isMuted)
+        if (!isMuted)
         {
             _reported.Add(new ReportedErrorWarning(message, isError, line, col));
         }
@@ -67,7 +67,7 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         {
             var kind = kinds[i];
             sb.Append(kind);
-            if(i < kinds.Length-1)
+            if (i < kinds.Length - 1)
             {
                 sb.Append(", ");
             }
@@ -95,9 +95,15 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         Report(message, true, textLocation);
     }
 
-    public void ReportKeywordOnlyAllowedInTopScope(TokenKind keyword, TextLocation location) 
+    public void ReportKeywordOnlyAllowedInTopScope(TokenKind keyword, TextLocation location)
     {
         var message = $"The keyword '{keyword.AsString()}' may only appear in the top level";
+        Report(message, true, location);
+    }
+
+    public void ReportTrailingCommaInParameterList(TextLocation location)
+    {
+        var message = "Trailing comma in parameter list - please remove the comma";
         Report(message, true, location);
     }
 }

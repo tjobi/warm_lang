@@ -42,7 +42,7 @@ public sealed class Conversion
         //Any CLI reference type is nullable - for now
         if(from == Null && !to.IsValueType) return Implicit;
 
-        if(from == to || eql(from, to))
+        if (from == to || eql(from, to))
             return Identity;
         
         if(eql(Int, from))

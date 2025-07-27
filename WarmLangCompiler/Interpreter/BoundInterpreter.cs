@@ -5,6 +5,7 @@ using WarmLangCompiler.Interpreter.Values;
 using WarmLangCompiler.Interpreter.Exceptions;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser;
+using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Interpreter;
 
@@ -90,12 +91,14 @@ public sealed class BoundInterpreter
                     {
                         var index = labelIndex[gotoo.Label];
                         i = index;
-                    } break;
+                    }
+                    break;
                 case BoundConditionalGotoStatement jmp:
                     {
                         var condition = EvaluateExpression(jmp.Condition) as BoolValue;
                         i = labelIndex[condition! ? jmp.LabelTrue : jmp.LabelFalse];
-                    } break;
+                    }
+                    break;
                 case BoundReturnStatement ret:
                     {
                         if (ret.Expression is null)
@@ -108,7 +111,8 @@ public sealed class BoundInterpreter
                 default:
                     {
                         res = EvaluateStatement(stmnt);
-                    } break;
+                    }
+                    break;
             }
         }
         PopEnvironments();
@@ -136,8 +140,7 @@ public sealed class BoundInterpreter
             BoundTypeConversionExpression conv => EvaluateTypeConversionExpression(conv),
             BoundUnaryExpression unaOp => EvaluateUnaryExpression(unaOp),
             BoundBinaryExpression binOp => EvaluateBinaryExpression(binOp),
-            // BoundCallExpression call => EvaluateCallExpression(call),
-            BoundCallExpression2 call => EvaluateCallExpression2(call),
+            BoundCallExpression2 call => EvaluateCallExpression(call),
             BoundAssignmentExpression asn => EvaluateAssignmentExpression(asn),
             BoundAccessExpression acc => EvaluateAccessExpression(acc),
             BoundConstantExpression konst => EvaluateConstantExpression(konst),
@@ -145,13 +148,19 @@ public sealed class BoundInterpreter
             BoundObjectInitExpression bse => EvaluateObjectInitExpression(bse),
             BoundNullExpression _ => EvaluateNullExpression(),
             BoundLambdaExpression lambda => EvaluateLambdaExpression(lambda),
+            BoundTypeApplication typeApp => EvaluateTypeApplication(typeApp),
             _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{expr.GetType().Name}' yet"),
         };
     }
 
-    private Value EvaluateCallExpression2(BoundCallExpression2 call)
+    private Value EvaluateTypeApplication(BoundTypeApplication typeApp)
     {
-        var targetValue = GetValueFromAccess(call.Target);
+        return GetFunctionValueFromSymbol(typeApp.Specialized.SpecializedFrom);
+    }
+
+    private Value EvaluateCallExpression(BoundCallExpression2 call)
+    {
+        var targetValue = GetValueFromAccess(call.Target, call.Location);
         if (targetValue is not FunctionValue funcValue) throw new NotImplementedException($"ADD SUPPORT FOR NAMED FUNCTIONS");
 
         if (funcValue.Symbol.IsBuiltInFunction())
@@ -162,11 +171,11 @@ public sealed class BoundInterpreter
         var callArgs = call.Arguments;
         var funcParameters = funcValue.Symbol.Parameters;
         PushEnvironments();
-        // if(call.Function is SpecializedFunctionSymbol f)
-        // {
-        //     var top = _typeArgumentEnvironment.Peek();
-        //     foreach(var (p, c) in f.TypeParameters.Zip(f.TypeArguments)) top.Add(p,c);
-        // }
+        if (call.AppliedTypeArguments.Count > 0)
+        {
+            var top = _typeArgumentEnvironment.Peek();
+            foreach (var (p, c) in call.AppliedTypeArguments) top.Add(p,c);
+        } 
 
         for (int i = 0; i < call.Arguments.Length; i++)
         {
@@ -264,59 +273,6 @@ public sealed class BoundInterpreter
         return res;
     }
 
-    private Value EvaluateCallExpression(BoundCallExpression call)
-    {
-        var function = call.Function switch
-        {
-            SpecializedFunctionSymbol s => s.SpecializedFrom,
-            _ => call.Function,
-        };
-        if (function.IsBuiltInFunction())
-            return EvaluateCallBuiltinExpression(function, call.Arguments);
-
-        BoundBlockStatement LookupMethod(FunctionSymbol function, TypeSymbol owner)
-        {
-            var ownerInfo = program.TypeInformation[owner];
-            if (!ownerInfo.MethodBodies.TryGetValue(function, out var body))
-            {
-                if (ownerInfo is GenericTypeInformation gt
-                   && program.TypeInformation[gt.SpecializedFrom].MethodBodies.TryGetValue(function, out body))
-                { }
-                else throw new Exception($"{nameof(EvaluateCallExpression)} couldn't locate '{function}' for type '{owner}'");
-            }
-            return body;
-        }
-
-        var functionBody = function switch
-        {
-            FunctionSymbol sym when sym.IsMemberFunc => LookupMethod(sym, sym.OwnerType),
-            LambdaFunctionSymbol => throw new NotImplementedException($"No lambdas here"),
-            _ => _functionEnvironment.Lookup(function)
-                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{function}'")
-        };
-
-
-        var callArgs = call.Arguments;
-        var funcParams = function.Parameters;
-        PushEnvironments();
-        if (call.Function is SpecializedFunctionSymbol f)
-        {
-            var top = _typeArgumentEnvironment.Peek();
-            foreach (var (p, c) in f.TypeParameters.Zip(f.TypeArguments)) top.Add(p, c);
-        }
-
-        for (int i = 0; i < call.Arguments.Length; i++)
-        {
-            //var paramType = funcParams[i].Type; //We have checked this type in the binder, should be all good!
-            var paramName = funcParams[i];
-            var paramValue = EvaluateExpression(callArgs[i]);
-            _variableEnvironment.Declare(paramName, paramValue);
-        }
-        Value res = EvaluateStatement(functionBody);
-        PopEnvironments();
-        return res;
-    }
-
     private Value EvaluateCallBuiltinExpression(FunctionSymbol function, IList<BoundExpression> arguments)
     {
         if (function == BuiltInFunctions.StdWriteLine || function == BuiltInFunctions.StdWrite)
@@ -360,10 +316,11 @@ public sealed class BoundInterpreter
                 {
                     res = EvaluateExpression(assign.RightHandSide);
                     _variableEnvironment.Assign(nameAccess.Symbol, res);
-                } break;
+                }
+                break;
             case BoundSubscriptAccess sa:
                 {
-                    var target = GetValueFromAccess(sa.Target);
+                    var target = GetValueFromAccess(sa.Target, assign.Location);
                     var idx = EvaluateExpressionToValueOrThrow<IntValue>(sa.Index, "subscript");
                     res = EvaluateExpression(assign.RightHandSide);
 
@@ -375,7 +332,7 @@ public sealed class BoundInterpreter
                 }
             case BoundMemberAccess bma:
                 {
-                    var target = GetValueFromAccess(bma.Target);
+                    var target = GetValueFromAccess(bma.Target, assign.Location);
                     EnsureNotNullValue(target, assign.Location, "Cannot assign to null");
 
                     if (bma.Member.IsReadOnly)
@@ -384,7 +341,8 @@ public sealed class BoundInterpreter
                         throw new NotImplementedException($"{nameof(BoundInterpreter)}.{nameof(EvaluateAssignmentExpression)} doesn't know assignment of '{bma.Target.Type}.{bma.Member}'");
 
                     res = objVal[bma.Member.Name] = EvaluateExpression(assign.RightHandSide);
-                } break;
+                }
+                break;
             default:
                 throw new NotImplementedException($"Assignment into access of type '{assign.Access.GetType().Name}' is not known");
         }
@@ -398,7 +356,8 @@ public sealed class BoundInterpreter
             BoundNameAccess nameAccess => _variableEnvironment.Lookup(nameAccess.Symbol),
             BoundExprAccess ae => EvaluateExpression(ae.Expression),
             BoundMemberAccess
-            or BoundSubscriptAccess => GetValueFromAccess(acc.Access, acc.Location),
+            or BoundSubscriptAccess
+            or BoundFuncAccess => GetValueFromAccess(acc.Access, acc.Location),
             _ => throw new NotImplementedException($"Access of type '{acc.Access.GetType().Name}' is not known"),
         };
     }
@@ -412,8 +371,8 @@ public sealed class BoundInterpreter
                 return _variableEnvironment.Lookup(name.Symbol);
             case BoundExprAccess ea:
                 return EvaluateExpression(ea.Expression);
-            case BoundMemberAccess bma when bma is { Member: MemberFieldSymbol symbol }:
-                target = GetValueFromAccess(bma.Target);
+            case BoundMemberAccess { Member: MemberFieldSymbol symbol } bma:
+                target = GetValueFromAccess(bma.Target, loc);
                 EnsureNotNullValue(target, loc, $"Cannot access '{symbol}' of null");
                 if (symbol.IsBuiltin)
                 {
@@ -431,7 +390,7 @@ public sealed class BoundInterpreter
                 return fieldValue;
             case BoundSubscriptAccess sa:
                 {
-                    target = GetValueFromAccess(sa.Target);
+                    target = GetValueFromAccess(sa.Target, loc);
                     EnsureNotNullValue(target, loc);
                     var idx = EvaluateExpressionToValueOrThrow<IntValue>(sa.Index, "subscript");
                     if (target is CollectionValue sv)
@@ -441,17 +400,11 @@ public sealed class BoundInterpreter
                     }
                     throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
                 }
-            case BoundFuncAccess funcAccess:
-                var func = funcAccess.Func;
-                if (func.IsBuiltInFunction()) return new FunctionValue(func, null!);
-                var functionBody = func switch
-                {
-                    FunctionSymbol sym when sym.IsMemberFunc => LookupMethod(sym, sym.OwnerType),
-                    LambdaFunctionSymbol l => l.Body ?? throw new Exception($"{nameof(BoundInterpreter)} - compiler bug - couldn't find body of lambda!"),
-                    _ => _functionEnvironment.Lookup(func)
-                        ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{func}'")
-                };
-                return new FunctionValue(func, functionBody);
+            case BoundFuncAccess funcAccess: return GetFunctionValueFromSymbol(funcAccess.Func);
+            case BoundMemberAccess { Member: MemberFuncSymbol memSymbol } bma:
+                target = GetValueFromAccess(bma.Target, loc);
+                EnsureNotNullValue(target, loc, $"Cannot access '{memSymbol.Name}' of null reference");
+                return GetFunctionValueFromSymbol(memSymbol.Function);
             default:
                 throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} doesn't know how to handle {accessTarget}");
         }
@@ -459,7 +412,8 @@ public sealed class BoundInterpreter
 
     private Value EvaluateConstantExpression(BoundConstantExpression konst)
     {
-        return konst.Constant.Value switch {
+        return konst.Constant.Value switch
+        {
             int i => new IntValue(i),
             bool boo => BoolValue.FromBool(boo),
             string s => new StrValue(s),
@@ -579,17 +533,30 @@ public sealed class BoundInterpreter
             throw new Exception($"{nameof(BoundInterpreter)} cannot use '{expr.Type}' as {expected}");
         return t;
     }
-    
+
     private BoundBlockStatement LookupMethod(FunctionSymbol function, TypeSymbol owner)
     {
         var ownerInfo = program.TypeInformation[owner];
-        if(!ownerInfo.MethodBodies.TryGetValue(function, out var body))
+        if (!ownerInfo.MethodBodies.TryGetValue(function, out var body))
         {
-            if(ownerInfo is GenericTypeInformation gt 
+            if (ownerInfo is GenericTypeInformation gt
             && program.TypeInformation[gt.SpecializedFrom].MethodBodies.TryGetValue(function, out body))
             { }
             else throw new Exception($"{nameof(LookupMethod)} couldn't locate '{function}' for type '{owner}'");
         }
         return body;
+    }
+
+    private FunctionValue GetFunctionValueFromSymbol(FunctionSymbol func)
+    {
+        if (func.IsBuiltInFunction()) return new FunctionValue(func, null!);
+        var body = func switch
+        {
+            FunctionSymbol sym when sym.IsMemberFunc => LookupMethod(sym, sym.OwnerType),
+            LambdaFunctionSymbol l => l.Body ?? throw new Exception($"{nameof(BoundInterpreter)} - compiler bug - couldn't find body of lambda!"),
+            _ => _functionEnvironment.Lookup(func)
+                ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{func}'")
+        };
+        return new FunctionValue(func, body);
     }
 }

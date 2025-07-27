@@ -2,7 +2,7 @@ type LinkedListNode<T> = { LinkedListNode<T> next; T value; }
 type LinkedList<T> = { LinkedListNode<T> head; }
 
 function main() {
-    LinkedList<int> q = createLinkedList();
+    var q = createLinkedList<int>();
     q.enqueue(1);
     q.enqueue(2);
     stdWriteLine(q.toString());
@@ -13,10 +13,13 @@ function main() {
     stdWriteLine(string(x));
 
     //TODO: why does this need an explicit int - hmm
-    LinkedList<int> someInts = fromList<int>([1,2,3,4]);
+    //      `LinkedList<int> someInts = fromList<int>([1,2,3,4]);`
+    //      it is fixed by var but there is a buuuuuug here ;(
+    var someInts = fromList([1,2,3,4]);
     stdWriteLine(someInts.toString());
     someInts.reverse();
     stdWriteLine(someInts.toString());
+    stdWriteLine(someInts.filter((i) => i >= 2).toString());
 }
 
 function createLinkedList<T>() LinkedList<T> {
@@ -24,8 +27,8 @@ function createLinkedList<T>() LinkedList<T> {
 }
 
 function fromList<T>(T[] ts) LinkedList<T> {
-    LinkedList<T> lst = createLinkedList();
-    int i = 0;
+    var lst = createLinkedList<T>();
+    var i = 0;
     while i < ts.len : i = i + 1 {
         lst.push(ts[i]);
     }
@@ -97,4 +100,13 @@ function LinkedList<T>.toString<T>(LinkedList<T> self) string {
         out = out + string(cur.value);
     }
     return out + " ]";
+}
+
+function LinkedList<T>.filter<T>(LinkedList<T> self, Func<T, bool> predicate) LinkedList<T> {
+    var l = createLinkedList<T>();
+    var cur = self.head;
+    while cur != null : cur = cur.next {
+        if predicate(cur.value) { l.enqueue(cur.value); }
+    }
+    return l;
 }

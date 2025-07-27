@@ -206,6 +206,6 @@ internal static class BinderErrorWarnings
 
     internal static void ReportFeatureNotImplemented(this ErrorWarrningBag bag, TextLocation location, string msg)
     {
-        bag.Report(msg, true, location);
+        bag.Report("FEATURE MISSING - " + msg, true, location);
     }
 }

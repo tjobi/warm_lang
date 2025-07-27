@@ -137,7 +137,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.WarmLang",
-				"match": "\\b(if|else|while|return|function|new|type|null)\\b"
+				"match": "\\b(if|else|while|return|function|new|type|null|var)\\b"
 			}]
 		},
 		"strings": {

@@ -12,20 +12,23 @@ public class FunctionSymbol : EntitySymbol
     public FunctionSymbol(SyntaxToken nameToken,
                           ImmutableArray<TypeSymbol> typeParameters,
                           ImmutableArray<ParameterSymbol> parameters,
-                          TypeSymbol type, TypeSymbol returnType)
-    : this(nameToken.Name!, typeParameters, parameters, type, returnType, nameToken.Location) { }
+                          TypeSymbol type, TypeSymbol returnType,
+                          TypeSymbol? ownerType = null)
+    : this(nameToken.Name!, typeParameters, parameters, type, returnType, nameToken.Location, ownerType) { }
 
     internal FunctionSymbol(string name,
                             ImmutableArray<TypeSymbol> typeParameters,
                             ImmutableArray<ParameterSymbol> parameters,
                             TypeSymbol functionType, TypeSymbol returnType,
                             TextLocation location,
+                            TypeSymbol? ownerType = null,
                             bool connectParams = true)
     : base(name, functionType)
     {
         TypeParameters = typeParameters;
         Parameters = parameters;
         Location = location;
+        OwnerType = ownerType;
         ReturnType = returnType;
         SharedLocals = new HashSet<ScopedVariableSymbol>();
         if (connectParams) foreach (var p in parameters) p.BelongsTo = this;
@@ -45,7 +48,7 @@ public class FunctionSymbol : EntitySymbol
     public ImmutableArray<ParameterSymbol> Parameters { get; }
     public TextLocation Location { get; }
     public TypeSymbol ReturnType { get; }
-    public TypeSymbol? OwnerType { get; private set; }
+    public TypeSymbol? OwnerType { get; }
 
     [MemberNotNullWhen(true, nameof(OwnerType))]
     public bool IsMemberFunc => OwnerType is not null;
@@ -53,10 +56,6 @@ public class FunctionSymbol : EntitySymbol
     //Locals that are shared with any nested functions - could be parameters or local variables
     public ISet<ScopedVariableSymbol> SharedLocals { get; set; }
 
-    public void SetOwnerType(TypeSymbol type)
-    {
-        OwnerType ??= type;
-    }
     public override string ToString()
     {
         var sb = new StringBuilder();

@@ -24,7 +24,7 @@ function StringDisplay.show(StringDisplay self) {
         int nextIdx = 0;
         while i < self.displayLength : i = i + 1 {
             if i >= printcol && nextIdx + from <= to {
-                stdWritec(s[(from + nextIdx)]);
+                stdWritec(s[from + nextIdx]);
                 nextIdx = nextIdx + 1;
             } else {
                 stdWrite(" ");
@@ -48,6 +48,6 @@ function StringDisplay.show(StringDisplay self) {
         
         //2147483600 <- MAX INT
         // Empty loop to waste some time :D - busy waiting
-        while i < 715827866 : i = i + 1 { }
+        while i < 215800 : i = i + 1 { }
     }
 }

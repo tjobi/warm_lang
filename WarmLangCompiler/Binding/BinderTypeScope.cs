@@ -27,6 +27,7 @@ public sealed class BinderTypeScope
         yield return TypeSymbol.Bool;
         yield return TypeSymbol.String;
         yield return TypeSymbol.List;
+        yield return TypeSymbol.Func;
     }
 
     private readonly List<InternalTypeScope> _scopes;
@@ -171,6 +172,14 @@ public sealed class BinderTypeScope
         //FIXME: Couldn't we somehow do this from the unify?
         if (aInfo is ListTypeInformation la && bInfo is ListTypeInformation lb)
             return TypeEquality(la.NestedType, lb.NestedType);
+        if (aInfo is FunctionTypeInformation f1 && bInfo is FunctionTypeInformation f2 && f1.Parameters.Count == f2.Parameters.Count)
+        {
+            for (int i = 0; i < f1.Parameters.Count; i++)
+            {
+                if (!TypeEquality(f1.Parameters[i], f2.Parameters[i])) return false;
+            }
+            return TypeEquality(f1.ReturnType, f2.ReturnType);
+        }
         return parA == parB;
     }
 
@@ -423,6 +432,14 @@ public sealed class BinderTypeScope
                         stack.Push((t1, t2));
                     }
                     break;
+                case (FunctionTypeInformation f1, FunctionTypeInformation f2):
+                    //TODO: type arguments
+                    if (f1.Parameters.Count == f2.Parameters.Count)
+                    {
+                        for (int i = 0; i < f1.Parameters.Count; i++) stack.Push((f1.Parameters[i], f2.Parameters[i]));
+                        stack.Push((f1.ReturnType, f2.ReturnType));
+                    }
+                    break;
             }
         }
         /* FIXME: 
@@ -470,11 +487,17 @@ public sealed class BinderTypeScope
             _diag.ReportTypeNotFound(genericType.Name, location!);
             return TypeSymbol.Error;
         }
-        if (baseInfo is { TypeParameters: null })
+        if (TypeEquality(baseInfo.Type, TypeSymbol.Func))
         {
-            _diag.ReportNonGenericType(genericType.Name, location);
-            return TypeSymbol.Error;
+            var parameters = typeArguments.Take(typeArguments.Count - 1).ToImmutableArray();
+            var (type, _) = CreateFunctionType(parameters, typeArguments[^1]);
+            return type;
         }
+        if (baseInfo is { TypeParameters: null })
+            {
+                _diag.ReportNonGenericType(genericType.Name, location);
+                return TypeSymbol.Error;
+            }
         var baseTypeParameters = baseInfo.TypeParameters.Value;
         if (baseTypeParameters.Length != typeArguments.Count)
         {
@@ -542,6 +565,9 @@ public sealed class BinderTypeScope
                 GetOrCreateListType(MakeConcrete(lst.NestedType, concreteOf, location)),
             GenericTypeInformation gt =>
                 GetOrCreateTypeApplication(gt.SpecializedFrom, gt.TypeArguments.Select(t => MakeConcrete(t, concreteOf, location)).ToList(), location),
+            FunctionTypeInformation f => 
+                CreateFunctionType(f.Parameters.Select(t => MakeConcrete(t, concreteOf, location)).ToList(),
+                                   MakeConcrete(f.ReturnType, concreteOf, location)).Item1,
             null => throw new Exception($"{nameof(MakeConcrete)} - tried to concretify '{param}' with no information"),
             _ => param
         };
@@ -629,7 +655,18 @@ public sealed class BinderTypeScope
     public (TypeSymbol, FunctionTypeInformation) CreateFunctionType(
         ImmutableArray<ParameterSymbol> parameters,
         TypeSymbol returnType,
-        ImmutableArray<TypeSymbol>? typeParameters = null
+        ImmutableArray<TypeSymbol>? typeParameters = null,
+        bool isMemberFunc = false
+    )
+    {
+        var parameterTypes = parameters.Select(p => p.Type).ToList();
+        return CreateFunctionType(parameterTypes, returnType, typeParameters, isMemberFunc);
+    }
+    public (TypeSymbol, FunctionTypeInformation) CreateFunctionType(
+        IList<TypeSymbol> parameterTypes,
+        TypeSymbol returnType,
+        ImmutableArray<TypeSymbol>? typeParameters = null,
+        bool isMemberFunc = false
     )
     {
         //TODO: So many types and strings are gonna be around
@@ -638,7 +675,7 @@ public sealed class BinderTypeScope
         {
             sb.Append('<').AppendJoin(", ", typeParameters.Value).Append('>');
         }
-        var parameterTypes = parameters.Select(p => p.Type).ToList();
+        
         sb.Append('(')
           .AppendJoin(", ", parameterTypes)
           .Append(") => ")
@@ -652,7 +689,7 @@ public sealed class BinderTypeScope
         }
         var typeSymbol = new TypeSymbol(sb.ToString());
 
-        var typeInfo = new FunctionTypeInformation(typeSymbol, parameterTypes, returnType, typeParameters);
+        var typeInfo = new FunctionTypeInformation(typeSymbol, parameterTypes, returnType, typeParameters, isMemberFunc);
         AddType(typeInfo, AddTo.Global);
         return (typeInfo.Type, typeInfo);
     }
