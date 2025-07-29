@@ -12,21 +12,26 @@ public sealed class CilTypeManager
 
     private record CachedSignature(TypeSymbol Type, string Name, int Arity);
     private readonly Dictionary<CachedSignature, MethodReference> methodCache;
+    private readonly Dictionary<int, TypeReference> funcTypeCache;
     private readonly AssemblyDefinition assemblyDef;
     private readonly IReadOnlyDictionary<TypeSymbol, TypeInformation> infoOf;
     private readonly ErrorWarrningBag _diag;
+    private readonly AssemblyDefinition mscorlib;
 
     public ListMethodHelper ListHelper { get; }
 
     public CilTypeManager(AssemblyDefinition programAssembly, 
-                          IReadOnlyDictionary<TypeSymbol, TypeInformation> infoOf, ErrorWarrningBag diag)
+                          IReadOnlyDictionary<TypeSymbol, TypeInformation> infoOf, ErrorWarrningBag diag,
+                          AssemblyDefinition mscorlib)
     {
         toCILType = new();
         methodCache = new();
         ListHelper = new(this);
+        funcTypeCache = new();
         assemblyDef = programAssembly;
         this.infoOf = infoOf;
         _diag = diag;
+        this.mscorlib = mscorlib;
     }
 
     public void Add(TypeSymbol key, TypeReference cilType) => toCILType.Add(key, cilType);
@@ -38,28 +43,43 @@ public sealed class CilTypeManager
         if(toCILType.TryGetValue(type, out var typeRef)) return typeRef;
         
         var typeInfo = infoOf[type];
-        switch(typeInfo)
+        switch (typeInfo)
         {
-            default: 
-            {
+            default:
                 //May happen that an inferred type wasn't in toCILTYPE - let's see if it is there now
                 // or then just add it
-                if(!toCILType.TryGetValue(typeInfo.Type, out typeRef))
+                if (!toCILType.TryGetValue(typeInfo.Type, out typeRef))
                     throw new NotImplementedException($"{nameof(GetType)} - compiler bug know what to do with {type}");
                 return toCILType[type] = typeRef;
-            }
             case GenericTypeInformation gt:
-            {
                 var genericBase = GetType(gt.SpecializedFrom);
                 var typeParameters = gt.TypeArguments.Select(GetType).ToArray();
                 var genericInstance = genericBase.MakeGenericInstanceType(typeParameters);
                 return toCILType[type] = genericInstance;
-            }
+
             case PlaceHolderInformation:
-            {
                 //the binder never hit this placeholder with a union... so failback to mscorlib.Object
                 return toCILType[EmitterTypeSymbolHelpers.CILBaseTypeSymbol];
-            }
+
+            case FunctionTypeInformation f:
+                /*TODO: first-order functions ?
+                    function id<T>(T t) T { return t; }
+                    var f = id;
+                    f<int>(2);... 
+                */
+                if (!funcTypeCache.TryGetValue(f.Parameters.Count + 1, out var baseFuncType))
+                {
+                    var funcTypeString = "System.Func`" + (f.Parameters.Count + 1);
+                    baseFuncType = mscorlib.Modules
+                                        .FirstOrDefault(m => m.GetType(funcTypeString) is not null)?
+                                        .GetType(funcTypeString);
+                    if (baseFuncType is null)
+                        throw new NotImplementedException("Something is wrong");
+                    funcTypeCache[f.Parameters.Count + 1 ] = baseFuncType = assemblyDef.MainModule.ImportReference(baseFuncType); 
+                }
+
+                var genericArgs = f.Parameters.Append(f.ReturnType).Select(GetType);
+                return toCILType[type] = baseFuncType.MakeGenericInstanceType(genericArgs.ToArray());
         }
     }
 
@@ -72,10 +92,20 @@ public sealed class CilTypeManager
     {
         var signature = new CachedSignature(type, name, arity);
         if(methodCache.ContainsKey(signature)) return methodCache[signature];
-        
+
         //FIXME: Should we add some sort of check to make sure only valid "GenericTypeInformation" or "ListTypeInformation" goes here?
+        var info = infoOf[type];
+        //Needs be here because GetType has side effects - it creates TypeReferences ... nasty ;(
+        var specializedType = GetType(type);
+        TypeReference baseType = infoOf[type] switch
+        {
+            GenericTypeInformation gt => toCILType[gt.SpecializedFrom],
+            FunctionTypeInformation f => funcTypeCache[f.Parameters.Count + 1],
+            _ => toCILType[type]
+        };
+        
         MethodReference? genericMethod = null;
-        foreach(var method in toCILType[TypeSymbol.List].Resolve().Methods)
+        foreach(var method in baseType.Resolve().Methods)
         {
             if(method.Name == name && method.Parameters.Count == arity)
             {
@@ -85,7 +115,6 @@ public sealed class CilTypeManager
         }
         if(genericMethod is null) 
             throw new Exception($"'{nameof(CilTypeManager)}.{nameof(GetSpecializedMethod)}' found nothing for '{type}'.'{name}'({arity})");
-        var specializedType = GetType(type);
         //TODO: Figure out why the HasThis is required.
         var specializedMethod = new MethodReference(genericMethod.Name, genericMethod.ReturnType, specializedType)
         {
@@ -98,7 +127,7 @@ public sealed class CilTypeManager
         return methodCache[signature] = specializedMethod;
     }
 
-    public MethodReference GetSpecializedConstructor(TypeSymbol type, MethodReference ctor, IEnumerable<TypeSymbol> typeArgs)
+    public MethodReference GetSpecializedConstructor(TypeSymbol type, MethodReference ctor)
     {
         var specializedType = GetType(type);
         var specializedMethod = new MethodReference(ctor.Name, ctor.ReturnType, specializedType)

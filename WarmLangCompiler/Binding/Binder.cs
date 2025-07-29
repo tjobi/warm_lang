@@ -544,7 +544,6 @@ public sealed class Binder
 
         if (funcTypeInfo is null) return new BoundErrorExpression(ce);
 
-
         var typeArgEnv = ImmutableDictionary<TypeSymbol, TypeSymbol>.Empty;
         if (funcTypeInfo.HasTypeParameters && funcTypeInfo.TypeParameters.Value.Length > 0)
         {
@@ -559,6 +558,7 @@ public sealed class Binder
             }
             typeArgEnv = specialized.TypeParameters.Zip(specialized.TypeArguments).ToImmutableDictionary(kv => kv.First, kv => kv.Second);
             funcTypeInfo = (FunctionTypeInformation)_typeScope.GetTypeInformationOrThrow(specialized.Type);
+            accessToCall = new BoundExprAccess(new BoundTypeApplication(ce, accessToCall, specialized));
         }
 
         var argsSize = ce.Arguments.Count + (funcTypeInfo.IsMemberFunc ? 1 : 0);
@@ -599,7 +599,7 @@ public sealed class Binder
         {
             arguments[i] = BindTypeConversion(arguments[i], funcTypeInfo.Parameters[i]);
         }
-        return new BoundCallExpression2(ce, accessToCall, arguments.MoveToImmutable(), funcTypeInfo.ReturnType, typeArgEnv);
+        return new BoundCallExpression(ce, accessToCall, arguments.MoveToImmutable(), funcTypeInfo.ReturnType, typeArgEnv);
     }
 
     private BoundExpression BindAccessExpression(AccessExpression ae)

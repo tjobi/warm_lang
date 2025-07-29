@@ -88,8 +88,9 @@ public class FunctionSymbol : EntitySymbol
 public sealed class LambdaFunctionSymbol : FunctionSymbol
 {
     //TODO: Remember to change EntitySymbol.Type to not have a setter!
+    private static int ID = 0;
     public LambdaFunctionSymbol(TextLocation location, ImmutableArray<ParameterSymbol> parameters, TypeSymbol funcType, TypeSymbol returnType)
-    : base($"__#$lambda_at_{location}", ImmutableArray<TypeSymbol>.Empty, parameters, funcType, returnType, location)
+    : base($"__#$lambda{ID++}", ImmutableArray<TypeSymbol>.Empty, parameters, funcType, returnType, location)
     { }
 
     [MemberNotNullWhen(true, nameof(Body))]

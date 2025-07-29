@@ -140,7 +140,7 @@ public sealed class BoundInterpreter
             BoundTypeConversionExpression conv => EvaluateTypeConversionExpression(conv),
             BoundUnaryExpression unaOp => EvaluateUnaryExpression(unaOp),
             BoundBinaryExpression binOp => EvaluateBinaryExpression(binOp),
-            BoundCallExpression2 call => EvaluateCallExpression(call),
+            BoundCallExpression call => EvaluateCallExpression(call),
             BoundAssignmentExpression asn => EvaluateAssignmentExpression(asn),
             BoundAccessExpression acc => EvaluateAccessExpression(acc),
             BoundConstantExpression konst => EvaluateConstantExpression(konst),
@@ -158,7 +158,7 @@ public sealed class BoundInterpreter
         return GetFunctionValueFromSymbol(typeApp.Specialized.SpecializedFrom);
     }
 
-    private Value EvaluateCallExpression(BoundCallExpression2 call)
+    private Value EvaluateCallExpression(BoundCallExpression call)
     {
         var targetValue = GetValueFromAccess(call.Target, call.Location);
         if (targetValue is not FunctionValue funcValue) throw new NotImplementedException($"ADD SUPPORT FOR NAMED FUNCTIONS");
