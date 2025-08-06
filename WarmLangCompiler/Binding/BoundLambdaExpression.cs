@@ -5,14 +5,13 @@ namespace WarmLangCompiler.Binding;
 
 public sealed class BoundLambdaExpression : BoundExpression
 {
-    public BoundLambdaExpression(ExpressionNode node, LambdaFunctionSymbol symbol)
+    public BoundLambdaExpression(ExpressionNode node, FunctionSymbol symbol, BoundBlockStatement body)
     : base(node, symbol.Type)
     {
         Symbol = symbol;
-        if (!symbol.IsComplete) throw new Exception($"Compiler bug - {nameof(BoundLambdaExpression)} received symbol with no body, {node.Location}");
-        Body = symbol.Body;
+        Body = body;
     }
 
-    public LambdaFunctionSymbol Symbol { get; }
+    public FunctionSymbol Symbol { get; }
     public BoundBlockStatement Body { get; }
 }

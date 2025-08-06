@@ -22,6 +22,8 @@ public sealed class Emitter
 
     private static int _localFuncId = 0;
 
+    private readonly BoundProgram _boundProgram;
+
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _stringConcat, _stringEqual, _stringSubscript;
     private readonly MethodReference _objectEquals, _objectCtor, _wlEquals, _wlToString;
@@ -71,6 +73,7 @@ public sealed class Emitter
         _globals = new();
         _funcClosure = new();
         _typeInfoOf = new();
+        _boundProgram = program;
 
         // IL -> ".assembly 'App' {}"
         var assemblyName = new AssemblyNameDefinition("App", new Version(1, 0));
@@ -207,7 +210,7 @@ public sealed class Emitter
 
         foreach (var (type, members) in program.GetDeclaredTypes()) EmitTypeMembers(type, members);
 
-        foreach (var func in program.GetFunctionSymbols())
+        foreach (var (func, _) in program.GetGlobalFunctionSymbols())
         {
             EmitFunctionDeclaration(func);
         }
@@ -224,7 +227,7 @@ public sealed class Emitter
 
         //program.TypeMemberInformation still holds all the type information
         //GetFunctionSymbols just skips the need for multiple loops (for now at least)
-        foreach (var (func, body) in program.GetFunctionSymbolsAndBodies())
+        foreach (var (func, body) in program.GetGlobalFunctionSymbols())
         {
             EmitFunctionBody(func, body);
         }
@@ -408,11 +411,11 @@ public sealed class Emitter
             case BoundReturnStatement ret:
                 EmitReturnStatement(processor, ret);
                 break;
-            case BoundFunctionDeclaration func when func.Symbol is LocalFunctionSymbol symbol:
-                if (symbol.Body is not null)
+            case BoundFunctionDeclaration { Symbol: LocalFunctionSymbol symbol }:
+                if (_boundProgram.Functions[symbol] is BoundBlockStatement body)
                 {
                     EmitLocalFunctionDeclaration(symbol);
-                    EmitFunctionBody(symbol, symbol.Body);
+                    EmitFunctionBody(symbol, body);
                     break;
                 }
                 throw new Exception($"{nameof(Emitter)} - has reached exception state in {nameof(EmitStatement)} - LocalFunction '{symbol}' doesn't have a body!");

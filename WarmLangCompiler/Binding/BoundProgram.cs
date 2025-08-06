@@ -38,10 +38,10 @@ public sealed class BoundProgram
             yield return (t, TypeInformation[t].Members);
     }
 
-    public IEnumerable<FunctionSymbol> GetFunctionSymbols()
+    public IEnumerable<(FunctionSymbol Func, BoundBlockStatement Body)> GetGlobalFunctionSymbols()
     {
-        foreach(var (func, _) in GetFunctionSymbolsAndBodies())
-            yield return func;
+        foreach(var (func, body) in GetFunctionSymbolsAndBodies())
+            if (func.IsGlobal) yield return (func, body);
     }
 
     public IEnumerable<(FunctionSymbol Func, BoundBlockStatement Body)> GetFunctionSymbolsAndBodies()

@@ -64,17 +64,8 @@ public static class Lowerer
             BoundIfStatement iff when iff.Else is not null => RewriteIfElseStatement(iff),
             BoundIfStatement iff when iff.Else is null => RewriteIfStatement(iff),
             BoundBlockStatement block => RewriteBlockStatement(block),
-            BoundFunctionDeclaration func when func.Symbol is LocalFunctionSymbol symbol => RewriteFunctionDeclaration(func, symbol),
             _ => statement,
         };
-    }
-
-    private static BoundStatement RewriteFunctionDeclaration(BoundFunctionDeclaration func, LocalFunctionSymbol symbol)
-    {
-        if(symbol.Body is null)
-            return func;
-        symbol.Body = LowerBody(symbol, symbol.Body);
-        return func;
     }
 
     private static BoundBlockStatement RewriteBlockStatement(BoundBlockStatement block)

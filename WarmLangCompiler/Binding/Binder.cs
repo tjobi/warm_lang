@@ -19,6 +19,8 @@ public sealed class Binder
     private readonly Stack<FunctionSymbol> _functionStack;
     private readonly Stack<HashSet<ScopedVariableSymbol>> _closureStack;
 
+    private readonly Dictionary<FunctionSymbol, BoundBlockStatement> _functionToBody;
+
     public Binder(ErrorWarrningBag bag)
     {
         _diag = bag;
@@ -28,6 +30,7 @@ public sealed class Binder
         _functionStack = new();
         _unBoundBodyOf = new();
         _closureStack = new();
+        _functionToBody = new();
 
         _scope.PushScope(); //Push scope to contain builtin stuff
         foreach (var func in BuiltInFunctions.GetBuiltInFunctions())
@@ -44,13 +47,13 @@ public sealed class Binder
 
         var (bound, globalVariables, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
 
-        var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
+        // var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
         foreach (var function in _scope.GetFunctions())
         {
             if (function.IsBuiltInFunction())
                 continue;
             var boundBody = BindFunctionBody(function, _unBoundBodyOf[function]);
-            functions.Add(function, boundBody);
+            _functionToBody.Add(function, boundBody);
         }
 
         foreach (var (type, memberFuncs) in _typeScope.GetFunctionMembers())
@@ -64,7 +67,7 @@ public sealed class Binder
 
         FunctionSymbol? main = null;
         FunctionSymbol? scriptMain = null;
-        if (functions.Where(kv => kv.Key.Name == "main").FirstOrDefault() is { Key: FunctionSymbol mainSymbol, Value: BoundBlockStatement mainBody })
+        if (_functionToBody.Where(kv => kv.Key.Name == "main").FirstOrDefault() is { Key: FunctionSymbol mainSymbol, Value: BoundBlockStatement mainBody })
         {
             main = mainSymbol;
         }
@@ -76,9 +79,9 @@ public sealed class Binder
 
             scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
             var scriptMainBody = Lowerer.LowerBody(scriptMain, bound);
-            functions[scriptMain] = scriptMainBody;
+            _functionToBody[scriptMain] = scriptMainBody;
         }
-        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
+        return new BoundProgram(main, scriptMain, _functionToBody.ToImmutableDictionary(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
     }
 
     private (BoundBlockStatement boundRoot, ImmutableArray<BoundVarDeclaration> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
@@ -305,7 +308,7 @@ public sealed class Binder
 
         _closureStack.Push(new());
         var boundBody = BindFunctionBody(symbol, funcDecl.Body);
-        symbol.Body = boundBody;
+        _functionToBody[symbol] = boundBody;
         _typeScope.Pop();
         if (symbol.Closure is null) symbol.Closure = _closureStack.Pop();
         else symbol.Closure.UnionWith(_closureStack.Pop());
@@ -804,7 +807,7 @@ public sealed class Binder
         var parameters = _typeScope.CreateParameterSymbols(expr.Parameters!, treatNullAsPlaceholder: true);
         var returnType = _typeScope.CreatePlacerHolderType();
         var (lambdaType, _) = _typeScope.CreateFunctionType(parameters, returnType);
-        var lambdaSymbol = new LambdaFunctionSymbol(expr.Location, parameters, lambdaType, returnType);
+        var lambdaSymbol = FunctionSymbolFactory.CreateLambda(expr.Location, parameters, lambdaType, returnType);
 
         _functionStack.Push(lambdaSymbol);
         _scope.PushScope();
@@ -818,7 +821,7 @@ public sealed class Binder
                 synthStatement,
                 ImmutableArray.Create<BoundStatement>(synthReturn)
             );
-            lambdaSymbol.SetBody(synthBody);
+            _functionToBody[lambdaSymbol] = synthBody;
         }
         _ = _functionStack.Pop();
         _ = _scope.PopScope();
@@ -829,7 +832,7 @@ public sealed class Binder
             return new BoundErrorExpression(expr);
         }
 
-        return new BoundLambdaExpression(expr, lambdaSymbol); ;
+        return new BoundLambdaExpression(expr, lambdaSymbol, _functionToBody[lambdaSymbol]);
     }
 
     private static BoundExpression BindNullExpression(NullExpression @null)
@@ -877,23 +880,13 @@ public sealed class Binder
             _diag.ReportExpectedFunctionName(access.Location);
             return null;
         }
-        switch (accessSymbol)
+        symbol = accessSymbol switch
         {
-            case BoundFuncAccess acc: symbol = acc.Func; break;
-            case BoundMemberAccess { Member: MemberFuncSymbol acc }:
-                symbol = acc.Function; break;
-            case BoundExprAccess { Expression: BoundTypeApplication app }:
-                symbol = app.Specialized; break;
-            case BoundNameAccess:
-            case BoundMemberAccess:
-            case BoundInvalidAccess:
-            case BoundExprAccess { Expression: BoundErrorExpression }:
-                break;
-            default:
-                //TODO: comeback for higher-order functions
-                _diag.ReportExpectedFunctionName(access.Location);
-                break;
-        }
+            BoundFuncAccess acc => acc.Func,
+            BoundMemberAccess { Member: MemberFuncSymbol acc } => acc.Function,
+            BoundExprAccess { Expression: BoundTypeApplication app } => app.Specialized, 
+            _ => null
+        };
         return funcInfo;
     }
     

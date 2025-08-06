@@ -128,7 +128,11 @@ public sealed class BoundInterpreter
 
     private Value EvaluateFunctionDeclaration(LocalFunctionSymbol local)
     {
-        _functionEnvironment.Declare(local, local.Body!);
+        if (!program.Functions.TryGetValue(local, out var body))
+        {
+            throw new Exception($"{nameof(EvaluateFunctionDeclaration)} - ran into a compiler bug, no body of local function: '{local}'");
+        }
+        _functionEnvironment.Declare(local, program.Functions[local]);
         return Value.Void;
     }
 
@@ -553,7 +557,6 @@ public sealed class BoundInterpreter
         var body = func switch
         {
             FunctionSymbol sym when sym.IsMemberFunc => LookupMethod(sym, sym.OwnerType),
-            LambdaFunctionSymbol l => l.Body ?? throw new Exception($"{nameof(BoundInterpreter)} - compiler bug - couldn't find body of lambda!"),
             _ => _functionEnvironment.Lookup(func)
                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{func}'")
         };
