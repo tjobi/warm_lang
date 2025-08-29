@@ -101,15 +101,16 @@ public sealed class Binder
             {
                 case TopLevelTypeDeclaration:
                 case TopLevelFuncDeclaration:
+                case TopLevelError:
                     continue;
                 case TopLevelStamentNode top: //ArbitraryStatementNode and VarDeclaration
                     var bound = BindTopLevelStatement(top);
-                    topLevelstatments.Add(bound);
+                    if (bound is BoundErrorStatement) continue;
 
+                    topLevelstatments.Add(bound);
                     if (bound is BoundVarDeclaration var)
                         globalVariables.Add(var);
                     break;
-                case TopLevelError: continue;
                 default: throw new NotImplementedException($"{nameof(Binder)} does not yet allow {toplevel.GetType().Name}");
             }
         }
@@ -813,7 +814,7 @@ public sealed class Binder
         _scope.PushScope();
         _closureStack.Push(new());
         {
-            foreach (var @param in parameters) { _scope.TryDeclareVariable(@param); }
+            foreach (var @param in parameters) _scope.TryDeclareVariable(@param, allowShadowing: true);
             var boundExpr = BindTypeConversion(BindExpression(expr.Body), returnType);
             var synthStatement = new ExprStatement(expr);
             var synthReturn = new BoundReturnStatement(synthStatement, boundExpr);
