@@ -6,7 +6,7 @@ using WarmLangLexerParser.ErrorReporting;
 using System.Diagnostics.CodeAnalysis;
 namespace WarmLangCompiler.ILGen;
 
-public sealed class CilTypeManager 
+public sealed class CilTypeManager
 {
     private readonly Dictionary<TypeSymbol, TypeReference> toCILType;
 
@@ -20,7 +20,7 @@ public sealed class CilTypeManager
 
     public ListMethodHelper ListHelper { get; }
 
-    public CilTypeManager(AssemblyDefinition programAssembly, 
+    public CilTypeManager(AssemblyDefinition programAssembly,
                           IReadOnlyDictionary<TypeSymbol, TypeInformation> infoOf, ErrorWarrningBag diag,
                           AssemblyDefinition mscorlib)
     {
@@ -40,8 +40,8 @@ public sealed class CilTypeManager
 
     public TypeReference GetType(TypeSymbol type)
     {
-        if(toCILType.TryGetValue(type, out var typeRef)) return typeRef;
-        
+        if (toCILType.TryGetValue(type, out var typeRef)) return typeRef;
+
         var typeInfo = infoOf[type];
         switch (typeInfo)
         {
@@ -67,16 +67,20 @@ public sealed class CilTypeManager
                     var f = id;
                     f<int>(2);... 
                 */
-                if (!funcTypeCache.TryGetValue(f.Parameters.Count + 1, out var baseFuncType))
+                var paramCount = ParameterCount(f);
+                if (!funcTypeCache.TryGetValue(paramCount, out var baseFuncType))
                 {
-                    var funcTypeString = "System.Func`" + (f.Parameters.Count + 1);
+                    var funcTypeString = paramCount == 0
+                                         ? "System.Action"
+                                         : ("System.Func`" + (f.Parameters.Count + 1));
                     baseFuncType = mscorlib.Modules
                                         .FirstOrDefault(m => m.GetType(funcTypeString) is not null)?
                                         .GetType(funcTypeString);
                     if (baseFuncType is null)
-                        throw new NotImplementedException("Something is wrong");
-                    funcTypeCache[f.Parameters.Count + 1 ] = baseFuncType = assemblyDef.MainModule.ImportReference(baseFuncType); 
+                        throw new NotImplementedException("Compiler bug - couldn't retrieve Func/Action type from mscorlib");
+                    funcTypeCache[paramCount] = baseFuncType = assemblyDef.MainModule.ImportReference(baseFuncType);
                 }
+                if (paramCount == 0) return toCILType[type] = baseFuncType;
 
                 var genericArgs = f.Parameters.Append(f.ReturnType).Select(GetType);
                 return toCILType[type] = baseFuncType.MakeGenericInstanceType(genericArgs.ToArray());
@@ -91,7 +95,7 @@ public sealed class CilTypeManager
     public MethodReference GetSpecializedMethod(TypeSymbol type, string name, int arity)
     {
         var signature = new CachedSignature(type, name, arity);
-        if(methodCache.ContainsKey(signature)) return methodCache[signature];
+        if (methodCache.ContainsKey(signature)) return methodCache[signature];
 
         //FIXME: Should we add some sort of check to make sure only valid "GenericTypeInformation" or "ListTypeInformation" goes here?
         var info = infoOf[type];
@@ -100,20 +104,20 @@ public sealed class CilTypeManager
         TypeReference baseType = infoOf[type] switch
         {
             GenericTypeInformation gt => toCILType[gt.SpecializedFrom],
-            FunctionTypeInformation f => funcTypeCache[f.Parameters.Count + 1],
+            FunctionTypeInformation f => funcTypeCache[ParameterCount(f)],
             _ => toCILType[type]
         };
-        
+
         MethodReference? genericMethod = null;
-        foreach(var method in baseType.Resolve().Methods)
+        foreach (var method in baseType.Resolve().Methods)
         {
-            if(method.Name == name && method.Parameters.Count == arity)
+            if (method.Name == name && method.Parameters.Count == arity)
             {
                 genericMethod = assemblyDef.MainModule.ImportReference(method);
                 break;
             }
         }
-        if(genericMethod is null) 
+        if (genericMethod is null)
             throw new Exception($"'{nameof(CilTypeManager)}.{nameof(GetSpecializedMethod)}' found nothing for '{type}'.'{name}'({arity})");
         //TODO: Figure out why the HasThis is required.
         var specializedMethod = new MethodReference(genericMethod.Name, genericMethod.ReturnType, specializedType)
@@ -136,16 +140,23 @@ public sealed class CilTypeManager
         };
         return specializedMethod;
     }
-    
+
     public bool IsListType(TypeSymbol type)
     {
-        if(type == TypeSymbol.Null || type == TypeSymbol.Error) return false;
+        if (type == TypeSymbol.Null || type == TypeSymbol.Error) return false;
         return infoOf[type] is ListTypeInformation;
     }
 
     public bool TryGetTypeInformation(TypeSymbol type, [NotNullWhen(true)] out TypeInformation? result)
     {
         return infoOf.TryGetValue(type, out result);
+    }
+    
+    private int ParameterCount(FunctionTypeInformation func)
+    {
+        var retInfo = infoOf[func.ReturnType];
+        return func.Parameters.Count == 0 && retInfo.Type == TypeSymbol.Void
+               ? 0 : (func.Parameters.Count + 1);
     }
 }
 public class ListMethodHelper
