@@ -8,18 +8,24 @@ namespace WarmLangCompiler.ILGen;
 
 public sealed class ClosureState 
 {
-    public ClosureState(TypeDefinition closureType, VariableDefinition closureVariable, FunctionBodyState belongsTo)
+    public ClosureState(FunctionSymbol func, TypeDefinition closureType, MethodDefinition ctor, MethodDefinition funcDef, VariableDefinition closureVariable)
     {
+        Func = func;
         TypeDef = closureType;
+        Constructor = ctor;
+        FuncDef = funcDef;
         VariableDef = closureVariable;
-        BelongsTo = belongsTo;
         ReferenceType = TypeDef.MakeByReferenceType();
+
+        closureType.Methods.Add(ctor);
+        closureType.Methods.Add(funcDef);
     }
 
+    public FunctionSymbol Func { get; }
     public TypeDefinition TypeDef { get; }
-
+    public MethodDefinition Constructor { get; }
+    public MethodDefinition FuncDef { get; }
     public VariableDefinition VariableDef { get; }
-    public FunctionBodyState BelongsTo { get; }
     public ByReferenceType ReferenceType { get; } 
 
     public void AddField(FieldDefinition @field) 
@@ -45,6 +51,8 @@ public sealed class ClosureState
         }
         return null;
     }
+
+    public bool HasField(VariableSymbol symbol) => GetField(symbol) is not null;
 
     public FieldDefinition GetFieldOrThrow(VariableSymbol symbol) => GetField(symbol.Name) ?? throw new Exception($"{nameof(ClosureState)} of '{TypeDef.FullName}' couldn't find '{symbol}'");
 

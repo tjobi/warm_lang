@@ -363,8 +363,6 @@ public sealed class Emitter
         var funcDefintion = _funcs[func];
         var ilProcessor = funcDefintion.Body.GetILProcessor();
 
-        SetupClosureState(thisState, func, ilProcessor);
-
         EmitBlockStatement(ilProcessor, body);
 
 
@@ -414,7 +412,7 @@ public sealed class Emitter
             case BoundFunctionDeclaration { Symbol: LocalFunctionSymbol symbol }:
                 if (_boundProgram.Functions[symbol] is BoundBlockStatement body)
                 {
-                    EmitLocalFunctionDeclaration(symbol);
+                    EmitLocalFunctionDeclaration(processor, symbol);
                     EmitFunctionBody(symbol, body);
                     break;
                 }
@@ -430,17 +428,10 @@ public sealed class Emitter
     private void EmitVariableDeclaration(ILProcessor processor, BoundVarDeclaration varDecl)
     {
         var symbol = varDecl.Symbol;
-        if (symbol is LocalVariableSymbol local && BodyState.IsSharedVariable(local))
-        {
-            var fieldDef = _funcClosure[local.BelongsToOrThrow].GetFieldOrThrow(symbol);
-            //BodyState.SharedLocals[symbol] = fieldDef;
-        }
-        else
-        {
-            var variable = new VariableDefinition(CilTypeOf(varDecl.Type));
-            BodyState.Locals[symbol] = variable;
-            processor.Body.Variables.Add(variable);
-        }
+        var variable = new VariableDefinition(CilTypeOf(varDecl.Type));
+        BodyState.Locals[symbol] = variable;
+        processor.Body.Variables.Add(variable);
+
         var intstrBefore = GetLastInstruction(processor);
         EmitExpression(processor, varDecl.RightHandSide);
         EmitStoreLocation(processor, symbol, intstrBefore);
@@ -493,12 +484,18 @@ public sealed class Emitter
         processor.Emit(OpCodes.Ret);
     }
 
-    private void EmitLocalFunctionDeclaration(LocalFunctionSymbol func)
+    private void EmitLocalFunctionDeclaration(ILProcessor ilProcessor, LocalFunctionSymbol func)
     {
         var funcName = $"_local_{_localFuncId++}_{func.Name}";
-        var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(TypeSymbol.Void));
+        var attrs = func.FreeVariables.Count == 0
+                    ? MethodAttributes.Static | MethodAttributes.Assembly
+                    : MethodAttributes.Public | MethodAttributes.HideBySig;
+        var funcDefintion = new MethodDefinition(funcName, attrs, CilTypeOf(TypeSymbol.Void));
+        _ = SetupClosureState(func, funcDefintion, ilProcessor);  
+
         _funcs[func] = funcDefintion;
-        _program.Methods.Add(funcDefintion);
+        //is done implicitly in the SetupCloseureState
+        //_program.Methods.Add(funcDefintion);
 
         foreach (var typeParam in func.TypeParameters)
         {
@@ -596,9 +593,9 @@ public sealed class Emitter
             funcDefintion.Parameters.Add(paramDef);
         }
 
-        if(_boundProgram.Functions[lambda.Symbol] is null)
+        if (_boundProgram.Functions[lambda.Symbol] is null)
             throw new Exception($"{nameof(EmitLambdaExpression)} - compiler bug, lambda '{lambda}' has no body");
-        
+
         EmitFunctionBody(lambda.Symbol, _boundProgram.Functions[lambda.Symbol]);
         EmitStaticFuncAccess(processor, funcTypeInfo.Type, funcDefintion);
     }
@@ -682,7 +679,9 @@ public sealed class Emitter
         {
             case BoundNameAccess name:
                 var instrBefore = GetLastInstruction(processor);
-                var isVariableInClosure = BodyState.IsSharedVariable(name.Symbol);
+                var isVariableInClosure = _funcClosure.TryGetValue(BodyState.Func, out var closureState)
+                                          && closureState.HasField(name.Symbol);
+
                 EmitExpression(processor, assignment.RightHandSide);
 
                 //Very important to dup because the assignment will consume the value, but we want to leave a value on the stack.
@@ -745,7 +744,7 @@ public sealed class Emitter
             BoundExprAccess { Expression: BoundTypeApplication app } => app.Specialized,
             _ => null,
         };
-        if (functionSymbol is null)
+        if (functionSymbol is null || functionSymbol.HasFreeVariables) //anynomous function call
         {
             EmitLoadAccess(processor, call.Target);
             foreach (var arg in call.Arguments) EmitExpression(processor, arg);
@@ -766,23 +765,6 @@ public sealed class Emitter
             EmitExpression(processor, arg);
         }
 
-        if (functionSymbol is LocalFunctionSymbol f && f.RequiresClosure)
-        {
-            var funcDef = _funcs[f];
-            for (int i = f.Parameters.Length; i < funcDef.Parameters.Count; i++)
-            {
-
-                var closureType = funcDef.Parameters[i].ParameterType;
-                if (!BodyState.TryGetAvailableClosureLoadInstruction(closureType, processor, out var loadClosureInstr))
-                {
-                    throw new Exception($"Couldn't find '{closureType}' when calling '{f}'");
-                }
-                processor.Append(loadClosureInstr);
-            }
-        }
-
-        // var funcTypeInfo = 
-        // Console.WriteLine($"Trying to emit a call to {functionSymbol} - with type args {}");
         if (functionSymbol is SpecializedFunctionSymbol sp)
         {
             var generic = new GenericInstanceMethod(_funcs[sp.SpecializedFrom]);
@@ -1058,7 +1040,8 @@ public sealed class Emitter
 
     private void EmitStoreLocation(ILProcessor processor, VariableSymbol variable, Instruction? before = null)
     {
-        if (variable is ScopedVariableSymbol sv && BodyState.IsSharedVariable(sv))
+        if (variable is ScopedVariableSymbol sv &&
+            _funcClosure.TryGetValue(BodyState.Func, out var closure) && closure.HasField(sv))
         {
             var (ldClosure, stfld) = GetClosureVariableAccess(processor, sv, OpCodes.Stfld);
             if (before is not null)
@@ -1089,7 +1072,7 @@ public sealed class Emitter
         {
             case BoundNameAccess name:
                 var nameSymbol = name.Symbol;
-                if (nameSymbol is ScopedVariableSymbol sv && BodyState.IsSharedVariable(sv))
+                if (nameSymbol is ScopedVariableSymbol sv && IsVariableInAClosure(sv))
                 {
                     var (closureLoad, fieldLoad) = GetClosureVariableAccess(processor, sv, OpCodes.Ldfld);
                     processor.Append(closureLoad);
@@ -1145,7 +1128,10 @@ public sealed class Emitter
                 EmitExpression(processor, ae.Expression);
                 break;
             case BoundFuncAccess f:
-                EmitStaticFuncAccess(processor, f.Type, _funcs[f.Func]);
+                if (f.Func.HasFreeVariables)
+                    EmitFunctionClosure(processor, f.Func);
+                else
+                    EmitStaticFuncAccess(processor, f.Type, _funcs[f.Func]);
                 break;
             default:
                 throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't know how to emit access for '{acc}'");
@@ -1181,61 +1167,70 @@ public sealed class Emitter
 
     private (Instruction LoadClosureInstr, Instruction fieldInstr) GetClosureVariableAccess(ILProcessor processor, ScopedVariableSymbol scoped, OpCode action)
     {
-        var varClosure = _funcClosure[scoped.BelongsTo!];
-        if (!BodyState.TryGetAvailableClosureLoadInstruction(varClosure, processor, out var loadinstr))
-            throw new Exception($"{nameof(GetClosureVariableAccess)} couldn't find '{varClosure}' for '{BodyState.Func}'");
+        var closure = _funcClosure[BodyState.Func];
+        if (!closure.TryGetField(scoped, out var closureField))
+            throw new Exception($"{nameof(GetClosureVariableAccess)} - compiler bug - couldn't find a closure for '{BodyState.Func}'");
+            //Always arg0 because closures are instance methods 
+        var loadClosure = processor.Create(OpCodes.Ldarg_0);
+        var loadField = processor.Create(action, closureField);
+        return (loadClosure, loadField);
+        // var varClosure = _funcClosure[scoped.BelongsTo!];
+        // if (!BodyState.TryGetAvailableClosureLoadInstruction(varClosure, processor, out var loadinstr))
+        //     throw new Exception($"{nameof(GetClosureVariableAccess)} couldn't find '{varClosure}' for '{BodyState.Func}'");
 
-        var loadField = processor.Create(action, varClosure.GetFieldOrThrow(scoped));
-        return (loadinstr, loadField);
+        // var loadField = processor.Create(action, varClosure.GetFieldOrThrow(scoped));
+        // return (loadinstr, loadField);
     }
 
-    private void SetupClosureState(FunctionBodyState stateOfFuncBody, FunctionSymbol func, ILProcessor ilProcessor)
+    //Setups up a closure type AND creates a local variable in the outer function!
+    private ClosureState? SetupClosureState(FunctionSymbol func, MethodDefinition fMethod, ILProcessor ilProcessor)
     {
-        if (stateOfFuncBody.SharedLocals.Count > 0) //Does the function share locals? Then add a closure
-        {
-            var closureType = new TypeDefinition("", $"closure_{func.Name}",
+        //TODO: If a function with free variables never escape - we can use ref structs!
+        //Does the function have free variables? => then it needs a closure 
+        if (func.FreeVariables.Count == 0) return null;
+
+        var closureType = new TypeDefinition("", $"#closure_{func.Name}",
                                                  TypeAttributes.NestedPrivate | TypeAttributes.Sealed
                                                  | TypeAttributes.SequentialLayout
-                                                 | TypeAttributes.AnsiClass,
-                                                 CilTypeOf(CILClosureType));
-            _program.NestedTypes.Add(closureType);
-            var closureVariable = new VariableDefinition(closureType);
-            ilProcessor.Body.Variables.Add(closureVariable);
-
-            var closure = new ClosureState(closureType, closureVariable, stateOfFuncBody);
-            stateOfFuncBody.AddClosureVariable(_funcClosure[func] = closure);
-
-            foreach (var shared in stateOfFuncBody.SharedLocals)
-            {
-                var @field = new FieldDefinition(shared.Name, FieldAttributes.Public, CilTypeOf(shared.Type));
-                stateOfFuncBody.AddClosureField(@field);
-                if (shared is ParameterSymbol p)
-                {
-                    ilProcessor.Emit(OpCodes.Ldloca, closureVariable);
-                    ilProcessor.Emit(OpCodes.Ldarg, p.Placement);
-                    ilProcessor.Emit(OpCodes.Stfld, @field);
-                }
+                                                 | TypeAttributes.AnsiClass
+                                                 | TypeAttributes.BeforeFieldInit,
+                                                 CilTypeOf(CILBaseTypeSymbol));
+        var ctor = new MethodDefinition(".ctor",
+            MethodAttributes.Public
+            | MethodAttributes.HideBySig
+            | MethodAttributes.SpecialName
+            | MethodAttributes.RTSpecialName,
+            CilTypeOf(TypeSymbol.Void));
+        ctor.Body = new MethodBody(ctor) {
+            Instructions = {
+                Instruction.Create(OpCodes.Ldarg_0),
+                Instruction.Create(OpCodes.Call, _objectCtor),
+                Instruction.Create(OpCodes.Ret)
             }
-        }
-        if (func is LocalFunctionSymbol l && l.Closure is { Count: > 0 })
+        };
+        var closureVariable = new VariableDefinition(closureType);
+
+        var closure = new ClosureState(func, closureType, ctor, fMethod, closureVariable);
+
+        _program.NestedTypes.Add(closureType);
+        ilProcessor.Body.Variables.Add(closureVariable);
+
+        //Save this somewhere
+        _funcClosure[func] = closure;
+        foreach (var (_, local) in func.FreeVariables)
         {
-            stateOfFuncBody.SharedLocals.UnionWith(l.Closure);
-            foreach (var cVar in l.Closure)
-            {
-                var cVarClosure = _funcClosure[cVar.BelongsToOrThrow];
-                if (!EmitterClosureHelper.TryFindMatchingClosureParameter(_funcs, func, cVarClosure, out var paramDef))
-                {
-                    paramDef = EmitterClosureHelper.CreateMatchingClosureParameter(_funcs, func, cVarClosure);
-                }
-                stateOfFuncBody.AddAvailableClosure(cVarClosure, paramDef);
-            }
+            var field = new FieldDefinition(local.Name, FieldAttributes.Public, CilTypeOf(local.Type));
+            closure.AddField(@field);
         }
+
+        return closure;
     }
 
     private void PrintFuncBody(FunctionSymbol func, ILProcessor ilProcessor)
     {
-        Console.WriteLine($"-- FUNCTION '{func}'");
-        foreach (var parameter in _funcs[func].Parameters)
+        var methodDef = _funcs[func];
+        Console.WriteLine($"-- FUNCTION '{func}' {(methodDef.HasThis ? "instance" : " ")} --");
+        foreach (var parameter in methodDef.Parameters)
         {
             Console.Write("    ");
             Console.WriteLine($"arg: {parameter.Index} - {parameter.ParameterType}");
@@ -1252,11 +1247,35 @@ public sealed class Emitter
         Console.WriteLine($"-- END      '{func.Name}'");
     }
 
-    private void EmitStaticFuncAccess(ILProcessor processor,TypeSymbol functionType, MethodDefinition funcDef)
+    private void EmitStaticFuncAccess(ILProcessor processor, TypeSymbol functionType, MethodDefinition funcDef)
     {
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Ldftn, funcDef);
         var funcCtor = _cilTypeManager.GetSpecializedMethod(functionType, ".ctor", 2);
         processor.Emit(OpCodes.Newobj, funcCtor);
     }
+
+    private void EmitFunctionClosure(ILProcessor processor, FunctionSymbol func)
+    {
+        if (!_funcClosure.TryGetValue(func, out var closure))
+            throw new Exception($"{nameof(EmitFunctionClosure)} - compiler bug - no closure for '{func}'");
+
+        processor.Emit(OpCodes.Newobj, closure.Constructor);
+        processor.Emit(OpCodes.Dup);
+        processor.Emit(OpCodes.Stloc, closure.VariableDef);
+        foreach (var (sv, local) in func.FreeVariables)
+        {
+            processor.Emit(OpCodes.Dup);
+            processor.Emit(OpCodes.Ldloc, BodyState.Locals[sv]); //Is this really it?
+            processor.Emit(OpCodes.Stfld, closure.GetFieldOrThrow(local));
+        }
+        processor.Emit(OpCodes.Ldftn, closure.FuncDef);
+        var funcCtr = _cilTypeManager.GetSpecializedMethod(func.Type, ".ctor", 2);
+        processor.Emit(OpCodes.Newobj, funcCtr);
+    }
+
+    private bool IsVariableInAClosure(VariableSymbol variable) =>
+        variable is ScopedVariableSymbol sv &&
+        _funcClosure.TryGetValue(BodyState.Func, out var closureState)
+        && closureState.HasField(sv);
 }

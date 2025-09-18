@@ -62,6 +62,7 @@ public class FunctionSymbol : EntitySymbol
     //IImmutableSet<ScopedVariableSymbol>
     public IDictionary<ScopedVariableSymbol, LocalVariableSymbol> FreeVariables { get; } = new Dictionary<ScopedVariableSymbol, LocalVariableSymbol>();
 
+    public bool HasFreeVariables => FreeVariables.Count > 0;
     public override string ToString()
     {
         var sb = new StringBuilder();
