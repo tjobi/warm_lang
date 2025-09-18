@@ -33,17 +33,11 @@ var tokens = lexer.Lex();
 
 if(pArgs.LexerDebug)
 {
-    foreach(var token in tokens)
-    {
-        Console.WriteLine(token);
-    }
+    foreach(var token in tokens) Console.WriteLine(token);
     if(diagnostics.Any())
     {
         Console.WriteLine("--Lexer problems--");
-        foreach(var err in diagnostics)
-        {
-            Console.WriteLine(err);
-        }
+        DisplayErrorsAndWarnings();
     }
 }
 
@@ -55,11 +49,7 @@ if(pArgs.ParserDebug)
     if(diagnostics.Any())
     {
         Console.WriteLine("--Parser problems--");
-        foreach(var err in diagnostics)
-        {
-            Console.WriteLine(err);
-        }
-
+        DisplayErrorsAndWarnings();
     }
 }
 
@@ -75,31 +65,38 @@ if(ContainsErrors())
     return 1;
 }
 
-if(pArgs.Evaluate)
+if (pArgs.Evaluate)
 {
+    DisplayErrorsAndWarnings();
     var res = BoundInterpreter.Run(boundProgram);
     Console.WriteLine($"Evaluated '{program}' -> {res}");
     return 0;
 }
-
-File.WriteAllText(outfile, string.Empty);
-Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
-if(ContainsErrors())
+else
 {
+    File.WriteAllText(outfile, string.Empty);
+    Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
+    if(ContainsErrors())
+    {
+        DisplayErrorsAndWarnings();
+        Console.WriteLine("Exitting...");
+        return 1;
+    }
     DisplayErrorsAndWarnings();
-    Console.WriteLine("Exitting...");
-    return 1;
+    DefaultRuntimeConfig.Write(outfile);
+    Console.WriteLine($"Compiled '{program}' to '{outfile}'");
+    return 0;
 }
-DefaultRuntimeConfig.Write(outfile);
-
-DisplayErrorsAndWarnings();
-
-Console.WriteLine($"Compiled '{program}' to '{outfile}'");
-return 0;
 
 void DisplayErrorsAndWarnings()
 {
-    foreach(var err in diagnostics) Console.WriteLine(err);
+    foreach (var record in diagnostics)
+    {
+        if (record.IsError) Console.ForegroundColor = ConsoleColor.Red;
+        else Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(record);
+    }
+    Console.ResetColor();
 }
 
 bool ContainsErrors() => diagnostics.Any(reported => reported.IsError);

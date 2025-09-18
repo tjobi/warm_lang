@@ -208,4 +208,10 @@ internal static class BinderErrorWarnings
     {
         bag.Report("FEATURE MISSING - " + msg, true, location);
     }
+
+    internal static void ReportVariablesCapturedByClosureAreLocal(this ErrorWarrningBag bag, TextLocation location, string name)
+    {
+        var message = $"'{name}' is captured by a closure, if you want mutability consider using a reference type (object, list).";
+        bag.Report(message, false, location);
+    }
 }

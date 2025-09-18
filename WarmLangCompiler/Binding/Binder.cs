@@ -494,7 +494,7 @@ public sealed class Binder
 
     private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
     {
-        var boundAccess = BindAccess(assignment.Access);
+        var boundAccess = BindAccess(assignment.Access, expectWriteable: true);
         if (boundAccess is BoundExprAccess)
         {
             _diag.ReportInvalidLeftSideOfAssignment(assignment.Location);
@@ -592,7 +592,7 @@ public sealed class Binder
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 
-    private BoundAccess BindAccess(Access access, bool expectFunc = false)
+    private BoundAccess BindAccess(Access access, bool expectFunc = false, bool expectWriteable = false)
     {
         switch (access)
         {
@@ -614,6 +614,11 @@ public sealed class Binder
                                     fv[scoped] = local = new LocalVariableSymbol(scoped.Name, scoped.Type, currentFunction);
                                 }
                                 variable = local;
+
+                                if (expectWriteable)
+                                {
+                                    _diag.ReportVariablesCapturedByClosureAreLocal(na.Location, na.Name);
+                                }
                             }
                             return new BoundNameAccess(variable);
                         }
