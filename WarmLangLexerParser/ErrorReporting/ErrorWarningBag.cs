@@ -20,13 +20,15 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
 
     public void Report(string message, bool isError, int line, int col)
     {
-        _reported.Add(new ReportedErrorWarning(message, isError, line, col));   
+        _reported.Add(new ReportedErrorWarning(message, isError, line, col));
     }
 
     public void Report(string message, bool isError, TextLocation location)
     {
         Report(message, isError, location.StartLine, location.StartColumn);
     }
+
+    public bool AnyError() => _reported.Any(r => r.IsError);
 
     public void ReportInvalidCharacter(char c, int line, int col)
     {

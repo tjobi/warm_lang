@@ -57,7 +57,7 @@ var binder = new Binder(diagnostics);
 var boundProgram = binder.BindProgram(root);
 if(pArgs.BinderDebug) Console.WriteLine($"Bound: {boundProgram}");
 
-if(ContainsErrors())
+if(diagnostics.AnyError())
 {
     Console.WriteLine("--Compilation failed on: --");
     DisplayErrorsAndWarnings();
@@ -76,13 +76,12 @@ else
 {
     File.WriteAllText(outfile, string.Empty);
     Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
-    if(ContainsErrors())
+    DisplayErrorsAndWarnings();
+    if (diagnostics.AnyError())
     {
-        DisplayErrorsAndWarnings();
         Console.WriteLine("Exitting...");
         return 1;
     }
-    DisplayErrorsAndWarnings();
     DefaultRuntimeConfig.Write(outfile);
     Console.WriteLine($"Compiled '{program}' to '{outfile}'");
     return 0;
@@ -98,5 +97,3 @@ void DisplayErrorsAndWarnings()
     }
     Console.ResetColor();
 }
-
-bool ContainsErrors() => diagnostics.Any(reported => reported.IsError);

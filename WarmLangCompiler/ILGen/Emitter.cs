@@ -59,8 +59,6 @@ public sealed class Emitter
     public static void EmitProgram(string outfile, BoundProgram program, ErrorWarrningBag diag, bool debug = false)
     {
         var emitter = new Emitter(diag, program, debug);
-        if (emitter._diag.Any())
-            return;
         emitter.EmitProgram(outfile, program);
     }
 
@@ -203,7 +201,7 @@ public sealed class Emitter
 
     private void EmitProgram(string outfile, BoundProgram program)
     {
-        if (_diag.Any())
+        if (_diag.AnyError())
             return; //something went wrong in constructor
 
         foreach (var (type, _) in program.GetDeclaredTypes()) EmitTypeDeclaration(type);
@@ -486,16 +484,8 @@ public sealed class Emitter
 
     private void EmitLocalFunctionDeclaration(ILProcessor ilProcessor, LocalFunctionSymbol func)
     {
-        var funcName = $"_local_{_localFuncId++}_{func.Name}";
-        var attrs = func.FreeVariables.Count == 0
-                    ? MethodAttributes.Static | MethodAttributes.Assembly
-                    : MethodAttributes.Public | MethodAttributes.HideBySig;
-        var funcDefintion = new MethodDefinition(funcName, attrs, CilTypeOf(TypeSymbol.Void));
-        _ = SetupClosureState(func, funcDefintion, ilProcessor);  
-
-        _funcs[func] = funcDefintion;
-        //is done implicitly in the SetupCloseureState
-        //_program.Methods.Add(funcDefintion);
+        var funcName = $"<>_local_{_localFuncId++}_{func.Name}";
+        var (funcDefintion, _) = CreateLocalFunctionDefinition(ilProcessor, funcName, func);
 
         foreach (var typeParam in func.TypeParameters)
         {
@@ -566,17 +556,12 @@ public sealed class Emitter
 
     private void EmitLambdaExpression(ILProcessor processor, BoundLambdaExpression lambda)
     {
-        //TODO: Considerable rewrite when closure are implemented, cannot be STATIC then ...
-        //      We will probably have to build our own class WarmlangFunction that holds any free variables
-        //      and some invoke method
-        var funcName = $"__<>{lambda.Symbol.Name}";
         if (!_cilTypeManager.TryGetTypeInformation(lambda.Type, out var lamdaType) || lamdaType is not FunctionTypeInformation funcTypeInfo)
         {
             throw new Exception($"{nameof(EmitLambdaExpression)} - compiler bug, no function type information for lambda expression {lambda}");
         }
-        var funcDefintion = new MethodDefinition(funcName, MethodAttributes.Static | MethodAttributes.Assembly, CilTypeOf(TypeSymbol.Void));
-        _funcs[lambda.Symbol] = funcDefintion;
-        _program.Methods.Add(funcDefintion);
+        var funcName = $"__<>{lambda.Symbol.Name}";
+        var (funcDefintion, _) = CreateLocalFunctionDefinition(processor, funcName, lambda.Symbol);
 
         //TODO: no generics for lambdas (yet)
         // foreach(var typeParam in func.TypeParameters)
@@ -597,7 +582,7 @@ public sealed class Emitter
             throw new Exception($"{nameof(EmitLambdaExpression)} - compiler bug, lambda '{lambda}' has no body");
 
         EmitFunctionBody(lambda.Symbol, _boundProgram.Functions[lambda.Symbol]);
-        EmitStaticFuncAccess(processor, funcTypeInfo.Type, funcDefintion);
+        EmitFunctionAccess(processor, lambda.Symbol, funcTypeInfo.Type);
     }
 
     private void EmitTypeConvesionExpression(ILProcessor processor, BoundTypeConversionExpression conv)
@@ -1128,15 +1113,18 @@ public sealed class Emitter
                 EmitExpression(processor, ae.Expression);
                 break;
             case BoundFuncAccess f:
-                if (f.Func.HasFreeVariables)
-                    EmitFunctionClosure(processor, f.Func);
-                else
-                    EmitStaticFuncAccess(processor, f.Type, _funcs[f.Func]);
+                EmitFunctionAccess(processor, f.Func, f.Type);
                 break;
             default:
                 throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't know how to emit access for '{acc}'");
 
         }
+    }
+
+    private void EmitFunctionAccess(ILProcessor processor, FunctionSymbol f, TypeSymbol funcType)
+    {
+        if (f.HasFreeVariables) EmitFunctionClosure(processor, f);
+        else EmitStaticFuncAccess(processor, funcType, _funcs[f]);
     }
 
     private void EmitBuiltinTypeMember(ILProcessor processor, TypeSymbol type, MemberSymbol member)
@@ -1174,12 +1162,6 @@ public sealed class Emitter
         var loadClosure = processor.Create(OpCodes.Ldarg_0);
         var loadField = processor.Create(action, closureField);
         return (loadClosure, loadField);
-        // var varClosure = _funcClosure[scoped.BelongsTo!];
-        // if (!BodyState.TryGetAvailableClosureLoadInstruction(varClosure, processor, out var loadinstr))
-        //     throw new Exception($"{nameof(GetClosureVariableAccess)} couldn't find '{varClosure}' for '{BodyState.Func}'");
-
-        // var loadField = processor.Create(action, varClosure.GetFieldOrThrow(scoped));
-        // return (loadinstr, loadField);
     }
 
     //Setups up a closure type AND creates a local variable in the outer function!
@@ -1224,6 +1206,18 @@ public sealed class Emitter
         }
 
         return closure;
+    }
+
+    private (MethodDefinition, ClosureState?) CreateLocalFunctionDefinition(ILProcessor ilProcessor, string funcName, FunctionSymbol func)
+    {
+        var attrs = func.FreeVariables.Count == 0
+                    ? MethodAttributes.Static | MethodAttributes.Assembly
+                    : MethodAttributes.Public | MethodAttributes.HideBySig;
+        var funcDefintion = new MethodDefinition(funcName, attrs, CilTypeOf(TypeSymbol.Void));
+        var closure = SetupClosureState(func, funcDefintion, ilProcessor);
+        _funcs[func] = funcDefintion;
+        if (closure is null) _program.Methods.Add(funcDefintion);
+        return (funcDefintion, closure);
     }
 
     private void PrintFuncBody(FunctionSymbol func, ILProcessor ilProcessor)
