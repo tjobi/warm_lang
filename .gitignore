@@ -482,3 +482,4 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+*.runtimeconfig.json
