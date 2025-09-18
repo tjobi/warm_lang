@@ -309,28 +309,7 @@ public sealed class Binder
         _functionToBody[symbol] = boundBody;
         _typeScope.Pop();
 
-        //Create a copy - so we can remove from the original ... oof
-        var fvMap = symbol.FreeVariables.ToDictionary();
-
-        if (fvMap.Count > 0)
-        {
-            var missingLinkUpwards = fvMap.Keys.ToHashSet();
-            foreach (var func in _functionStack)
-            {
-                if (func.IsGlobal) continue;
-                foreach (var (v, l) in fvMap)
-                {
-                    if (v.BelongsTo != func && !func.FreeVariables.ContainsKey(v))
-                        func.FreeVariables[v] = new LocalVariableSymbol(l.Name, l.Type, func);
-
-                    if (missingLinkUpwards.Remove(v))
-                    {
-                        symbol.FreeVariables.Remove(v);
-                        symbol.FreeVariables[func.FreeVariables[v]] = l;
-                    }
-                }
-            }
-        }
+        PushFreeVariablesUpwards(symbol);
 
         return new BoundFunctionDeclaration(funcDecl, symbol);
     }
@@ -828,12 +807,12 @@ public sealed class Binder
         _ = _functionStack.Pop();
         _ = _scope.PopScope();
 
-        if (lambdaSymbol.FreeVariables.Count > 0)
-        {
-            _diag.ReportFeatureNotImplemented(expr.Location, "Lambda expressions do not allow closures");
-            // lambdaSymbol.FreeVariables.AddRange(closure);
-            return new BoundErrorExpression(expr);
-        }
+        PushFreeVariablesUpwards(lambdaSymbol);
+        // if (lambdaSymbol.FreeVariables.Count > 0)
+        // {
+        //     _diag.ReportFeatureNotImplemented(expr.Location, "Lambda expressions do not allow closures");
+        //     return new BoundErrorExpression(expr);
+        // }
 
         return new BoundLambdaExpression(expr, lambdaSymbol);
     }
@@ -893,8 +872,27 @@ public sealed class Binder
         return funcInfo;
     }
 
-    private void PushFreeVariablesUpwards(FunctionSymbol func)
+    private void PushFreeVariablesUpwards(FunctionSymbol target)
     {
-        
+        //Create a copy - so we can remove from the original ... oof
+        if (target.FreeVariables.Count == 0) return;
+
+        var fvMap = target.FreeVariables.ToDictionary();
+        var missingLinkUpwards = target.FreeVariables.Keys.ToHashSet();
+        foreach (var func in _functionStack)
+        {
+            if (func.IsGlobal) continue;
+            foreach (var (v, l) in fvMap)
+            {
+                if (v.BelongsTo != func && !func.FreeVariables.ContainsKey(v))
+                    func.FreeVariables[v] = new LocalVariableSymbol(l.Name, l.Type, func);
+
+                if (func.FreeVariables.TryGetValue(v, out var upperLocal) && missingLinkUpwards.Remove(v))
+                {
+                    target.FreeVariables.Remove(v);
+                    target.FreeVariables[upperLocal] = l;
+                }
+            }
+        }
     }
 }
