@@ -44,13 +44,7 @@ public sealed class SymbolEnvironment
         return false;
     }
 
-    public bool IsUnboundInCurrentAndGlobalScope(string name)
-    {
-        var curScope = _scopeStack[^1];
-        return !(curScope.ContainsKey(name) || GlobalScope.ContainsKey(name));
-    }
-
-    public bool IsUnboundInCurrentAndGlobalScope(Symbol symbol) => IsUnboundInCurrentAndGlobalScope(symbol.Name);
+    
 
     public bool TryDeclareVariable(VariableSymbol variable, bool allowShadowing = false) => TryDeclare(variable, allowShadowing);
 

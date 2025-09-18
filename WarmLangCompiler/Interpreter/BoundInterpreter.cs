@@ -5,7 +5,7 @@ using WarmLangCompiler.Interpreter.Values;
 using WarmLangCompiler.Interpreter.Exceptions;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser;
-using WarmLangLexerParser.AST;
+using System.Collections.Immutable;
 
 namespace WarmLangCompiler.Interpreter;
 
@@ -165,7 +165,7 @@ public sealed class BoundInterpreter
     private Value EvaluateCallExpression(BoundCallExpression call)
     {
         var targetValue = GetValueFromAccess(call.Target, call.Location);
-        if (targetValue is not FunctionValue funcValue) throw new NotImplementedException($"ADD SUPPORT FOR NAMED FUNCTIONS");
+        if (targetValue is not ClosureValue funcValue) throw new NotImplementedException($"ADD SUPPORT FOR NAMED FUNCTIONS");
 
         if (funcValue.Symbol.IsBuiltInFunction())
             return EvaluateCallBuiltinExpression(funcValue.Symbol, call.Arguments);
@@ -188,6 +188,15 @@ public sealed class BoundInterpreter
             var paramValue = EvaluateExpression(callArgs[i]);
             _variableEnvironment.Declare(paramName, paramValue);
         }
+
+        //Handle closure
+        if (funcValue.Closure is not null)
+        {
+            foreach (var (var, val) in funcValue.Closure)
+            {
+                _ = _variableEnvironment.Declare(var, val);
+            }
+        }
         Value res = EvaluateStatement(funcValue.Body);
         PopEnvironments();
         return res;
@@ -196,8 +205,7 @@ public sealed class BoundInterpreter
 
     private Value EvaluateLambdaExpression(BoundLambdaExpression lambda)
     {
-        _ = _variableEnvironment;
-        return new FunctionValue(lambda.Symbol, lambda.Body);
+        return GetFunctionValueFromSymbol(lambda.Symbol);
     }
 
     private Value EvaluateTypeConversionExpression(BoundTypeConversionExpression conv)
@@ -551,15 +559,25 @@ public sealed class BoundInterpreter
         return body;
     }
 
-    private FunctionValue GetFunctionValueFromSymbol(FunctionSymbol func)
+    private ClosureValue GetFunctionValueFromSymbol(FunctionSymbol func)
     {
-        if (func.IsBuiltInFunction()) return new FunctionValue(func, null!);
+        if (func.IsBuiltInFunction()) return new ClosureValue(func, null!, null);
         var body = func switch
         {
             FunctionSymbol sym when sym.IsMemberFunc => LookupMethod(sym, sym.OwnerType),
             _ => _functionEnvironment.Lookup(func)
                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{func}'")
         };
-        return new FunctionValue(func, body);
+        IDictionary<ScopedVariableSymbol, Value>? closure = null;
+        if (func.FreeVariables.Count > 0)
+        {
+            closure = new Dictionary<ScopedVariableSymbol, Value>();
+            foreach (var (free, local) in func.FreeVariables)
+            {
+                closure[local] = _variableEnvironment.Lookup(free);
+            }
+        }
+
+        return new ClosureValue(func, body, closure);
     }
 }

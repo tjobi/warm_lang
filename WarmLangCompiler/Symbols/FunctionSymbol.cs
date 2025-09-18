@@ -59,6 +59,9 @@ public class FunctionSymbol : EntitySymbol
     //Locals that are shared with any nested functions - could be parameters or local variables
     public ISet<ScopedVariableSymbol> SharedLocals { get; set; }
 
+    //IImmutableSet<ScopedVariableSymbol>
+    public IDictionary<ScopedVariableSymbol, LocalVariableSymbol> FreeVariables { get; } = new Dictionary<ScopedVariableSymbol, LocalVariableSymbol>();
+
     public override string ToString()
     {
         var sb = new StringBuilder();
@@ -86,6 +89,13 @@ public class FunctionSymbol : EntitySymbol
             new TextLocation(0, 0)
         );
 
+    //closureBelongsToThis: if true, the closure is a 1-1 match of the free variables of this function, otherwise whatever is referenced may or may not belong to this function
+    public void MergeFreeVariablesWith(IDictionary<ScopedVariableSymbol, LocalVariableSymbol> closure, bool closureBelongsToThis = false)
+    {
+        foreach (var (v, l) in closure)
+            if (!FreeVariables.ContainsKey(v) && (closureBelongsToThis || v.BelongsTo != this))
+                FreeVariables[v] = closureBelongsToThis ? l : new LocalVariableSymbol(l.Name, l.Type, this);
+    }
 }
 
 public static class FunctionSymbolFactory

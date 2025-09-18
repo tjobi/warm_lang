@@ -5,7 +5,6 @@ using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
-using System.Runtime.CompilerServices;
 
 var DEFAULT_PROGRAM = "SyntaxTest/test.wl";
 

@@ -30,16 +30,18 @@ public record class NullValue : Value
     private NullValue() { }
 }
 
-public sealed record FunctionValue : Value
+public sealed record ClosureValue : Value
 {
-    public FunctionValue(FunctionSymbol symbol, BoundBlockStatement body)
+    public ClosureValue(FunctionSymbol symbol, BoundBlockStatement body, IDictionary<ScopedVariableSymbol, Value>? closure)
     {
         Symbol = symbol;
         Body = body;
+        Closure = closure;
     }
 
     public FunctionSymbol Symbol { get; }
     public BoundBlockStatement Body { get; }
+    public IDictionary<ScopedVariableSymbol, Value>? Closure { get; }
 
     public override string StdWriteString()
     {

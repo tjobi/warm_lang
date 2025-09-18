@@ -596,7 +596,10 @@ public sealed class Emitter
             funcDefintion.Parameters.Add(paramDef);
         }
 
-        EmitFunctionBody(lambda.Symbol, lambda.Body);
+        if(_boundProgram.Functions[lambda.Symbol] is null)
+            throw new Exception($"{nameof(EmitLambdaExpression)} - compiler bug, lambda '{lambda}' has no body");
+        
+        EmitFunctionBody(lambda.Symbol, _boundProgram.Functions[lambda.Symbol]);
         EmitStaticFuncAccess(processor, funcTypeInfo.Type, funcDefintion);
     }
 

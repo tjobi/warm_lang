@@ -1,9 +1,7 @@
 namespace WarmLangCompiler.Symbols;
 
-public abstract class VariableSymbol : EntitySymbol
+public abstract class VariableSymbol(string name, TypeSymbol type) : EntitySymbol(name, type)
 {
-    public VariableSymbol(string name, TypeSymbol type) 
-    : base(name, type) { }
     public override string ToString() => $"{Type} {Name}";
 }
 

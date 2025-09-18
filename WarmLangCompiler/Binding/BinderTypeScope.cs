@@ -261,6 +261,7 @@ public sealed class BinderTypeScope
             TypeSyntaxList lst => GetOrCreateListType(AsTypeSymbol(lst.InnerType)),
             TypeSyntaxParameterType tv => new TypeSymbol(tv.Name),
             TypeSyntaxTypeApplication ta => GetOrCreateTypeSymbolFromApplication(ta),
+            BadTypeSyntax => TypeSymbol.Error,
             _ => throw new NotImplementedException($"{nameof(BinderTypeScope)}.{nameof(AsTypeSymbol)} doesn't know {typeSyntax}")
         };
     }

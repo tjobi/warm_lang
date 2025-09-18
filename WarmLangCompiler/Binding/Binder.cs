@@ -17,7 +17,6 @@ public sealed class Binder
     private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
     private readonly Stack<FunctionSymbol> _functionStack;
-    private readonly Stack<HashSet<ScopedVariableSymbol>> _closureStack;
 
     private readonly Dictionary<FunctionSymbol, BoundBlockStatement> _functionToBody;
 
@@ -28,9 +27,8 @@ public sealed class Binder
         _typeScope = new(_diag);
         _scope = new(_typeScope);
         _functionStack = new();
-        _unBoundBodyOf = new();
-        _closureStack = new();
-        _functionToBody = new();
+        _unBoundBodyOf = [];
+        _functionToBody = [];
 
         _scope.PushScope(); //Push scope to contain builtin stuff
         foreach (var func in BuiltInFunctions.GetBuiltInFunctions())
@@ -307,27 +305,29 @@ public sealed class Binder
             return new BoundErrorStatement(funcDecl);
         }
 
-        _closureStack.Push(new());
         var boundBody = BindFunctionBody(symbol, funcDecl.Body);
         _functionToBody[symbol] = boundBody;
         _typeScope.Pop();
-        if (symbol.Closure is null) symbol.Closure = _closureStack.Pop();
-        else symbol.Closure.UnionWith(_closureStack.Pop());
 
-        if (symbol.RequiresClosure)
+        //Create a copy - so we can remove from the original ... oof
+        var fvMap = symbol.FreeVariables.ToDictionary();
+
+        if (fvMap.Count > 0)
         {
+            var missingLinkUpwards = fvMap.Keys.ToHashSet();
             foreach (var func in _functionStack)
             {
-                foreach (var variable in symbol.Closure)
+                if (func.IsGlobal) continue;
+                foreach (var (v, l) in fvMap)
                 {
-                    if (func is not LocalFunctionSymbol && func == variable.BelongsTo) func.SharedLocals.Add(variable);
-                    else if (func is LocalFunctionSymbol local)
-                    {
-                        local.Closure ??= new();
-                        if (variable.BelongsTo == local) local.SharedLocals.Add(variable);
-                        else local.Closure.Add(variable);
-                    }
+                    if (v.BelongsTo != func && !func.FreeVariables.ContainsKey(v))
+                        func.FreeVariables[v] = new LocalVariableSymbol(l.Name, l.Type, func);
 
+                    if (missingLinkUpwards.Remove(v))
+                    {
+                        symbol.FreeVariables.Remove(v);
+                        symbol.FreeVariables[func.FreeVariables[v]] = l;
+                    }
                 }
             }
         }
@@ -506,7 +506,7 @@ public sealed class Binder
         }
 
         var concreteParameters = instantiatedParameters.MoveToImmutable();
-        var (specializedFunctionType,_) = _typeScope.CreateFunctionType(concreteParameters, concreteReturn, isMemberFunc: func.IsMemberFunc);
+        var (specializedFunctionType, _) = _typeScope.CreateFunctionType(concreteParameters, concreteReturn, isMemberFunc: func.IsMemberFunc);
         var specailized = new SpecializedFunctionSymbol(func, instantiatedTypeParameters,
                                                         concreteParameters, specializedFunctionType,
                                                         concreteReturn, location);
@@ -609,10 +609,7 @@ public sealed class Binder
     private BoundExpression BindAccessExpression(AccessExpression ae)
     {
         var boundAccess = BindAccess(ae.Access);
-        if (boundAccess is BoundInvalidAccess)
-        {
-            return new BoundErrorExpression(ae);
-        }
+        if (boundAccess is BoundInvalidAccess) return new BoundErrorExpression(ae);
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 
@@ -622,20 +619,25 @@ public sealed class Binder
         {
             case NameAccess na:
                 {
-                    if (_scope.TryLookup(na.Name, out var symbol) && symbol is not null)
+                    if (_scope.TryLookup(na.Name, out var symbol))
                     {
+                        if (symbol is FunctionSymbol func) return new BoundFuncAccess(func);
                         if (symbol is VariableSymbol variable)
                         {
-                            //Are we inside of a local function? Then remember any variables that aren't bound in scope or a parameter
-                            if (_closureStack.TryPeek(out var closure)
-                                && variable is ScopedVariableSymbol scopedVar
-                                && scopedVar.BelongsToOrThrow != _functionStack.Peek())
+                            //Have we reached a free variable?
+                            var currentFunction = _functionStack.Peek();
+                            if (variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
                             {
-                                closure.Add(scopedVar);
+                                var fv = currentFunction.FreeVariables;
+                                //Create a new mapping for this free variable
+                                if (!fv.TryGetValue(scoped, out var local))
+                                {
+                                    fv[scoped] = local = new LocalVariableSymbol(scoped.Name, scoped.Type, currentFunction);
+                                }
+                                variable = local;
                             }
                             return new BoundNameAccess(variable);
                         }
-                        if (symbol is FunctionSymbol func) return new BoundFuncAccess(func);
                     }
                     if (_typeScope.TryGetType(na.Name, out var type))
                         return new BoundTypeAccess(type);
@@ -812,7 +814,6 @@ public sealed class Binder
 
         _functionStack.Push(lambdaSymbol);
         _scope.PushScope();
-        _closureStack.Push(new());
         {
             foreach (var @param in parameters) _scope.TryDeclareVariable(@param, allowShadowing: true);
             var boundExpr = BindTypeConversion(BindExpression(expr.Body), returnType);
@@ -820,20 +821,21 @@ public sealed class Binder
             var synthReturn = new BoundReturnStatement(synthStatement, boundExpr);
             var synthBody = new BoundBlockStatement(
                 synthStatement,
-                ImmutableArray.Create<BoundStatement>(synthReturn)
+                [synthReturn]
             );
             _functionToBody[lambdaSymbol] = synthBody;
         }
         _ = _functionStack.Pop();
         _ = _scope.PopScope();
-        var closure = _closureStack.Pop();
-        if (closure.Count > 0)
+
+        if (lambdaSymbol.FreeVariables.Count > 0)
         {
             _diag.ReportFeatureNotImplemented(expr.Location, "Lambda expressions do not allow closures");
+            // lambdaSymbol.FreeVariables.AddRange(closure);
             return new BoundErrorExpression(expr);
         }
 
-        return new BoundLambdaExpression(expr, lambdaSymbol, _functionToBody[lambdaSymbol]);
+        return new BoundLambdaExpression(expr, lambdaSymbol);
     }
 
     private static BoundExpression BindNullExpression(NullExpression @null)
@@ -885,11 +887,14 @@ public sealed class Binder
         {
             BoundFuncAccess acc => acc.Func,
             BoundMemberAccess { Member: MemberFuncSymbol acc } => acc.Function,
-            BoundExprAccess { Expression: BoundTypeApplication app } => app.Specialized, 
+            BoundExprAccess { Expression: BoundTypeApplication app } => app.Specialized,
             _ => null
         };
         return funcInfo;
     }
-    
 
+    private void PushFreeVariablesUpwards(FunctionSymbol func)
+    {
+        
+    }
 }

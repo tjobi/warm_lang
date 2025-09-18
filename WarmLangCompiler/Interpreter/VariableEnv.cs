@@ -11,7 +11,7 @@ public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
     private Dictionary<VariableSymbol, Value> _globalScope => env[0];
     public VariableEnv()
     {
-        env = new List<Dictionary<VariableSymbol, Value>>() { new() };
+        env = [[]];
     }
 
     public (Value, IEnv<VariableSymbol, Value>) Declare(VariableSymbol name, Value value)
@@ -47,8 +47,8 @@ public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
 
     public Value Lookup(VariableSymbol name)
     {
-        if(name is GlobalVariableSymbol && _globalScope.ContainsKey(name))
-            return _globalScope[name];
+        if(name is GlobalVariableSymbol && _globalScope.TryGetValue(name, out var value))
+            return value;
         else 
         {
             for (int i = env.Count - 1; i >= 0 ; i--)
@@ -89,6 +89,8 @@ public sealed class VariableEnv : IAssignableEnv<VariableSymbol,Value>
             }
             foreach(var variable in layer.Keys)
             {
+                if (variable is ScopedVariableSymbol s)
+                    sb.Append($"('{s.BelongsTo?.Name})");
                 sb.Append($"{variable}-({layer[variable]}),");
             }
             sb.Append('\n');
