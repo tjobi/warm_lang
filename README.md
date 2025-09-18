@@ -3,13 +3,6 @@ The idea is to develop a compiled programming language. The compile target shoul
 
 ## How to run
 
-Use the following command (or your favourite IDE play button)
-```console
-dotnet run --project WarmLangCompiler
-```
-
-Or you can provide a target by arguement:
-
 ```console
 dotnet run --project WarmLangCompiler <program>
 ```
@@ -18,24 +11,23 @@ You can get command line help by using the `-lh` or `--lang-help` flag(s).
 
 ## Running the compiled DLL
 
-The compiler will output a DLL. The DLL must be run using dotnet
+The compiler will output a DLL and a `runtimeconfig.json` file both of which must be present to run the program. The DLL compiled program can be run using:
 
 ```
 dotnet {pathToDll}
 ```
 
-and will require a `runtimeconfig.json` in the same directory. 
-The file needs be named as `{nameOfDllWithoutFileExtension}.runtimeconfig.json`. Meaning for a compiled DLL called `out.dll`, you will need a config file called `out.runtimeconfig.json`.
+The runtime configuration file must be named `{nameOfDllWithoutFileExtension}.runtimeconfig.json`.
 
-Here is a the most basic (and currently complete) runtimeconfig that can be copy pasted (NOTE, it requires dotnet 7.0): 
+Here is a the most basic (and currently complete) runtimeconfig that can be copy pasted (NOTE, it uses dotnet 9): 
 
 ```json
 {
     "runtimeOptions": {
-      "tfm": "net7.0",
+      "tfm": "net9.0",
       "framework": {
         "name": "Microsoft.NETCore.App",
-        "version": "7.0.0"
+        "version": "9.0.0"
       }
     }
   }
