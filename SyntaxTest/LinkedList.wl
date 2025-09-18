@@ -19,7 +19,8 @@ function main() {
     stdWriteLine(someInts.toString());
     someInts.reverse();
     stdWriteLine(someInts.toString());
-    stdWriteLine(someInts.filter((i) => i >= 2).toString());
+    var target = 2;
+    stdWriteLine(someInts.filter((i) => i >= target).toString());
 }
 
 function createLinkedList<T>() LinkedList<T> {

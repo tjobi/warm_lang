@@ -1039,7 +1039,8 @@ public sealed class Emitter
         switch (variable)
         {
             case ParameterSymbol ps:
-                processor.Emit(OpCodes.Starg, ps.Placement);
+                var placement = BodyState.Func.HasFreeVariables ? ps.Placement + 1 : ps.Placement;
+                processor.Emit(OpCodes.Starg, placement);
                 return;
             case GlobalVariableSymbol gs:
                 processor.Emit(OpCodes.Stsfld, _globals[gs]);
@@ -1067,7 +1068,8 @@ public sealed class Emitter
                 switch (nameSymbol)
                 {
                     case ParameterSymbol ps:
-                        processor.Emit(OpCodes.Ldarg, ps.Placement);
+                        var placement = BodyState.Func.HasFreeVariables ? ps.Placement + 1 : ps.Placement;
+                        processor.Emit(OpCodes.Ldarg, placement);
                         return;
                     case GlobalVariableSymbol gs:
                         var variable = _globals[gs];
@@ -1155,10 +1157,11 @@ public sealed class Emitter
 
     private (Instruction LoadClosureInstr, Instruction fieldInstr) GetClosureVariableAccess(ILProcessor processor, ScopedVariableSymbol scoped, OpCode action)
     {
-        var closure = _funcClosure[BodyState.Func];
+        var func = BodyState.Func;
+        var closure = _funcClosure[func];
         if (!closure.TryGetField(scoped, out var closureField))
             throw new Exception($"{nameof(GetClosureVariableAccess)} - compiler bug - couldn't find a closure for '{BodyState.Func}'");
-            //Always arg0 because closures are instance methods 
+        //Always arg0 because closures are instance methods 
         var loadClosure = processor.Create(OpCodes.Ldarg_0);
         var loadField = processor.Create(action, closureField);
         return (loadClosure, loadField);
