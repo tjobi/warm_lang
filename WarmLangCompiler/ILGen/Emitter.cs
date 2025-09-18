@@ -1035,21 +1035,8 @@ public sealed class Emitter
             processor.Append(stfld);
             return;
         }
-
-        switch (variable)
-        {
-            case ParameterSymbol ps:
-                var placement = BodyState.Func.HasFreeVariables ? ps.Placement + 1 : ps.Placement;
-                processor.Emit(OpCodes.Starg, placement);
-                return;
-            case GlobalVariableSymbol gs:
-                processor.Emit(OpCodes.Stsfld, _globals[gs]);
-                return;
-            case LocalVariableSymbol ls:
-                var variableDef = BodyState.Locals[variable];
-                processor.Emit(OpCodes.Stloc, variableDef);
-                return;
-        }
+        var instr = GetInstructionForDirectVariableAccess(processor, variable, load: false);
+        processor.Append(instr);
     }
 
     private void EmitLoadAccess(ILProcessor processor, BoundAccess acc)
@@ -1065,22 +1052,9 @@ public sealed class Emitter
                     processor.Append(fieldLoad);
                     return;
                 }
-                switch (nameSymbol)
-                {
-                    case ParameterSymbol ps:
-                        var placement = BodyState.Func.HasFreeVariables ? ps.Placement + 1 : ps.Placement;
-                        processor.Emit(OpCodes.Ldarg, placement);
-                        return;
-                    case GlobalVariableSymbol gs:
-                        var variable = _globals[gs];
-                        processor.Emit(OpCodes.Ldsfld, variable);
-                        return;
-                    case LocalVariableSymbol ls when BodyState.Locals.TryGetValue(nameSymbol, out var local):
-                        processor.Emit(OpCodes.Ldloc, local);
-                        return;
-                    default:
-                        throw new Exception($"{nameof(Emitter)}.{nameof(EmitLoadAccess)} couldn't find '{nameSymbol.Name}'");
-                }
+                var instr = GetInstructionForDirectVariableAccess(processor, nameSymbol, load: true);
+                processor.Append(instr);
+                return;
             case BoundMemberAccess mba:
                 var access = mba.Target;
                 EmitLoadAccess(processor, access);
@@ -1120,6 +1094,26 @@ public sealed class Emitter
             default:
                 throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't know how to emit access for '{acc}'");
 
+        }
+    }
+
+    private Instruction GetInstructionForDirectVariableAccess(ILProcessor processor, VariableSymbol variable, bool load)
+    {
+        OpCode opcode;
+        switch (variable)
+        {
+            case ParameterSymbol ps:
+                var placement = BodyState.Func.HasFreeVariables ? ps.Placement + 1 : ps.Placement;
+                opcode = load ? OpCodes.Ldarg : OpCodes.Starg;
+                return processor.Create(opcode, placement);
+            case GlobalVariableSymbol gs when _globals.TryGetValue(gs, out var local):
+                opcode = load ? OpCodes.Ldsfld : OpCodes.Stsfld;
+                return processor.Create(opcode, local);
+            case LocalVariableSymbol ls when BodyState.Locals.TryGetValue(variable, out var local):
+                opcode = load ? OpCodes.Ldloc : OpCodes.Stloc;
+                return processor.Create(opcode, local);
+            default:
+                throw new Exception($"{nameof(Emitter)}.{nameof(GetInstructionForDirectVariableAccess)} couldn't find '{variable.Name}'");
         }
     }
 
@@ -1263,7 +1257,8 @@ public sealed class Emitter
         foreach (var (sv, local) in func.FreeVariables)
         {
             processor.Emit(OpCodes.Dup);
-            processor.Emit(OpCodes.Ldloc, BodyState.Locals[sv]); //Is this really it?
+            var ld = GetInstructionForDirectVariableAccess(processor, sv, load: true);
+            processor.Append(ld); 
             processor.Emit(OpCodes.Stfld, closure.GetFieldOrThrow(local));
         }
         processor.Emit(OpCodes.Ldftn, closure.FuncDef);
