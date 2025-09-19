@@ -13,6 +13,7 @@ public sealed class CilTypeManager
     private record CachedSignature(TypeSymbol Type, string Name, int Arity);
     private readonly Dictionary<CachedSignature, MethodReference> methodCache;
     private readonly Dictionary<int, TypeReference> funcTypeCache;
+    private readonly Dictionary<int, TypeReference> actionTypecache;
     private readonly AssemblyDefinition assemblyDef;
     private readonly IReadOnlyDictionary<TypeSymbol, TypeInformation> infoOf;
     private readonly ErrorWarrningBag _diag;
@@ -27,7 +28,8 @@ public sealed class CilTypeManager
         toCILType = new();
         methodCache = new();
         ListHelper = new(this);
-        funcTypeCache = new();
+        funcTypeCache = [];
+        actionTypecache = [];
         assemblyDef = programAssembly;
         this.infoOf = infoOf;
         _diag = diag;
@@ -62,28 +64,8 @@ public sealed class CilTypeManager
                 return toCILType[EmitterTypeSymbolHelpers.CILBaseTypeSymbol];
 
             case FunctionTypeInformation f:
-                /*TODO: first-order functions ?
-                    function id<T>(T t) T { return t; }
-                    var f = id;
-                    f<int>(2);... 
-                */
-                var paramCount = ParameterCount(f);
-                if (!funcTypeCache.TryGetValue(paramCount, out var baseFuncType))
-                {
-                    var funcTypeString = paramCount == 0
-                                         ? "System.Action"
-                                         : ("System.Func`" + (f.Parameters.Count + 1));
-                    baseFuncType = mscorlib.Modules
-                                        .FirstOrDefault(m => m.GetType(funcTypeString) is not null)?
-                                        .GetType(funcTypeString);
-                    if (baseFuncType is null)
-                        throw new NotImplementedException("Compiler bug - couldn't retrieve Func/Action type from mscorlib");
-                    funcTypeCache[paramCount] = baseFuncType = assemblyDef.MainModule.ImportReference(baseFuncType);
-                }
-                if (paramCount == 0) return toCILType[type] = baseFuncType;
-
-                var genericArgs = f.Parameters.Append(f.ReturnType).Select(GetType);
-                return toCILType[type] = baseFuncType.MakeGenericInstanceType(genericArgs.ToArray());
+                var baseFuncType = GetCilFuncType(type, f); ;
+                return toCILType[type] = baseFuncType;
         }
     }
 
@@ -104,7 +86,7 @@ public sealed class CilTypeManager
         TypeReference baseType = infoOf[type] switch
         {
             GenericTypeInformation gt => toCILType[gt.SpecializedFrom],
-            FunctionTypeInformation f => funcTypeCache[ParameterCount(f)],
+            FunctionTypeInformation f => GetCilFuncType(type, f),
             _ => toCILType[type]
         };
 
@@ -151,12 +133,48 @@ public sealed class CilTypeManager
     {
         return infoOf.TryGetValue(type, out result);
     }
-    
-    private int ParameterCount(FunctionTypeInformation func)
+
+    private TypeReference GetCilFuncType(TypeSymbol type, FunctionTypeInformation func)
     {
-        var retInfo = infoOf[func.ReturnType];
-        return func.Parameters.Count == 0 && retInfo.Type == TypeSymbol.Void
-               ? 0 : (func.Parameters.Count + 1);
+        IEnumerable<TypeSymbol>? genericArgs = null;
+        TypeReference? res;
+        if (func.ReturnType == TypeSymbol.Void)
+        {
+            var isGeneric = func.Parameters.Count > 0;
+            if (isGeneric) genericArgs = func.Parameters;
+            if (!actionTypecache.TryGetValue(func.Parameters.Count, out res))
+            {
+                var actionTypeString = isGeneric
+                                       ? ("System.Action`" + func.Parameters.Count)
+                                       : "System.Action";
+                var baseActionType = mscorlib.Modules
+                                            .FirstOrDefault(m => m.GetType(actionTypeString) is not null)?
+                                            .GetType(actionTypeString);
+
+                if (baseActionType is null)
+                    throw new NotImplementedException($"Compiler bug - couldn't retrieve {actionTypeString} type from mscorlib");
+                res = actionTypecache[func.Parameters.Count] = assemblyDef.MainModule.ImportReference(baseActionType);
+            }
+        }
+        else
+        {
+            genericArgs = func.Parameters.Append(func.ReturnType);
+            if (!funcTypeCache.TryGetValue(func.Parameters.Count, out res))
+            {
+                var funcTypeString = "System.Func`" + (func.Parameters.Count + 1);
+                var baseFuncType = mscorlib.Modules
+                                            .FirstOrDefault(m => m.GetType(funcTypeString) is not null)?
+                                            .GetType(funcTypeString);
+                if (baseFuncType is null)
+                    throw new NotImplementedException($"Compiler bug - couldn't retrieve {funcTypeString} type from mscorlib");
+                res = funcTypeCache[func.Parameters.Count] = assemblyDef.MainModule.ImportReference(baseFuncType);
+            }
+        }
+        if(genericArgs is not null)
+        {
+            res = res.MakeGenericInstanceType(genericArgs.Select(GetType).ToArray());
+        }
+        return res;
     }
 }
 public class ListMethodHelper
