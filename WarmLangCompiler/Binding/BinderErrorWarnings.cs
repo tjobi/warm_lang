@@ -214,4 +214,9 @@ internal static class BinderErrorWarnings
         var message = $"'{name}' is captured by a closure, if you want mutability consider using a reference type (object, list).";
         bag.Report(message, false, location);
     }
+    internal static void ReportTooManyParametersInLocal(this ErrorWarrningBag bag, FunctionSymbol symbol, TextLocation location, int maxLocalParameters)
+    {
+        var message = $"Local function '{symbol.Name}' has more than {maxLocalParameters} parameters, consider using an object";
+        bag.Report(message, true, location);
+    }
 }

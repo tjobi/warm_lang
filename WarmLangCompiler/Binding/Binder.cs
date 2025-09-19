@@ -12,13 +12,16 @@ public sealed class Binder
 {
     private readonly ErrorWarrningBag _diag;
     private readonly SymbolEnvironment _scope;
-    // private readonly BinderTypeHelper _typeHelper;
     private readonly BinderTypeScope _typeScope;
     private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
     private readonly Stack<FunctionSymbol> _functionStack;
 
     private readonly Dictionary<FunctionSymbol, BoundBlockStatement> _functionToBody;
+
+    //TODO: limitation comes from the System.Func delegate definitions in mscorlib, 
+    //      apperently it can do at most 9 generic parameters (8 parameters + 1 return type)
+    private const int MAX_LOCAL_PARAMETERS = 8;
 
     public Binder(ErrorWarrningBag bag)
     {
@@ -310,6 +313,12 @@ public sealed class Binder
         _typeScope.Pop();
 
         PushFreeVariablesUpwards(symbol);
+
+        //TODO: can we get around this?
+        if (symbol.Parameters.Length > MAX_LOCAL_PARAMETERS)
+        {
+            _diag.ReportTooManyParametersInLocal(symbol, funcDecl.Location, MAX_LOCAL_PARAMETERS);
+        }
 
         return new BoundFunctionDeclaration(funcDecl, symbol);
     }
@@ -813,11 +822,12 @@ public sealed class Binder
         _ = _scope.PopScope();
 
         PushFreeVariablesUpwards(lambdaSymbol);
-        // if (lambdaSymbol.FreeVariables.Count > 0)
-        // {
-        //     _diag.ReportFeatureNotImplemented(expr.Location, "Lambda expressions do not allow closures");
-        //     return new BoundErrorExpression(expr);
-        // }
+
+        //TODO: can we get around this?
+        if (lambdaSymbol.Parameters.Length > MAX_LOCAL_PARAMETERS)
+        {
+            _diag.ReportTooManyParametersInLocal(lambdaSymbol, expr.Location, MAX_LOCAL_PARAMETERS);
+        }
 
         return new BoundLambdaExpression(expr, lambdaSymbol);
     }
