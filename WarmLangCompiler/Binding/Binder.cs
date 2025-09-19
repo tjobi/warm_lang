@@ -339,7 +339,7 @@ public sealed class Binder
         {   /* scope of function body */
             foreach (var @param in function.Parameters)
             {
-                _scope.TryDeclareVariable(@param);
+                _scope.TryDeclareVariable(@param, allowShadowing: true);
             }
             boundBody = BindBlockStatement(body, pushScope: false);
             boundBody = Lowerer.LowerBody(function, boundBody);
