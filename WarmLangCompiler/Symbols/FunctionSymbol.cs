@@ -89,21 +89,19 @@ public class FunctionSymbol : EntitySymbol
     }
 }
 
-//public sealed class 
-
 public static class FunctionFactory
 {
+    private static int lambdaID = 0;
+    private static readonly TextLocation BUILT_IN_LOCATION = new(0, 0);
+
     public static FunctionSymbol CreateMain(string name = "wl_main")
      => new(
-            name,
-            ImmutableArray<TypeSymbol>.Empty,
-            ImmutableArray<ParameterSymbol>.Empty,
+            name, [], [],
             TypeSymbol.Void, //TODO: fix function type
             TypeSymbol.Void,
-            new TextLocation(0, 0)
+            BUILT_IN_LOCATION
         );
 
-    private static int lambdaID = 0;
     public static FunctionSymbol CreateLambda(TextLocation location, ImmutableArray<ParameterSymbol> parameters, TypeSymbol funcType, TypeSymbol returnType)
     {
         return new FunctionSymbol(
@@ -123,4 +121,6 @@ public static class FunctionFactory
         ImmutableArray<ParameterSymbol> parameters,
         TypeSymbol funcType, TypeSymbol returnType)
     => new(nameToken, typeParameters, parameters, funcType, returnType, isGlobal: false);
+    public static FunctionSymbol CreateBuiltinFunction(string name, TypeSymbol returnType, params Span<ParameterSymbol> parameters)
+    => new(name, [], parameters.ToImmutableArray(), new TypeSymbol("BUILTIN:" + name), returnType, BUILT_IN_LOCATION);
 }

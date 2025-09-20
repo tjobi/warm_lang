@@ -1,25 +1,15 @@
 namespace WarmLangCompiler.Symbols;
 
-using System.Collections.Immutable;
-using System.Text;
-using WarmLangLexerParser;
-
+using static WarmLangCompiler.Symbols.FunctionFactory;
 public static class BuiltInFunctions
 {
-    private static readonly TextLocation BUILT_IN_LOCATION = new(0, 0);
-    private static FunctionSymbol MakeFunction(string name, TypeSymbol returnType, ImmutableArray<ParameterSymbol> parameters)
-    {
-        var funcType = new TypeSymbol("BUILTIN:" + name);
-        return new(name, ImmutableArray<TypeSymbol>.Empty, parameters, funcType, returnType, BUILT_IN_LOCATION);
-    } 
+    public static readonly FunctionSymbol StdWrite = CreateBuiltinFunction("stdWrite", TypeSymbol.Void, new ParameterSymbol("toPrint", TypeSymbol.String, 0));
+    public static readonly FunctionSymbol StdWriteC = CreateBuiltinFunction("stdWritec", TypeSymbol.Void, new ParameterSymbol("toPrint", TypeSymbol.Int, 0));
+    public static readonly FunctionSymbol StdWriteLine = CreateBuiltinFunction("stdWriteLine", TypeSymbol.Void, new ParameterSymbol("toPrint", TypeSymbol.String, 0));
+    public static readonly FunctionSymbol StdRead = CreateBuiltinFunction("stdRead", TypeSymbol.String);
+    public static readonly FunctionSymbol StdClear = CreateBuiltinFunction("stdClear", TypeSymbol.Void);
 
-    public static readonly FunctionSymbol StdWrite = MakeFunction("stdWrite", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.String, 0)));
-    public static readonly FunctionSymbol StdWriteC = MakeFunction("stdWritec", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.Int, 0)));
-    public static readonly FunctionSymbol StdWriteLine = MakeFunction("stdWriteLine", TypeSymbol.Void, ImmutableArray.Create(new ParameterSymbol("toPrint", TypeSymbol.String, 0)));
-    public static readonly FunctionSymbol StdRead = MakeFunction("stdRead", TypeSymbol.String, ImmutableArray<ParameterSymbol>.Empty);
-    public static readonly FunctionSymbol StdClear = MakeFunction("stdClear", TypeSymbol.Void, ImmutableArray<ParameterSymbol>.Empty);
-
-    public static readonly FunctionSymbol StrLen = MakeFunction("strLen", TypeSymbol.Int, ImmutableArray.Create(new ParameterSymbol("s", TypeSymbol.String, 0)));
+    public static readonly FunctionSymbol StrLen = CreateBuiltinFunction("strLen", TypeSymbol.Int, new ParameterSymbol("s", TypeSymbol.String, 0));
 
     public static IEnumerable<FunctionSymbol> GetBuiltInFunctions()
     {
@@ -36,5 +26,5 @@ public static class BuiltInFunctions
             if (func == function)
                 return true;
         return false;
-    } 
+    }
 }
