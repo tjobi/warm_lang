@@ -505,7 +505,10 @@ public sealed class Emitter
     private void EmitExprStatement(ILProcessor processor, BoundExprStatement stmnt)
     {
         EmitExpression(processor, stmnt.Expression);
-        if (stmnt.Expression.Type != TypeSymbol.Void)
+        if (!_cilTypeManager.TryGetTypeInformation(stmnt.Expression.Type, out var exprTypeInfo))
+            throw new Exception($"{nameof(Emitter)} - compiler bug, no type information for '{stmnt.Expression.Type}'");
+        
+        if (exprTypeInfo.Type != TypeSymbol.Void)
             processor.Emit(OpCodes.Pop);
     }
 

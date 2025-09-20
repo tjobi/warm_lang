@@ -32,3 +32,18 @@ public sealed class LambdaExpression : ExpressionNode
         return sb.ToString();
     }
 }
+
+
+public class C
+{
+    public void M()
+    {
+        var s = "hello";
+        var f = s.ExCount;
+    }
+}
+
+public static class Extensions
+{
+    public static int ExCount(this String s,int i) => s.Length + i;
+}

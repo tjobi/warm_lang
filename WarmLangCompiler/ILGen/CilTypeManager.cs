@@ -138,7 +138,8 @@ public sealed class CilTypeManager
     {
         IEnumerable<TypeSymbol>? genericArgs = null;
         TypeReference? res;
-        if (func.ReturnType == TypeSymbol.Void)
+        var returnInfo = infoOf[func.ReturnType];
+        if (returnInfo.Type == TypeSymbol.Void)
         {
             var isGeneric = func.Parameters.Count > 0;
             if (isGeneric) genericArgs = func.Parameters;
