@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using WarmLangCompiler.Symbols;
 using WarmLangLexerParser;
 

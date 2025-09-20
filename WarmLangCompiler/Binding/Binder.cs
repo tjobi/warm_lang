@@ -78,7 +78,7 @@ public sealed class Binder
             if (main is not null)
                 _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
 
-            scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
+            scriptMain = FunctionFactory.CreateMain("__wl_script_main");
             var scriptMainBody = Lowerer.LowerBody(scriptMain, bound);
             _functionToBody[scriptMain] = scriptMainBody;
         }
@@ -299,7 +299,7 @@ public sealed class Binder
 
         var (functionType, _) = _typeScope.CreateFunctionType(parameters, returnType, typeParameters);
 
-        var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, functionType, returnType);
+        var symbol = FunctionFactory.CreateLocalFunction(nameToken, typeParameters, parameters, functionType, returnType);
 
         if (!_scope.TryDeclareFunction(symbol))
         {
@@ -561,7 +561,7 @@ public sealed class Binder
         }
 
         var arguments = ImmutableArray.CreateBuilder<BoundExpression>(argsSize);
-        if (funcTypeInfo.IsMemberFunc)
+        if (funcTypeInfo.IsMemberFunc && accessToCall is not BoundFuncAccess)
         {
             BoundMemberAccess? bma = accessToCall switch
             {
@@ -579,8 +579,7 @@ public sealed class Binder
                 _diag.ReportFeatureNotImplemented(ce.Location, "Cannot use methods indirectly");
                 return new BoundErrorExpression(ce);
             }
-
-            if (bma.Target is not BoundTypeAccess && bma.Member is MemberFuncSymbol)
+            if (bma is { Target: not BoundTypeAccess, Member: MemberFuncSymbol} )
             {
                 arguments.Add(new BoundAccessExpression(ce, bma.Target));
             }
@@ -654,9 +653,12 @@ public sealed class Binder
                         _diag.ReportCouldNotFindMemberForType(ma.Location, boundTarget.Type, ma.MemberToken.Name);
                         return new BoundInvalidAccess();
                     }
-                    if (boundMember is MemberFuncSymbol && !expectFunc)
+                    if (boundMember is MemberFuncSymbol fs && !expectFunc)
                     {
-                        //TODO: we are not in a call context, so we cannot do this before proper closures!
+                        // if (!_typeScope.TryGetTypeInformation(fs.Type, out var funcInfo))
+                        //     throw new Exception($"Compiler bug - function member '{fs}' has no type information");
+                        // return new BoundFuncAccess(((MemberFuncSymbol)boundMember).Function);
+                        // TODO: we are not in a call context, so we cannot do this before proper closures!
                         _diag.ReportFeatureNotImplemented(access.Location, "Cannot reference methods (yet), since we do not include the target in a closure");
                         return new BoundInvalidAccess();
                     }
@@ -803,7 +805,7 @@ public sealed class Binder
         var parameters = _typeScope.CreateParameterSymbols(expr.Parameters!, treatNullAsPlaceholder: true);
         var returnType = _typeScope.CreatePlacerHolderType();
         var (lambdaType, _) = _typeScope.CreateFunctionType(parameters, returnType);
-        var lambdaSymbol = FunctionSymbolFactory.CreateLambda(expr.Location, parameters, lambdaType, returnType);
+        var lambdaSymbol = FunctionFactory.CreateLambda(expr.Location, parameters, lambdaType, returnType);
 
         _functionStack.Push(lambdaSymbol);
         _scope.PushScope();
@@ -872,7 +874,10 @@ public sealed class Binder
         symbol = null;
         accessSymbol = BindAccess(access, expectFunc: true);
         if (accessSymbol is BoundInvalidAccess) return null;
-        if (_typeScope.GetTypeInformation(accessSymbol.Type) is not FunctionTypeInformation funcInfo)
+        var typeInfo = _typeScope.GetTypeInformation(accessSymbol.Type);
+        if (typeInfo is null || typeInfo.Type == TypeSymbol.Error) return null;
+
+        if (typeInfo is not FunctionTypeInformation funcInfo)
         {
             _diag.ReportExpectedFunctionName(access.Location);
             return null;

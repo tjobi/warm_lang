@@ -28,7 +28,7 @@ public class BinderTests
     {
         var globals = statements.Where(s => s is BoundVarDeclaration).Select(s => (BoundVarDeclaration)s).ToImmutableArray();
         var body = statements.Where(s => s is not BoundFunctionDeclaration or BoundVarDeclaration).ToImmutableArray();
-        var scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
+        var scriptMain = FunctionFactory.CreateMain("__wl_script_main");
         var functions = ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty
         .Add(
             scriptMain, Lowerer.LowerBody(scriptMain, new BoundBlockStatement(body[0].Node, body))

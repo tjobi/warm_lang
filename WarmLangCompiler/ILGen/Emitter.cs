@@ -407,14 +407,14 @@ public sealed class Emitter
             case BoundReturnStatement ret:
                 EmitReturnStatement(processor, ret);
                 break;
-            case BoundFunctionDeclaration { Symbol: LocalFunctionSymbol symbol }:
-                if (_boundProgram.Functions[symbol] is BoundBlockStatement body)
+            case BoundFunctionDeclaration {Symbol: { IsGlobal:  false} func }:
+                if (_boundProgram.Functions[func] is BoundBlockStatement body)
                 {
-                    EmitLocalFunctionDeclaration(processor, symbol);
-                    EmitFunctionBody(symbol, body);
+                    EmitLocalFunctionDeclaration(processor, func);
+                    EmitFunctionBody(func, body);
                     break;
                 }
-                throw new Exception($"{nameof(Emitter)} - has reached exception state in {nameof(EmitStatement)} - LocalFunction '{symbol}' doesn't have a body!");
+                throw new Exception($"{nameof(Emitter)} - has reached exception state in {nameof(EmitStatement)} - LocalFunction '{func}' doesn't have a body!");
             case BoundExprStatement expr:
                 EmitExprStatement(processor, expr);
                 break;
@@ -482,7 +482,7 @@ public sealed class Emitter
         processor.Emit(OpCodes.Ret);
     }
 
-    private void EmitLocalFunctionDeclaration(ILProcessor ilProcessor, LocalFunctionSymbol func)
+    private void EmitLocalFunctionDeclaration(ILProcessor ilProcessor, FunctionSymbol func)
     {
         var funcName = $"<>_local_{_localFuncId++}_{func.Name}";
         var (funcDefintion, _) = CreateLocalFunctionDefinition(ilProcessor, funcName, func);

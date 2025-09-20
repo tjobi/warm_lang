@@ -60,7 +60,7 @@ public sealed class BoundInterpreter
             BoundExprStatement expr => EvaluateExpression(expr.Expression),
             BoundBlockStatement block => EvaluateBlock(block),
             BoundVarDeclaration varDecl => EvaluateVarDeclaration(varDecl),
-            BoundFunctionDeclaration decl when decl.Symbol is LocalFunctionSymbol func => EvaluateFunctionDeclaration(func),
+            BoundFunctionDeclaration decl when !decl.Symbol.IsGlobal => EvaluateFunctionDeclaration(decl.Symbol),
             BoundFunctionDeclaration => Value.Void, //Global function, is already declared from binder
             _ => throw new NotImplementedException($"Interpreter doesn't know {statement.GetType().Name} yet!"),
         };
@@ -126,7 +126,7 @@ public sealed class BoundInterpreter
         return initializer;
     }
 
-    private Value EvaluateFunctionDeclaration(LocalFunctionSymbol local)
+    private Value EvaluateFunctionDeclaration(FunctionSymbol local)
     {
         if (!program.Functions.TryGetValue(local, out var body))
         {
@@ -414,8 +414,9 @@ public sealed class BoundInterpreter
                 }
             case BoundFuncAccess funcAccess: return GetFunctionValueFromSymbol(funcAccess.Func);
             case BoundMemberAccess { Member: MemberFuncSymbol memSymbol } bma:
-                target = GetValueFromAccess(bma.Target, loc);
-                EnsureNotNullValue(target, loc, $"Cannot access '{memSymbol.Name}' of null reference");
+                // target = GetValueFromAccess(bma.Target, loc);
+                // Would be semantically different from the emitter!
+                // EnsureNotNullValue(target, loc, $"Cannot access '{memSymbol.Name}' of null reference");
                 return GetFunctionValueFromSymbol(memSymbol.Function);
             default:
                 throw new Exception($"{nameof(BoundInterpreter)}.{nameof(GetValueFromAccess)} doesn't know how to handle {accessTarget}");

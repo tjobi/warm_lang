@@ -80,6 +80,19 @@ public class FunctionSymbol : EntitySymbol
         return sb.Append('(').AppendJoin(", ", Parameters.Select(p => p.Type.Name)).Append(')').ToString();
     }
 
+    //closureBelongsToThis: if true, the closure is a 1-1 match of the free variables of this function, otherwise whatever is referenced may or may not belong to this function
+    public void MergeFreeVariablesWith(IDictionary<ScopedVariableSymbol, LocalVariableSymbol> closure, bool closureBelongsToThis = false)
+    {
+        foreach (var (v, l) in closure)
+            if (!FreeVariables.ContainsKey(v) && (closureBelongsToThis || v.BelongsTo != this))
+                FreeVariables[v] = closureBelongsToThis ? l : new LocalVariableSymbol(l.Name, l.Type, this);
+    }
+}
+
+//public sealed class 
+
+public static class FunctionFactory
+{
     public static FunctionSymbol CreateMain(string name = "wl_main")
      => new(
             name,
@@ -90,20 +103,24 @@ public class FunctionSymbol : EntitySymbol
             new TextLocation(0, 0)
         );
 
-    //closureBelongsToThis: if true, the closure is a 1-1 match of the free variables of this function, otherwise whatever is referenced may or may not belong to this function
-    public void MergeFreeVariablesWith(IDictionary<ScopedVariableSymbol, LocalVariableSymbol> closure, bool closureBelongsToThis = false)
-    {
-        foreach (var (v, l) in closure)
-            if (!FreeVariables.ContainsKey(v) && (closureBelongsToThis || v.BelongsTo != this))
-                FreeVariables[v] = closureBelongsToThis ? l : new LocalVariableSymbol(l.Name, l.Type, this);
-    }
-}
-
-public static class FunctionSymbolFactory
-{
     private static int lambdaID = 0;
     public static FunctionSymbol CreateLambda(TextLocation location, ImmutableArray<ParameterSymbol> parameters, TypeSymbol funcType, TypeSymbol returnType)
     {
-        return new FunctionSymbol($"__#$lambda{lambdaID++}", ImmutableArray<TypeSymbol>.Empty, parameters, funcType, returnType, location, isGlobal: false);
+        return new FunctionSymbol(
+            $"__#$lambda{lambdaID++}",
+            [],
+            parameters,
+            funcType,
+            returnType,
+            location,
+            isGlobal: false
+        );
     }
+
+    public static FunctionSymbol CreateLocalFunction(
+        SyntaxToken nameToken,
+        ImmutableArray<TypeSymbol> typeParameters,
+        ImmutableArray<ParameterSymbol> parameters,
+        TypeSymbol funcType, TypeSymbol returnType)
+    => new(nameToken, typeParameters, parameters, funcType, returnType, isGlobal: false);
 }
