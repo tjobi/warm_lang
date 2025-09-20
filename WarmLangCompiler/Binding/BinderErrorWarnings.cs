@@ -231,4 +231,10 @@ internal static class BinderErrorWarnings
         var message = $"The type 'void' is not valid in this context";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportIllegalVoidTypeArgument(this ErrorWarrningBag bag, FunctionSymbol called, TextLocation location)
+    {
+        var message = $"A type argument applied to function '{called.Name}' has type '{TypeSymbol.Void}' which is illegal";
+        bag.Report(message, true, location);
+    }
 }

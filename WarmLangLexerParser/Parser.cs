@@ -485,7 +485,7 @@ public class Parser
                         {
                             var (openAngle, args, closeAngle) = typeArgs.Value;
                             var resAccess = AccessFromExpression(res);
-                            res = new TypeApplication(resAccess, openAngle, args, closeAngle);
+                            res = new FuncTypeApplication(resAccess, openAngle, args, closeAngle);
                         }
                         else return res;
                     }

@@ -437,14 +437,14 @@ public sealed class Binder
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
             ObjectInitExpression se => BindObjectInitExpression(se),
             NullExpression @null => BindNullExpression(@null),
-            TypeApplication application => BindTypeApplication(application),
+            FuncTypeApplication application => BindFuncTypeApplication(application),
             LambdaExpression expr => BindLambdaExpression(expr),
             ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
     }
 
-    private BoundExpression BindTypeApplication(TypeApplication application)
+    private BoundExpression BindFuncTypeApplication(FuncTypeApplication application)
     {
         var funcTypeInfo = BindAccessCallExpression(application.AppliedOn, out var access, out var funcSymbol);
 
@@ -465,9 +465,10 @@ public sealed class Binder
         {
             var typeArg = _typeScope.GetTypeOrErrorType(typeParam);
             typeArgs.Add(typeArg);
-            if(typeArg == TypeSymbol.Void)
+            if (typeArg == TypeSymbol.Void)
             {
-                _diag.ReportTypeVoidIsNotValidHere(typeParam.Location);
+                _diag.ReportIllegalVoidTypeArgument(funcSymbol, typeParam.Location);
+                return new BoundErrorExpression(application);
             }
         }
         var specailized = CreateSpecializedFunction(funcSymbol, application.Location, typeArgs);
@@ -562,7 +563,7 @@ public sealed class Binder
             }
             if (calledFuncSymbol is not SpecializedFunctionSymbol specialized)
             {
-                specialized = CreateSpecializedFunction(calledFuncSymbol, ce.Location);
+                calledFuncSymbol = specialized = CreateSpecializedFunction(calledFuncSymbol, ce.Location);
             }
             typeArgEnv = specialized.TypeParameters.Zip(specialized.TypeArguments).ToImmutableDictionary(kv => kv.First, kv => kv.Second);
             funcTypeInfo = (FunctionTypeInformation)_typeScope.GetTypeInformationOrThrow(specialized.Type);
@@ -606,6 +607,19 @@ public sealed class Binder
         {
             arguments[i] = BindTypeConversion(arguments[i], funcTypeInfo.Parameters[i]);
         }
+
+        //After all unifies have happend
+        if (calledFuncSymbol is SpecializedFunctionSymbol sfs)
+        {
+            var voidTypeArg = sfs.TypeArguments.FirstOrDefault(t => _typeScope.GetActualType(t) == TypeSymbol.Void);
+            if(voidTypeArg is not null)
+            {
+                _diag.ReportIllegalVoidTypeArgument(calledFuncSymbol, ce.Location);
+                return new BoundErrorExpression(ce);
+            }
+        }
+
+
         return new BoundCallExpression(ce, accessToCall, arguments.MoveToImmutable(), funcTypeInfo.ReturnType, typeArgEnv);
     }
 
