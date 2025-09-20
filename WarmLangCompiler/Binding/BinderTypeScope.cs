@@ -515,12 +515,18 @@ public sealed class BinderTypeScope
         {
             var arg = typeArguments[i];
             TypeSymbol argType;
-            if (!TryGetTypeInformation(arg, out var argInfo))
+            if (TryGetTypeInformation(arg, out var argInfo)) argType = argInfo.Type;
+            else
             {
                 _diag.ReportTypeNotFound(arg.Name, location);
                 argType = TypeSymbol.Error;
             }
-            else argType = argInfo.Type;
+
+            if (argType == TypeSymbol.Void)
+            {
+                _diag.ReportTypeIllegalVoidTypeArgument(baseInfo.Type, location);
+                return TypeSymbol.Error;
+            }
 
             typeArgs.Add(argType);
             var paramType = baseTypeParameters[i];

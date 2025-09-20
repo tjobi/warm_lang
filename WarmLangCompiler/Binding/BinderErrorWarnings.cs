@@ -232,9 +232,15 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportIllegalVoidTypeArgument(this ErrorWarrningBag bag, FunctionSymbol called, TextLocation location)
+    internal static void ReportFunctionIllegalVoidTypeArgument(this ErrorWarrningBag bag, FunctionSymbol called, TextLocation location)
     {
         var message = $"A type argument applied to function '{called.Name}' has type '{TypeSymbol.Void}' which is illegal";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportTypeIllegalVoidTypeArgument(this ErrorWarrningBag bag, TypeSymbol type, TextLocation location)
+    {
+        var message = $"'{TypeSymbol.Void}' was passed as a type argument for generic type '{type.Name}' which is illegal";
         bag.Report(message, true, location);
     }
 }

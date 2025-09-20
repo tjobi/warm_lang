@@ -467,7 +467,7 @@ public sealed class Binder
             typeArgs.Add(typeArg);
             if (typeArg == TypeSymbol.Void)
             {
-                _diag.ReportIllegalVoidTypeArgument(funcSymbol, typeParam.Location);
+                _diag.ReportFunctionIllegalVoidTypeArgument(funcSymbol, typeParam.Location);
                 return new BoundErrorExpression(application);
             }
         }
@@ -614,7 +614,7 @@ public sealed class Binder
             var voidTypeArg = sfs.TypeArguments.FirstOrDefault(t => _typeScope.GetActualType(t) == TypeSymbol.Void);
             if(voidTypeArg is not null)
             {
-                _diag.ReportIllegalVoidTypeArgument(calledFuncSymbol, ce.Location);
+                _diag.ReportFunctionIllegalVoidTypeArgument(calledFuncSymbol, ce.Location);
                 return new BoundErrorExpression(ce);
             }
         }
