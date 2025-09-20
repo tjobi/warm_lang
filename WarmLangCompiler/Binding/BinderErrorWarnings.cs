@@ -152,7 +152,7 @@ internal static class BinderErrorWarnings
 
     internal static void ReportMemberFuncFirstParameterMustMatchOwner(this ErrorWarrningBag bag, TextLocation funcLocation, string name, TypeSymbol owner, TypeSymbol paramType)
     {
-        var message = $"The first parameter of member function '{name}' must same as the owner type '{owner}' and not '{paramType}'. Did you forgot the owner?";
+        var message = $"The first parameter of member function '{name}' must same as the owner type '{owner}' and not '{paramType}'. Did you forget the owner?";
         bag.Report(message, true, funcLocation);
     }
 

@@ -1092,7 +1092,7 @@ public sealed class Emitter
                 EmitExpression(processor, ae.Expression);
                 break;
             case BoundFuncAccess f:
-                EmitFunctionAccess(processor, f.Func, f.Type);
+                EmitFunctionAccess(processor, f.Func, f.Type, f.Target);
                 break;
             default:
                 throw new NotImplementedException($"{nameof(EmitLoadAccess)} doesn't know how to emit access for '{acc}'");
@@ -1120,8 +1120,15 @@ public sealed class Emitter
         }
     }
 
-    private void EmitFunctionAccess(ILProcessor processor, FunctionSymbol f, TypeSymbol funcType)
+    private void EmitFunctionAccess(ILProcessor processor, FunctionSymbol f, TypeSymbol funcType, BoundAccess? target = null)
     {
+        if (target is not null)
+        {
+            EmitLoadAccess(processor, target);
+            processor.Emit(OpCodes.Ldftn, _funcs[f]);
+            processor.Emit(OpCodes.Newobj, _cilTypeManager.GetSpecializedMethod(funcType, ".ctor", 2));
+            return;
+        }
         if (f.HasFreeVariables) EmitFunctionClosure(processor, f);
         else EmitStaticFuncAccess(processor, funcType, _funcs[f]);
     }

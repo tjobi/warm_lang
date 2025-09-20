@@ -645,22 +645,38 @@ public sealed class Binder
             case MemberAccess ma:
                 {
                     var boundTarget = BindAccess(ma.Target);
-                    if (boundTarget.Type == TypeSymbol.Error || ma.MemberToken.Name is null)
+                    var boundTargetType = _typeScope.GetActualType(boundTarget.Type);
+                    if (boundTargetType == TypeSymbol.Error || ma.MemberToken.Name is null)
                         return new BoundInvalidAccess();
 
-                    if (!_typeScope.TryFindMember(boundTarget.Type, ma.MemberToken.Name!, out var boundMember))
+                    if (!_typeScope.TryFindMember(boundTargetType, ma.MemberToken.Name!, out var boundMember))
                     {
-                        _diag.ReportCouldNotFindMemberForType(ma.Location, boundTarget.Type, ma.MemberToken.Name);
+                        _diag.ReportCouldNotFindMemberForType(ma.Location, boundTargetType, ma.MemberToken.Name);
                         return new BoundInvalidAccess();
                     }
                     if (boundMember is MemberFuncSymbol fs && !expectFunc)
                     {
-                        // if (!_typeScope.TryGetTypeInformation(fs.Type, out var funcInfo))
-                        //     throw new Exception($"Compiler bug - function member '{fs}' has no type information");
-                        // return new BoundFuncAccess(((MemberFuncSymbol)boundMember).Function);
-                        // TODO: we are not in a call context, so we cannot do this before proper closures!
-                        _diag.ReportFeatureNotImplemented(access.Location, "Cannot reference methods (yet), since we do not include the target in a closure");
-                        return new BoundInvalidAccess();
+                        if (boundTargetType.IsValueType)
+                        {
+                            //TODO: could be cool to just lock in the '2' in 'var twoStr = 2.toString();'
+                            _diag.ReportFeatureNotImplemented(ma.Location, "Cannot create closures for methods on value types");
+                            return new BoundInvalidAccess();
+                        }
+                        if (!_typeScope.TryGetTypeInformation(fs.Function.Type, out var memberFuncInfo)
+                           || memberFuncInfo.HasTypeParameters)
+                        {
+                            _diag.ReportFeatureNotImplemented(ma.Location, "Cannot reference generic methods (yet)");
+                            return new BoundInvalidAccess();
+                        }
+                        //TODO: Please, put the "target" into the free variables, so we can reuse closure logic!
+                        //TODO: Use the type information instead of function symbol
+                        var (funcType,_) = _typeScope.CreateFunctionType(
+                            fs.Function.Parameters.Skip(1).Select(p => p.Type).ToImmutableArray(),
+                            fs.Function.ReturnType,
+                            fs.Function.TypeParameters,
+                            isMemberFunc: false
+                        );
+                        return new BoundFuncAccess(boundTarget, fs.Function, funcType);
                     }
                     return new BoundMemberAccess(boundTarget, boundMember);
                 }

@@ -12,7 +12,7 @@ public class TypeInformation
     public Dictionary<FunctionSymbol, BoundBlockStatement> MethodBodies { get; }
 
     [MemberNotNullWhen(true, nameof(TypeParameters))]
-    public bool HasTypeParameters => TypeParameters.HasValue;
+    public bool HasTypeParameters => TypeParameters.HasValue && TypeParameters.Value.Length > 0;
     public ImmutableArray<TypeSymbol>? TypeParameters { get; }
 
     public bool IsCallable => this is FunctionTypeInformation;

@@ -412,7 +412,7 @@ public sealed class BoundInterpreter
                     }
                     throw new Exception($"Cannot subscript into '{sa.Target.Type}' using value of type '{sa.Index.Type}'");
                 }
-            case BoundFuncAccess funcAccess: return GetFunctionValueFromSymbol(funcAccess.Func);
+            case BoundFuncAccess funcAccess: return GetFunctionValueFromSymbol(funcAccess.Func, funcAccess.Target);
             case BoundMemberAccess { Member: MemberFuncSymbol memSymbol } bma:
                 // target = GetValueFromAccess(bma.Target, loc);
                 // Would be semantically different from the emitter!
@@ -560,7 +560,7 @@ public sealed class BoundInterpreter
         return body;
     }
 
-    private ClosureValue GetFunctionValueFromSymbol(FunctionSymbol func)
+    private ClosureValue GetFunctionValueFromSymbol(FunctionSymbol func, BoundAccess? target = null)
     {
         if (func.IsBuiltInFunction()) return new ClosureValue(func, null!, null);
         var body = func switch
@@ -569,14 +569,22 @@ public sealed class BoundInterpreter
             _ => _functionEnvironment.Lookup(func)
                 ?? throw new Exception($"{nameof(BoundInterpreter)} couldn't find function to call '{func}'")
         };
-        IDictionary<ScopedVariableSymbol, Value>? closure = null;
+        Dictionary<ScopedVariableSymbol, Value>? closure = null;
         if (func.FreeVariables.Count > 0)
         {
-            closure = new Dictionary<ScopedVariableSymbol, Value>();
+            closure = [];
             foreach (var (free, local) in func.FreeVariables)
             {
                 closure[local] = _variableEnvironment.Lookup(free);
             }
+        }
+        if (target is not null)
+        {
+            if (!func.IsMemberFunc)
+                throw new Exception($"{nameof(BoundInterpreter)} cannot get method '{func}' from target '{target}' because it is not a member function");
+            var targetValue = GetValueFromAccess(target);
+            closure ??= [];
+            closure[func.Parameters[0]] = targetValue;
         }
 
         return new ClosureValue(func, body, closure);
