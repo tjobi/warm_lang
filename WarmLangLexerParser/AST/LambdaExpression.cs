@@ -7,7 +7,7 @@ public sealed class LambdaExpression : ExpressionNode
 {
     public LambdaExpression(TextLocation location,
                             IList<(TypeSyntaxNode? type, SyntaxToken nameToken)> parameters,
-                            ExpressionNode body)
+                            BlockStatement body)
     : base(location)
     {
         Parameters = parameters;
@@ -15,7 +15,7 @@ public sealed class LambdaExpression : ExpressionNode
     }
 
     public IList<(TypeSyntaxNode? type, SyntaxToken nameToken)> Parameters { get; }
-    public ExpressionNode Body { get; }
+    public BlockStatement Body { get; }
 
     public override string ToString()
     {

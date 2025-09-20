@@ -216,7 +216,7 @@ public class Parser
         return new IfStatement(ifToken, condition, thenStmnt, elseStmnt);
     }
 
-    private StatementNode ParseBlockStatement()
+    private BlockStatement ParseBlockStatement()
     {
         var statements = new List<StatementNode>();
         var open = MatchKind(TCurLeft);
@@ -722,14 +722,9 @@ public class Parser
             if (Current.Kind is TParRight) depth--;
             _ = NextToken();
         }
-
-        if (Current.Kind is not TArrow)
-        {
-            RestoreCheckpoint(checkpoint);
-            return false;
-        }
+        var isPossible = Current.Kind is TArrow;
         RestoreCheckpoint(checkpoint);
-        return true;
+        return isPossible;
     }
 
     private ExpressionNode ParseLambdaExpression()
@@ -760,7 +755,19 @@ public class Parser
         _ = MatchKind(TParRight);
         _ = MatchKind(TArrow);
 
-        var lambdaBody = ParseExpression();
+        BlockStatement? lambdaBody = null;
+        if (Current.Kind != TCurLeft)
+        {
+            var lambdaExpr = ParseExpression();
+            var synthToken = new SyntaxToken(TSemiColon, lambdaExpr.Location);
+            var synthReturn = new ReturnStatement(synthToken, lambdaExpr);
+            lambdaBody = new BlockStatement(synthToken, [synthReturn], synthToken);
+        }
+        else
+        {
+            lambdaBody = ParseBlockStatement();
+        }
+
         var location = TextLocation.FromTo(openPar.Location, lambdaBody.Location);
         return new LambdaExpression(location, parameters, lambdaBody);
     }

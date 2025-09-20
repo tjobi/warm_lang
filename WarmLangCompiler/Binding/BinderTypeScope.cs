@@ -536,14 +536,12 @@ public sealed class BinderTypeScope
 
         var typeName = $"{baseInfo.Type}{_idToInformation.Count}<{string.Join(",", typeArgs)}>";
         var taType = new TypeSymbol(typeName);
-        var taId = TypeToId(taType);
         var members = new List<MemberSymbol>();
-        _idToInformation[taId] = new GenericTypeInformation(taType, baseInfo.Type,
-                                                            typeArgs, cntConcreteTypeParams,
-                                                            members,
-                                                            typeParameters: baseInfo.TypeParameters);
-        Global.Add(taType.Name, taId);
-        _typeUnion.Add(taType);
+        var typeInfo = new GenericTypeInformation(taType, baseInfo.Type,
+                                                          typeArgs, cntConcreteTypeParams,
+                                                          members,
+                                                          typeParameters: baseInfo.TypeParameters);
+        AddType(typeInfo, AddTo.Global);
 
         foreach (var member in baseInfo.Members)
         {

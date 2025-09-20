@@ -219,4 +219,16 @@ internal static class BinderErrorWarnings
         var message = $"Local function '{symbol.Name}' has more than {maxLocalParameters} parameters, consider using an object";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportCannotAssignVoidToImplicitlyTypedVariable(this ErrorWarrningBag bag, SyntaxToken nameToken, TextLocation location)
+    {
+        var message = $"Cannot assign void to implicitly typed variable '{nameToken.Name}'";
+        bag.Report(message, true, TextLocation.FromTo(nameToken.Location, location));
+    }
+
+    internal static void ReportTypeVoidIsNotValidHere(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = $"The type 'void' is not valid in this context";
+        bag.Report(message, true, location);
+    }
 }

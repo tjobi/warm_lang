@@ -79,7 +79,7 @@ public sealed class Binder
                 _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
 
             scriptMain = FunctionFactory.CreateMain("__wl_script_main");
-            var scriptMainBody = Lowerer.LowerBody(scriptMain, bound);
+            var scriptMainBody = LowerAndCheckControlFlow(scriptMain, bound);
             _functionToBody[scriptMain] = scriptMainBody;
         }
         return new BoundProgram(main, scriptMain, _functionToBody.ToImmutableDictionary(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
@@ -209,6 +209,15 @@ public sealed class Binder
         {
             var type = _typeScope.GetTypeOrErrorType(varDecl.Type);
             rightHandSide = BindTypeConversion(rightHandSide, type);
+            if(type == TypeSymbol.Void)
+            {
+                _diag.ReportTypeVoidIsNotValidHere(varDecl.Type.Location);
+            }
+        }
+
+        if (varDecl.Type is null && _typeScope.GetActualType(rightHandSide.Type) == TypeSymbol.Void)
+        {
+            _diag.ReportCannotAssignVoidToImplicitlyTypedVariable(varDecl.Identifier, rightHandSide.Location);
         }
 
         VariableSymbol variable = isGlobalScope
@@ -323,7 +332,7 @@ public sealed class Binder
         return new BoundFunctionDeclaration(funcDecl, symbol);
     }
 
-    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body)
+    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body, bool lower = true)
     {
         _functionStack.Push(function);
         _scope.PushScope();
@@ -342,9 +351,7 @@ public sealed class Binder
                 _scope.TryDeclareVariable(@param, allowShadowing: true);
             }
             boundBody = BindBlockStatement(body, pushScope: false);
-            boundBody = Lowerer.LowerBody(function, boundBody);
-            if (!ControlFlowGraph.AllPathsReturn(boundBody))
-                _diag.ReportNotAllCodePathsReturn(function);
+            if (lower) boundBody = LowerAndCheckControlFlow(function, boundBody);
         }
 
         _typeScope.Pop();
@@ -453,7 +460,16 @@ public sealed class Binder
             return new BoundErrorExpression(application);
         }
         // TypeParameters of the original function can be retrieved from the BoundTypeApplication
-        var typeArgs = application.TypeParams.Select(_typeScope.GetTypeOrErrorType).ToList();
+        List<TypeSymbol> typeArgs = [];
+        foreach (var typeParam in application.TypeParams)
+        {
+            var typeArg = _typeScope.GetTypeOrErrorType(typeParam);
+            typeArgs.Add(typeArg);
+            if(typeArg == TypeSymbol.Void)
+            {
+                _diag.ReportTypeVoidIsNotValidHere(typeParam.Location);
+            }
+        }
         var specailized = CreateSpecializedFunction(funcSymbol, application.Location, typeArgs);
 
         return new BoundTypeApplication(application, access, specailized);
@@ -579,7 +595,7 @@ public sealed class Binder
                 _diag.ReportFeatureNotImplemented(ce.Location, "Cannot use methods indirectly");
                 return new BoundErrorExpression(ce);
             }
-            if (bma is { Target: not BoundTypeAccess, Member: MemberFuncSymbol} )
+            if (bma is { Target: not BoundTypeAccess, Member: MemberFuncSymbol })
             {
                 arguments.Add(new BoundAccessExpression(ce, bma.Target));
             }
@@ -670,7 +686,7 @@ public sealed class Binder
                         }
                         //TODO: Please, put the "target" into the free variables, so we can reuse closure logic!
                         //TODO: Use the type information instead of function symbol
-                        var (funcType,_) = _typeScope.CreateFunctionType(
+                        var (funcType, _) = _typeScope.CreateFunctionType(
                             fs.Function.Parameters.Skip(1).Select(p => p.Type).ToImmutableArray(),
                             fs.Function.ReturnType,
                             fs.Function.TypeParameters,
@@ -823,22 +839,14 @@ public sealed class Binder
         var (lambdaType, _) = _typeScope.CreateFunctionType(parameters, returnType);
         var lambdaSymbol = FunctionFactory.CreateLambda(expr.Location, parameters, lambdaType, returnType);
 
-        _functionStack.Push(lambdaSymbol);
-        _scope.PushScope();
+        var lambdaBody = BindFunctionBody(lambdaSymbol, expr.Body, lower: false);
+        if (_typeScope.GetTypeInformation(returnType) is PlaceHolderInformation)
         {
-            foreach (var @param in parameters) _scope.TryDeclareVariable(@param, allowShadowing: true);
-            var boundExpr = BindTypeConversion(BindExpression(expr.Body), returnType);
-            var synthStatement = new ExprStatement(expr);
-            var synthReturn = new BoundReturnStatement(synthStatement, boundExpr);
-            var synthBody = new BoundBlockStatement(
-                synthStatement,
-                [synthReturn]
-            );
-            _functionToBody[lambdaSymbol] = synthBody;
+            //We weren't able to infer the return type - make it void
+            _typeScope.Unify(returnType, TypeSymbol.Void);
         }
-        _ = _functionStack.Pop();
-        _ = _scope.PopScope();
-
+        _functionToBody[lambdaSymbol] = LowerAndCheckControlFlow(lambdaSymbol, lambdaBody);
+        
         PushFreeVariablesUpwards(lambdaSymbol);
 
         //TODO: can we get around this?
@@ -931,4 +939,13 @@ public sealed class Binder
             }
         }
     }
+
+    private BoundBlockStatement LowerAndCheckControlFlow(FunctionSymbol func, BoundBlockStatement blockStatement)
+    {
+        blockStatement = Lowerer.LowerBody(func, blockStatement, _typeScope);
+
+        if (!ControlFlowGraph.AllPathsReturn(blockStatement))
+            _diag.ReportNotAllCodePathsReturn(func);
+        return blockStatement;
+    }    
 }
