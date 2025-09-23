@@ -817,7 +817,7 @@ public sealed class Binder
         else type = typeInfo.Type;
 
         if (type == TypeSymbol.Int || type == TypeSymbol.Bool || type == TypeSymbol.String
-           || typeInfo is TypeParamaterInformation)
+           || typeInfo is TypeParamaterInformation || typeInfo is FunctionTypeInformation)
         {
             //The "name" part of struct init is not an identifier, for example: "new int {...};"
             //TODO: Do we want to allow "int x = new int{5};"?
