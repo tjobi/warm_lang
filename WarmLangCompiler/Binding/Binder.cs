@@ -448,7 +448,10 @@ public sealed class Binder
 
     private BoundExpression BindFuncTypeApplication(FuncTypeApplication application, bool expectCallable)
     {
-        var funcTypeInfo = BindAccessToCallableExpression(application.AppliedOn, out var access, out var funcSymbol, callImmediately: expectCallable);
+        var funcTypeInfo = BindAccessToCallableExpression(
+            application.AppliedOn, out var access, out var funcSymbol,
+            callImmediately: expectCallable
+        );
         
         if (funcTypeInfo is null || funcSymbol is null) return new BoundErrorExpression(application);
 
@@ -629,7 +632,14 @@ public sealed class Binder
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 
-    private BoundAccess BindAccess(Access access, bool expectFunc = false, bool expectWriteable = false)
+    /*
+        immediateCall  : indicates whether the access is to be called immediately
+        allowGeneric   : indicates whether the caller is going to apply generic type parameters or not
+        expectWriteable: indicates whether we are in a writeablt context (left hand side of assignment)     
+    */
+    private BoundAccess BindAccess(
+        Access access, bool immediateCall = false,
+        bool allowGeneric = false, bool expectWriteable = false)
     {
         switch (access)
         {
@@ -639,34 +649,35 @@ public sealed class Binder
                     {
                         if (symbol is FunctionSymbol func)
                         {
-                            if(!expectFunc && func is not SpecializedFunctionSymbol && func.TypeParameters.Length > 0)
+                            if (!allowGeneric && func.TypeParameters.Length > 0)
                             {
-                                _diag.ReportFeatureNotImplemented(access.Location, "Cannot use generic function as a value (yet)");
+                                _diag.ReportFeatureNotImplemented(access.Location, "Cannot use generic functions without applying type parameters");
                                 return new BoundInvalidAccess();
                             }
                             return new BoundFuncAccess(func);
                         }
-                        if (symbol is VariableSymbol variable)
-                            {
-                                //Have we reached a free variable?
-                                var currentFunction = _functionStack.Peek();
-                                if (variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
-                                {
-                                    var fv = currentFunction.FreeVariables;
-                                    //Create a new mapping for this free variable
-                                    if (!fv.TryGetValue(scoped, out var local))
-                                    {
-                                        fv[scoped] = local = new LocalVariableSymbol(scoped.Name, scoped.Type, currentFunction);
-                                    }
-                                    variable = local;
 
-                                    if (expectWriteable)
-                                    {
-                                        _diag.ReportVariablesCapturedByClosureAreLocal(na.Location, na.Name);
-                                    }
+                        if (symbol is VariableSymbol variable)
+                        {
+                            //Have we reached a free variable?
+                            var currentFunction = _functionStack.Peek();
+                            if (variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
+                            {
+                                var fv = currentFunction.FreeVariables;
+                                //Create a new mapping for this free variable
+                                if (!fv.TryGetValue(scoped, out var local))
+                                {
+                                    fv[scoped] = local = new LocalVariableSymbol(scoped.Name, scoped.Type, currentFunction);
                                 }
-                                return new BoundNameAccess(variable);
+                                variable = local;
+
+                                if (expectWriteable)
+                                {
+                                    _diag.ReportVariablesCapturedByClosureAreLocal(na.Location, na.Name);
+                                }
                             }
+                            return new BoundNameAccess(variable);
+                        }
                     }
                     if (_typeScope.TryGetType(na.Name, out var type))
                         return new BoundTypeAccess(type);
@@ -691,7 +702,7 @@ public sealed class Binder
                         _diag.ReportCouldNotFindMemberForType(ma.Location, boundTargetType, ma.MemberToken.Name);
                         return new BoundInvalidAccess();
                     }
-                    if (boundMember is MemberFuncSymbol fs && !expectFunc)
+                    if (boundMember is MemberFuncSymbol fs && !immediateCall)
                     {
                         if (boundTargetType.IsValueType)
                         {
@@ -699,12 +710,12 @@ public sealed class Binder
                             _diag.ReportFeatureNotImplemented(ma.Location, "Cannot create closures for methods on value types");
                             return new BoundInvalidAccess();
                         }
-                        // if (!_typeScope.TryGetTypeInformation(fs.Function.Type, out var memberFuncInfo)
-                        //    || memberFuncInfo.HasTypeParameters)
-                        // {
-                        //     _diag.ReportFeatureNotImplemented(ma.Location, "Cannot reference generic methods (yet)");
-                        //     return new BoundInvalidAccess();
-                        // }
+                        if(!allowGeneric && fs.Function.TypeParameters.Length > 0)
+                        {
+                            _diag.ReportFeatureNotImplemented(ma.Location, "Cannot use generic functions without applying type parameters");
+                            return new BoundInvalidAccess();
+                        }
+
                         //TODO: Please, put the "target" into the free variables, so we can reuse closure logic!
                         //TODO: Use the type information instead of function symbol
                         var (funcType, _) = _typeScope.CreateFunctionType(
@@ -719,7 +730,7 @@ public sealed class Binder
                 }
             case ExprAccess exprAccess:
                 {
-                    var expr = BindExpression(exprAccess.Expression, expectCallable : expectFunc);
+                    var expr = BindExpression(exprAccess.Expression, expectCallable: immediateCall);
                     return new BoundExprAccess(expr);
                 }
             case SubscriptAccess sa:
@@ -915,10 +926,11 @@ public sealed class Binder
 
     private FunctionTypeInformation? BindAccessToCallableExpression(
         Access access, out BoundAccess accessSymbol,
-        out FunctionSymbol? symbol, bool callImmediately = true)
+        out FunctionSymbol? symbol,
+        bool callImmediately = true, bool allowGeneric = true)
     {
         symbol = null;
-        accessSymbol = BindAccess(access, expectFunc: callImmediately);
+        accessSymbol = BindAccess(access, immediateCall: callImmediately, allowGeneric: allowGeneric);
         if (accessSymbol is BoundInvalidAccess) return null;
         var typeInfo = _typeScope.GetTypeInformation(accessSymbol.Type);
         if (typeInfo is null || typeInfo.Type == TypeSymbol.Error) return null;
