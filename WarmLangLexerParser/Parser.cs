@@ -759,7 +759,7 @@ public class Parser
         if (Current.Kind != TCurLeft)
         {
             var lambdaExpr = ParseExpression();
-            var synthToken = new SyntaxToken(TSemiColon, lambdaExpr.Location);
+            var synthToken = new SyntaxToken(TBadToken, lambdaExpr.Location);
             var synthReturn = new ReturnStatement(synthToken, lambdaExpr);
             lambdaBody = new BlockStatement(synthToken, [synthReturn], synthToken);
         }

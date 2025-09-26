@@ -638,28 +638,36 @@ public sealed class Binder
                 {
                     if (_scope.TryLookup(na.Name, out var symbol))
                     {
-                        if (symbol is FunctionSymbol func) return new BoundFuncAccess(func);
-                        if (symbol is VariableSymbol variable)
+                        if (symbol is FunctionSymbol func)
                         {
-                            //Have we reached a free variable?
-                            var currentFunction = _functionStack.Peek();
-                            if (variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
+                            if(!expectFunc && func is not SpecializedFunctionSymbol && func.TypeParameters.Length > 0)
                             {
-                                var fv = currentFunction.FreeVariables;
-                                //Create a new mapping for this free variable
-                                if (!fv.TryGetValue(scoped, out var local))
-                                {
-                                    fv[scoped] = local = new LocalVariableSymbol(scoped.Name, scoped.Type, currentFunction);
-                                }
-                                variable = local;
-
-                                if (expectWriteable)
-                                {
-                                    _diag.ReportVariablesCapturedByClosureAreLocal(na.Location, na.Name);
-                                }
+                                _diag.ReportFeatureNotImplemented(access.Location, "Cannot use generic function as a value (yet)");
+                                return new BoundInvalidAccess();
                             }
-                            return new BoundNameAccess(variable);
+                            return new BoundFuncAccess(func);
                         }
+                        if (symbol is VariableSymbol variable)
+                            {
+                                //Have we reached a free variable?
+                                var currentFunction = _functionStack.Peek();
+                                if (variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
+                                {
+                                    var fv = currentFunction.FreeVariables;
+                                    //Create a new mapping for this free variable
+                                    if (!fv.TryGetValue(scoped, out var local))
+                                    {
+                                        fv[scoped] = local = new LocalVariableSymbol(scoped.Name, scoped.Type, currentFunction);
+                                    }
+                                    variable = local;
+
+                                    if (expectWriteable)
+                                    {
+                                        _diag.ReportVariablesCapturedByClosureAreLocal(na.Location, na.Name);
+                                    }
+                                }
+                                return new BoundNameAccess(variable);
+                            }
                     }
                     if (_typeScope.TryGetType(na.Name, out var type))
                         return new BoundTypeAccess(type);

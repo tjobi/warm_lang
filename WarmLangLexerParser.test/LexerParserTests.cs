@@ -1399,6 +1399,12 @@ h"";";
         _diag.Should().BeEmpty();
     }
 
+    private static BlockStatement SynthLambdaBody(ExpressionNode expr)
+    {
+        var synthToken = MakeToken(TBadToken, expr.Location);
+        return new BlockStatement(synthToken, [new ReturnStatement(synthToken, expr)], synthToken);
+    }
+
     [Fact]
     public void LexerParserImplicitLambdaExpression()
     {
@@ -1413,7 +1419,7 @@ h"";";
         };
         var expected = MakeRoot(
             new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
-                new LambdaExpression(lambdaLoc, parameters, new ConstExpression(5, new TextLocation(1, 16)))
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 16))))
             )
         );
 
@@ -1438,7 +1444,7 @@ h"";";
 
         var expected = MakeRoot(
             new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
-                new LambdaExpression(lambdaLoc, parameters, new ConstExpression(5, new TextLocation(1, 17)))
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 17))))
             )
         );
 
@@ -1465,7 +1471,7 @@ h"";";
         };
         var expected = MakeRoot(
             new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
-                new LambdaExpression(lambdaLoc, parameters, new ConstExpression(5, new TextLocation(1, 17)))
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 17))))
             )
         );
 
@@ -1489,7 +1495,7 @@ h"";";
         };
         var expected = MakeRoot(
             new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
-                new LambdaExpression(lambdaLoc, parameters, new ConstExpression(5, new TextLocation(1, 20)))
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 20))))
             )
         );
 

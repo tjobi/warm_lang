@@ -16,34 +16,41 @@ public class BinderTests
     private static readonly TypeSyntaxNode _syntaxIntList = new TypeSyntaxList(new TextLocation(1,1,length:3+2),_syntaxInt);
 
     private readonly Binder _binder;
+    private readonly BinderTypeScope _binderTypeScope;
     public BinderTests()
     {
         _diag = new ErrorWarrningBag();
         _binder = new Binder(_diag);
+
+        _binderTypeScope = new BinderTypeScope(_diag);
+
+
     }
 
     private static BlockStatement CreateBlockStatement(params StatementNode[] statements) => new(MakeToken(TCurLeft,1,1), statements.ToList(), MakeToken(TCurRight,1,1));
     private static BoundBlockStatement CreateBoundBlockStatement(StatementNode syntax, params BoundStatement[] statements) => new(syntax, statements.ToImmutableArray());
-    private static BoundProgram CreateBoundProgram(params BoundStatement[] statements) 
+    private BoundProgram CreateBoundProgram(params BoundStatement[] statements) 
     {
         var globals = statements.Where(s => s is BoundVarDeclaration).Select(s => (BoundVarDeclaration)s).ToImmutableArray();
         var body = statements.Where(s => s is not BoundFunctionDeclaration or BoundVarDeclaration).ToImmutableArray();
         var scriptMain = FunctionFactory.CreateMain("__wl_script_main");
+        var typeInfo = _binderTypeScope.ToProgramTypeMemberInformation();
+
         var functions = ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty
         .Add(
-            scriptMain, Lowerer.LowerBody(scriptMain, new BoundBlockStatement(body[0].Node, body))
+            scriptMain, Lowerer.LowerBody(scriptMain, new BoundBlockStatement(body[0].Node, body), _binderTypeScope)
         );
-        
-        var typeMembers = new ReadOnlyDictionary<TypeSymbol,IList<MemberSymbol>>(BuiltinMembers.CreateMembersForBuiltins());
+        // var typeMembers = new ReadOnlyDictionary<TypeSymbol,IList<MemberSymbol>>(BuiltinMembers.CreateMembersForBuiltins());
 
-        var typeInfoDict = new Dictionary<TypeSymbol, TypeInformation>();
-        foreach(var (type, fields) in BuiltinMembers.CreateMembersForBuiltins())
-        {
-            typeInfoDict[type] = new TypeInformation(type, fields.ToList(), new());
-        }
+        // var typeInfoDict = new Dictionary<TypeSymbol, TypeInformation>();
+        // foreach(var (type, fields) in BuiltinMembers.CreateMembersForBuiltins())
+        // {
+        //     typeInfoDict[type] = new TypeInformation(type, fields.ToList(), new());
+        // }
 
-        var declaredTypes = new List<TypeSymbol>().AsReadOnly();
-        var typeInfo = new TypeMemberInformation(typeInfoDict.AsReadOnly(), declaredTypes);
+        // var declaredTypes = new List<TypeSymbol>().AsReadOnly();
+        // var typeInfo = new TypeMemberInformation(typeInfoDict.AsReadOnly(), declaredTypes);
+
 
         return new BoundProgram(null, scriptMain, functions, typeInfo, globals);
     }
@@ -95,7 +102,7 @@ public class BinderTests
                     MakeToken(TBracketRight,1,1));
         var varDecl = new VarDeclaration(_syntaxInt,MakeVariableToken("x"),rhs);
         var input = MakeRoot(varDecl);
-        var rhsType = new TypeSymbol($"List`14<int>");
+        var rhsType = _binderTypeScope.GetOrCreateListType(TypeSymbol.Int);
         var expected = CreateBoundProgram(
             new BoundVarDeclaration(varDecl,new GlobalVariableSymbol("x", TypeSymbol.Int),
                 new BoundListExpression(
