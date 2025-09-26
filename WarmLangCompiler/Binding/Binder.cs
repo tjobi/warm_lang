@@ -593,7 +593,11 @@ public sealed class Binder
             accessToCall = new BoundExprAccess(new BoundFuncTypeApplication(ce, accessToCall, specialized));
         }
 
-        var argsSize = ce.Arguments.Count + (funcTypeInfo.IsMemberFunc ? 1 : 0);
+        var argsSize = ce.Arguments.Count + accessToCall switch {
+            BoundMemberAccess { Target: BoundTypeAccess or BoundPredefinedTypeAccess } => 0,
+            _ when funcTypeInfo.IsMemberFunc => 1,
+            _ => 0
+        };
         if (argsSize != funcTypeInfo.Parameters.Count)
         {
             _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, ce.Called.ToString(), funcTypeInfo.Parameters.Count, argsSize);
