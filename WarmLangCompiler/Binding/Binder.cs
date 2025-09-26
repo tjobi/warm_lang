@@ -452,18 +452,29 @@ public sealed class Binder
             application.AppliedOn, out var access, out var funcSymbol,
             callImmediately: expectCallable
         );
-        
-        if (funcTypeInfo is null || funcSymbol is null) return new BoundErrorExpression(application);
+        if (funcTypeInfo is null) return new BoundErrorExpression(application);
 
-        if (!funcTypeInfo.HasTypeParameters
-            || funcTypeInfo.HasTypeParameters && funcTypeInfo.TypeParameters.Value.Length != application.TypeParams.Count)
+        if(!funcTypeInfo.HasTypeParameters) //FuncTypeApplication only exists if count of appleid type args > 0
         {
-            var received = !funcTypeInfo.HasTypeParameters ? 0 : funcTypeInfo.TypeParameters.Value.Length;
-            _diag.ReportFunctionMismatchingTypeParameters(application.Location,
-                                                          application.TypeParams.Count,
-                                                          received);
+            _diag.ReportFunctionCannotBeUsedWithTypeArguments(application.Location, funcTypeInfo.Type);
             return new BoundErrorExpression(application);
         }
+
+        if (funcTypeInfo.TypeParameters.Value.Length != application.TypeParams.Count)
+        {
+            var expected = funcTypeInfo.TypeParameters.Value.Length;
+            _diag.ReportFunctionMismatchingTypeParameters(application.Location,
+                                                          application.TypeParams.Count,
+                                                          expected);
+            return new BoundErrorExpression(application);
+        }
+
+        if (funcSymbol is null)
+        {
+            _diag.ReportFeatureNotImplemented(application.Location, "Cannot apply type arguments to anonymous functions");
+            return new BoundErrorExpression(application);
+        }
+
         // TypeParameters of the original function can be retrieved from the BoundTypeApplication
         List<TypeSymbol> typeArgs = [];
         foreach (var typeParam in application.TypeParams)
@@ -940,6 +951,7 @@ public sealed class Binder
             _diag.ReportExpectedFunctionName(access.Location);
             return null;
         }
+        
         symbol = accessSymbol switch
         {
             BoundFuncAccess acc => acc.Func,

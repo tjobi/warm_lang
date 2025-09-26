@@ -249,4 +249,10 @@ internal static class BinderErrorWarnings
         var message = $"The generic type '{type.Name}' requires '{requiedTypeArgs}' type arguments";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportFunctionCannotBeUsedWithTypeArguments(this ErrorWarrningBag bag, TextLocation location, TypeSymbol type)
+    {
+        var message = $"Non-generic function type '{type.Name}' cannot be used with type arguments";
+        bag.Report(message, true, location);
+    }
 }
