@@ -481,7 +481,8 @@ public class Parser
                     continue;
                 case TLessThan:
                     {
-                        if (TryParseTypeArguments(out var typeArgs, end: TParLeft))
+                        //if (TryParseTypeArguments(out var typeArgs, end: TParLeft))
+                        if (TryParseTypeArguments(out var typeArgs))
                         {
                             var (openAngle, args, closeAngle) = typeArgs.Value;
                             var resAccess = AccessFromExpression(res);

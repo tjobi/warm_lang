@@ -549,12 +549,30 @@ public sealed class Emitter
             case BoundLambdaExpression lExpr:
                 EmitLambdaExpression(processor, lExpr);
                 break;
-            case BoundTypeApplication appli:
-                //EmitBoundTypeApplication(processor, appli);
+            case BoundFuncTypeApplication appli:
+                EmitBoundTypeApplication(processor, appli);
                 break;
             default:
                 throw new NotImplementedException($"{nameof(Emitter)} doesn't know '{expr} yet'");
         }
+    }
+
+    private void EmitBoundTypeApplication(ILProcessor processor, BoundFuncTypeApplication application)
+    {
+        var funcSymbol = application.Specialized;
+        var generic = new GenericInstanceMethod(_funcs[funcSymbol.SpecializedFrom]);
+        foreach (var typeParam in funcSymbol.TypeArguments)
+        {
+            generic.GenericArguments.Add(CilTypeOf(typeParam));
+        }
+        if (funcSymbol.SpecializedFrom.IsMemberFunc)
+        {
+            if (application.Access is not BoundFuncAccess { Target : var t and not null } )
+                throw new Exception($"{nameof(Emitter)} - compiler bug, expected a member function access for '{application}'");
+            EmitMethodClosureAccess(processor, application.Type, t, generic);
+            return;
+        }
+        EmitStaticFuncAccess(processor, application.Type, generic);
     }
 
     private void EmitLambdaExpression(ILProcessor processor, BoundLambdaExpression lambda)
@@ -729,7 +747,7 @@ public sealed class Emitter
         {
             BoundFuncAccess bfa => bfa.Func,
             BoundMemberAccess { Member: MemberFuncSymbol mfs } => mfs.Function,
-            BoundExprAccess { Expression: BoundTypeApplication app } => app.Specialized,
+            BoundExprAccess { Expression: BoundFuncTypeApplication app } => app.Specialized,
             _ => null,
         };
         if (functionSymbol is null || functionSymbol.HasFreeVariables) //anynomous function call
@@ -1122,15 +1140,17 @@ public sealed class Emitter
 
     private void EmitFunctionAccess(ILProcessor processor, FunctionSymbol f, TypeSymbol funcType, BoundAccess? target = null)
     {
-        if (target is not null)
-        {
-            EmitLoadAccess(processor, target);
-            processor.Emit(OpCodes.Ldftn, _funcs[f]);
-            processor.Emit(OpCodes.Newobj, _cilTypeManager.GetSpecializedMethod(funcType, ".ctor", 2));
-            return;
-        }
-        if (f.HasFreeVariables) EmitFunctionClosure(processor, f);
+        if (target is not null) EmitMethodClosureAccess(processor, funcType, target, _funcs[f]);
+        else if (f.HasFreeVariables) EmitFunctionClosure(processor, f);
         else EmitStaticFuncAccess(processor, funcType, _funcs[f]);
+    }
+
+    private void EmitMethodClosureAccess(ILProcessor processor, TypeSymbol funcType, BoundAccess target, MethodReference f)
+    {
+        EmitLoadAccess(processor, target);
+        processor.Emit(OpCodes.Ldftn, f);
+        processor.Emit(OpCodes.Newobj, _cilTypeManager.GetSpecializedMethod(funcType, ".ctor", 2));
+        return;
     }
 
     private void EmitBuiltinTypeMember(ILProcessor processor, TypeSymbol type, MemberSymbol member)
@@ -1248,7 +1268,7 @@ public sealed class Emitter
         Console.WriteLine($"-- END      '{func.Name}'");
     }
 
-    private void EmitStaticFuncAccess(ILProcessor processor, TypeSymbol functionType, MethodDefinition funcDef)
+    private void EmitStaticFuncAccess(ILProcessor processor, TypeSymbol functionType, MethodReference funcDef)
     {
         processor.Emit(OpCodes.Ldnull);
         processor.Emit(OpCodes.Ldftn, funcDef);

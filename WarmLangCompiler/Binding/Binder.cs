@@ -424,7 +424,9 @@ public sealed class Binder
     private BoundExpression BindExpression(ExpressionNode expression, TypeSymbol targetType)
     => BindTypeConversion(expression, targetType);
 
-    private BoundExpression BindExpression(ExpressionNode expression)
+    private BoundExpression BindExpression(ExpressionNode expression) => BindExpression(expression, expectCallable: false);
+
+    private BoundExpression BindExpression(ExpressionNode expression, bool expectCallable = false)
     {
         return expression switch
         {
@@ -437,17 +439,17 @@ public sealed class Binder
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
             ObjectInitExpression se => BindObjectInitExpression(se),
             NullExpression @null => BindNullExpression(@null),
-            FuncTypeApplication application => BindFuncTypeApplication(application),
+            FuncTypeApplication application => BindFuncTypeApplication(application, expectCallable),
             LambdaExpression expr => BindLambdaExpression(expr),
             ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
     }
 
-    private BoundExpression BindFuncTypeApplication(FuncTypeApplication application)
+    private BoundExpression BindFuncTypeApplication(FuncTypeApplication application, bool expectCallable)
     {
-        var funcTypeInfo = BindAccessCallExpression(application.AppliedOn, out var access, out var funcSymbol);
-
+        var funcTypeInfo = BindAccessToCallableExpression(application.AppliedOn, out var access, out var funcSymbol, callImmediately: expectCallable);
+        
         if (funcTypeInfo is null || funcSymbol is null) return new BoundErrorExpression(application);
 
         if (!funcTypeInfo.HasTypeParameters
@@ -471,48 +473,55 @@ public sealed class Binder
                 return new BoundErrorExpression(application);
             }
         }
-        var specailized = CreateSpecializedFunction(funcSymbol, application.Location, typeArgs);
+        var specailized = CreateSpecializedFunction(funcTypeInfo, funcSymbol, application.Location, typeArgs);
 
-        return new BoundTypeApplication(application, access, specailized);
+        return new BoundFuncTypeApplication(application, access, specailized);
     }
 
     //Nullable typeArguments because you may want to call a generic function "id<T>(T t)" by doing just "id(1)"
     //  which is then inferred to id<int>(1);
     private SpecializedFunctionSymbol CreateSpecializedFunction(
-        FunctionSymbol func,
+        FunctionTypeInformation funcInfo,
+        FunctionSymbol specalizedFrom,
         WarmLangLexerParser.TextLocation location,
         List<TypeSymbol>? typeArguments = null
     )
     {
-        if (typeArguments is not null && func.TypeParameters.Length != typeArguments.Count)
+        if (typeArguments is not null && funcInfo.HasTypeParameters && funcInfo.TypeParameters.Value.Length != typeArguments.Count)
             throw new Exception($"Compiler bug - do not allow inferring parameters when any are explicitly defined");
 
-        var instantiatedParameters = ImmutableArray.CreateBuilder<ParameterSymbol>(func.Parameters.Length);
+        if(!funcInfo.HasTypeParameters)
+            throw new Exception($"Compiler bug - cannot specialize a non-generic function");
+
+        var funcInfoParameters = funcInfo.Parameters;
+        var funcInfoTypeParameters = funcInfo.TypeParameters.Value;
+
+        var instantiatedParameters = ImmutableArray.CreateBuilder<ParameterSymbol>(funcInfo.Parameters.Count);
         var instantiatedTypeParameters = new List<TypeSymbol>();
         //FIXME: Honestly, a rewrite from typesymbol to a typeId is due...
         //       => pretty nasty using strings - but type parameters are unique within a function so should be fine... 
         var typeParametersMap = new Dictionary<string, TypeSymbol>();
         // We have to create a concrete version of the definition. Any TypeParameterSymbol is replaced by its concrete...
-        for (int i = 0; i < func.TypeParameters.Length; i++)
+        for (int i = 0; i < funcInfoTypeParameters.Length; i++)
         {
-            var typeParam = func.TypeParameters[i];
+            var typeParam = funcInfoTypeParameters[i];
             var concrete = typeArguments?[i] ?? _typeScope.CreatePlacerHolderType();
             instantiatedTypeParameters.Add(concrete);
             typeParametersMap[typeParam.Name] = concrete;
         }
 
         //Let's also concretize the actual parameters + return type
-        var concreteReturn = _typeScope.MakeConcrete(func.ReturnType, typeParametersMap, location);
-        for (int i = 0; i < func.Parameters.Length; i++)
+        var concreteReturn = _typeScope.MakeConcrete(funcInfo.ReturnType, typeParametersMap, location);
+        for (int i = 0; i < funcInfoParameters.Count; i++)
         {
-            var param = func.Parameters[i];
-            var concrete = _typeScope.MakeConcrete(param.Type, typeParametersMap, location);
-            instantiatedParameters.Add(new ParameterSymbol(param.Name, concrete, param.Placement));
+            var paramType = funcInfoParameters[i];
+            var concrete = _typeScope.MakeConcrete(paramType, typeParametersMap, location);
+            instantiatedParameters.Add(new ParameterSymbol("$"+i, concrete, i));
         }
 
         var concreteParameters = instantiatedParameters.MoveToImmutable();
-        var (specializedFunctionType, _) = _typeScope.CreateFunctionType(concreteParameters, concreteReturn, isMemberFunc: func.IsMemberFunc);
-        var specailized = new SpecializedFunctionSymbol(func, instantiatedTypeParameters,
+        var (specializedFunctionType, _) = _typeScope.CreateFunctionType(concreteParameters, concreteReturn, isMemberFunc: funcInfo.IsMemberFunc);
+        var specailized = new SpecializedFunctionSymbol(specalizedFrom, instantiatedTypeParameters,
                                                         concreteParameters, specializedFunctionType,
                                                         concreteReturn, location);
         return specailized;
@@ -549,7 +558,7 @@ public sealed class Binder
             var predefinedType = _typeScope.GetTypeOrErrorType(predefined.Syntax);
             return BindTypeConversion(ce.Arguments[0], predefinedType, allowExplicit: true);
         }
-        var funcTypeInfo = BindAccessCallExpression(ce.Called, out var accessToCall, out var calledFuncSymbol);
+        var funcTypeInfo = BindAccessToCallableExpression(ce.Called, out var accessToCall, out var calledFuncSymbol);
 
         if (funcTypeInfo is null) return new BoundErrorExpression(ce);
 
@@ -563,11 +572,11 @@ public sealed class Binder
             }
             if (calledFuncSymbol is not SpecializedFunctionSymbol specialized)
             {
-                calledFuncSymbol = specialized = CreateSpecializedFunction(calledFuncSymbol, ce.Location);
+                calledFuncSymbol = specialized = CreateSpecializedFunction(funcTypeInfo, calledFuncSymbol, ce.Location);
             }
             typeArgEnv = specialized.TypeParameters.Zip(specialized.TypeArguments).ToImmutableDictionary(kv => kv.First, kv => kv.Second);
             funcTypeInfo = (FunctionTypeInformation)_typeScope.GetTypeInformationOrThrow(specialized.Type);
-            accessToCall = new BoundExprAccess(new BoundTypeApplication(ce, accessToCall, specialized));
+            accessToCall = new BoundExprAccess(new BoundFuncTypeApplication(ce, accessToCall, specialized));
         }
 
         var argsSize = ce.Arguments.Count + (funcTypeInfo.IsMemberFunc ? 1 : 0);
@@ -583,25 +592,15 @@ public sealed class Binder
             BoundMemberAccess? bma = accessToCall switch
             {
                 BoundMemberAccess b => b,
-                BoundExprAccess { Expression: BoundTypeApplication { Access: BoundMemberAccess b } } => b,
+                BoundExprAccess { Expression: BoundFuncTypeApplication { Access: BoundMemberAccess b } } => b,
                 _ => null
             };
-            if (bma is null)
-            {
-                /*TODO: We need to synthesize a closure inside "BindAccessCallExpression"
-                        So, if a MemberFuncSymbol is directly used, do as normal...
-                        but if it is as a value, then we need to create a closure that requires the "target"
-                        on which we are calling it as a method...
-                */
-                _diag.ReportFeatureNotImplemented(ce.Location, "Cannot use methods indirectly");
-                return new BoundErrorExpression(ce);
-            }
             if (bma is { Target: not BoundTypeAccess, Member: MemberFuncSymbol })
             {
                 arguments.Add(new BoundAccessExpression(ce, bma.Target));
             }
         }
-
+        
         arguments.AddRange(ce.Arguments.Select(BindExpression));
         for (int i = 0; i < argsSize; i++)
         {
@@ -700,12 +699,12 @@ public sealed class Binder
                             _diag.ReportFeatureNotImplemented(ma.Location, "Cannot create closures for methods on value types");
                             return new BoundInvalidAccess();
                         }
-                        if (!_typeScope.TryGetTypeInformation(fs.Function.Type, out var memberFuncInfo)
-                           || memberFuncInfo.HasTypeParameters)
-                        {
-                            _diag.ReportFeatureNotImplemented(ma.Location, "Cannot reference generic methods (yet)");
-                            return new BoundInvalidAccess();
-                        }
+                        // if (!_typeScope.TryGetTypeInformation(fs.Function.Type, out var memberFuncInfo)
+                        //    || memberFuncInfo.HasTypeParameters)
+                        // {
+                        //     _diag.ReportFeatureNotImplemented(ma.Location, "Cannot reference generic methods (yet)");
+                        //     return new BoundInvalidAccess();
+                        // }
                         //TODO: Please, put the "target" into the free variables, so we can reuse closure logic!
                         //TODO: Use the type information instead of function symbol
                         var (funcType, _) = _typeScope.CreateFunctionType(
@@ -720,7 +719,7 @@ public sealed class Binder
                 }
             case ExprAccess exprAccess:
                 {
-                    var expr = BindExpression(exprAccess.Expression);
+                    var expr = BindExpression(exprAccess.Expression, expectCallable : expectFunc);
                     return new BoundExprAccess(expr);
                 }
             case SubscriptAccess sa:
@@ -914,11 +913,12 @@ public sealed class Binder
         return new BoundTypeConversionExpression(expr.Node, to, expr);
     }
 
-    private FunctionTypeInformation? BindAccessCallExpression(Access access, out BoundAccess accessSymbol,
-                                                              out FunctionSymbol? symbol)
+    private FunctionTypeInformation? BindAccessToCallableExpression(
+        Access access, out BoundAccess accessSymbol,
+        out FunctionSymbol? symbol, bool callImmediately = true)
     {
         symbol = null;
-        accessSymbol = BindAccess(access, expectFunc: true);
+        accessSymbol = BindAccess(access, expectFunc: callImmediately);
         if (accessSymbol is BoundInvalidAccess) return null;
         var typeInfo = _typeScope.GetTypeInformation(accessSymbol.Type);
         if (typeInfo is null || typeInfo.Type == TypeSymbol.Error) return null;
@@ -932,7 +932,7 @@ public sealed class Binder
         {
             BoundFuncAccess acc => acc.Func,
             BoundMemberAccess { Member: MemberFuncSymbol acc } => acc.Function,
-            BoundExprAccess { Expression: BoundTypeApplication app } => app.Specialized,
+            BoundExprAccess { Expression: BoundFuncTypeApplication app } => app.Specialized,
             _ => null
         };
         return funcInfo;

@@ -243,4 +243,10 @@ internal static class BinderErrorWarnings
         var message = $"'{TypeSymbol.Void}' was passed as a type argument for generic type '{type.Name}' which is illegal";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportCannotInstantiateGenericTypeWithoutTypeArguments(this ErrorWarrningBag bag, TextLocation location, TypeSymbol type, int requiedTypeArgs)
+    {
+        var message = $"The generic type '{type.Name}' requires '{requiedTypeArgs}' type arguments";
+        bag.Report(message, true, location);
+    }
 }

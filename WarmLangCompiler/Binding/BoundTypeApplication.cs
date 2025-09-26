@@ -4,9 +4,9 @@ using WarmLangLexerParser.AST;
 
 namespace WarmLangCompiler.Binding;
 
-public sealed class BoundTypeApplication : BoundExpression
+public sealed class BoundFuncTypeApplication : BoundExpression
 {
-    public BoundTypeApplication(ExpressionNode node, BoundAccess access, SpecializedFunctionSymbol funcSymbol) 
+    public BoundFuncTypeApplication(ExpressionNode node, BoundAccess access, SpecializedFunctionSymbol funcSymbol) 
     : base(node, funcSymbol.Type)
     {
         Access = access;

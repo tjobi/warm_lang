@@ -152,12 +152,12 @@ public sealed class BoundInterpreter
             BoundObjectInitExpression bse => EvaluateObjectInitExpression(bse),
             BoundNullExpression _ => EvaluateNullExpression(),
             BoundLambdaExpression lambda => EvaluateLambdaExpression(lambda),
-            BoundTypeApplication typeApp => EvaluateTypeApplication(typeApp),
+            BoundFuncTypeApplication typeApp => EvaluateTypeApplication(typeApp),
             _ => throw new NotImplementedException($"{nameof(BoundInterpreter)} doesn't know '{expr.GetType().Name}' yet"),
         };
     }
 
-    private Value EvaluateTypeApplication(BoundTypeApplication typeApp)
+    private Value EvaluateTypeApplication(BoundFuncTypeApplication typeApp)
     {
         return GetFunctionValueFromSymbol(typeApp.Specialized.SpecializedFrom);
     }
