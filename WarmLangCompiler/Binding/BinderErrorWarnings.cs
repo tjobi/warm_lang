@@ -255,4 +255,10 @@ internal static class BinderErrorWarnings
         var message = $"Non-generic function type '{type.Name}' cannot be used with type arguments";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportMixImplicitAndExplicitLambdaParameters(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = $"Cannot mix implicit and explicit parameters in lambda expression";
+        bag.Report(message, true, location);
+    }
 }

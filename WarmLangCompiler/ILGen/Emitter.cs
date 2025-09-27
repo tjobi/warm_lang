@@ -505,10 +505,9 @@ public sealed class Emitter
     private void EmitExprStatement(ILProcessor processor, BoundExprStatement stmnt)
     {
         EmitExpression(processor, stmnt.Expression);
-        if (!_cilTypeManager.TryGetTypeInformation(stmnt.Expression.Type, out var exprTypeInfo))
-            throw new Exception($"{nameof(Emitter)} - compiler bug, no type information for '{stmnt.Expression.Type}'");
-        
-        if (exprTypeInfo.Type != TypeSymbol.Void)
+
+        var type = _cilTypeManager.GetActualTypeOrThrowCompilerBug(stmnt.Expression.Type);
+        if (type != TypeSymbol.Void)
             processor.Emit(OpCodes.Pop);
     }
 
@@ -681,6 +680,7 @@ public sealed class Emitter
     private void EmitAssignmentExpression(ILProcessor processor, BoundAssignmentExpression assignment)
     {
         VariableDefinition tmpVar;
+        TypeSymbol? targetType = null;
         switch (assignment.Access)
         {
             case BoundNameAccess name:
@@ -698,7 +698,7 @@ public sealed class Emitter
                 if (isVariableInClosure) EmitLoadAccess(processor, name); //must leave something to pop.
                 break;
             case BoundSubscriptAccess sa:
-                var targetType = sa.Target.Type;
+                targetType = sa.Target.Type;
                 if (_cilTypeManager.IsListType(targetType))
                 {
                     var rhsType = CilTypeOf(assignment.RightHandSide.Type);
@@ -717,11 +717,9 @@ public sealed class Emitter
                 }
                 throw new NotImplementedException($"{nameof(EmitAssignmentExpression)} doesn't allow assignments into type '{assignment.Access.Type}'");
             case BoundMemberAccess bma and { Member: MemberFieldSymbol fSymbol }:
-                if (!_cilTypeManager.TryGetTypeInformation(bma.Target.Type, out var binderInfo))
-                {
-                    throw new Exception($"Compiler bug - {bma.Target.Type} has no information from the binder");
-                }
-                var typeInfo = _typeInfoOf[binderInfo.Type];
+                targetType = _cilTypeManager.GetActualTypeOrThrowCompilerBug(bma.Target.Type);
+
+                var typeInfo = _typeInfoOf[targetType];
                 var fieldRef = typeInfo.SymbolToField[fSymbol.Name];
                 //TODO: can we avoid the temporary variable, or is it possible to reuse them?
                 tmpVar = new VariableDefinition(CilTypeOf(assignment.RightHandSide.Type));
@@ -1155,6 +1153,7 @@ public sealed class Emitter
 
     private void EmitBuiltinTypeMember(ILProcessor processor, TypeSymbol type, MemberSymbol member)
     {
+        type = _cilTypeManager.GetActualTypeOrThrowCompilerBug(type);
         if (member.Name == "len")
         {
             if (type == TypeSymbol.String)

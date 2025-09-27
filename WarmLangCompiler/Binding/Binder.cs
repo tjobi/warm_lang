@@ -426,7 +426,8 @@ public sealed class Binder
 
     private BoundExpression BindExpression(ExpressionNode expression) => BindExpression(expression, expectCallable: false);
 
-    private BoundExpression BindExpression(ExpressionNode expression, bool expectCallable = false)
+    //expectedType is here to push down the expected type for better type inference
+    private BoundExpression BindExpression(ExpressionNode expression, bool expectCallable = false, TypeSymbol? expectedType = null)
     {
         return expression switch
         {
@@ -440,7 +441,7 @@ public sealed class Binder
             ObjectInitExpression se => BindObjectInitExpression(se),
             NullExpression @null => BindNullExpression(@null),
             FuncTypeApplication application => BindFuncTypeApplication(application, expectCallable),
-            LambdaExpression expr => BindLambdaExpression(expr),
+            LambdaExpression expr => BindLambdaExpression(expr, expectedType),
             ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
@@ -888,11 +889,19 @@ public sealed class Binder
         return new BoundObjectInitExpression(se, type, members.MoveToImmutable());
     }
 
-    private BoundExpression BindLambdaExpression(LambdaExpression expr)
+    private BoundExpression BindLambdaExpression(LambdaExpression expr, TypeSymbol? expectedType)
     {
-        var parameters = _typeScope.CreateParameterSymbols(expr.Parameters!, treatNullAsPlaceholder: true);
-        var returnType = _typeScope.CreatePlacerHolderType();
-        var (lambdaType, _) = _typeScope.CreateFunctionType(parameters, returnType);
+        //Check if parameters mixed explicit types and implicit types
+        bool seenImplicit = false, seenExplicit = false;
+        foreach (var p in expr.Parameters)
+        {
+            if (p.type is null) seenImplicit = true;
+            else seenExplicit = true;
+        }
+        if(seenImplicit && seenExplicit)
+            _diag.ReportMixImplicitAndExplicitLambdaParameters(expr.Location);
+
+        var (lambdaType, _) = _typeScope.CreateLambdaFunctionType(expr, out var parameters, out var returnType, expectedType);
         var lambdaSymbol = FunctionFactory.CreateLambda(expr.Location, parameters, lambdaType, returnType);
 
         var lambdaBody = BindFunctionBody(lambdaSymbol, expr.Body, lower: false);
@@ -919,7 +928,7 @@ public sealed class Binder
 
     private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowExplicit = false)
     {
-        var boundExpression = BindExpression(expr);
+        var boundExpression = BindExpression(expr, expectedType: to);
         return BindTypeConversion(boundExpression, to, allowExplicit);
     }
 

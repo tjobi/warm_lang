@@ -133,6 +133,13 @@ public sealed class CilTypeManager
     {
         return infoOf.TryGetValue(type, out result);
     }
+    
+    public TypeSymbol GetActualTypeOrThrowCompilerBug(TypeSymbol type)
+    {
+        if (!infoOf.TryGetValue(type, out var info))
+            throw new Exception($"{nameof(CilTypeManager)} - compiler bug, couldn't find info of {type}");
+        return info.Type;
+    }
 
     private TypeReference GetCilFuncType(TypeSymbol type, FunctionTypeInformation func)
     {
@@ -171,7 +178,7 @@ public sealed class CilTypeManager
                 res = funcTypeCache[func.Parameters.Count] = assemblyDef.MainModule.ImportReference(baseFuncType);
             }
         }
-        if(genericArgs is not null)
+        if (genericArgs is not null)
         {
             res = res.MakeGenericInstanceType(genericArgs.Select(GetType).ToArray());
         }

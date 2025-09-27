@@ -495,10 +495,10 @@ public sealed class BinderTypeScope
             return type;
         }
         if (baseInfo is { TypeParameters: null })
-            {
-                _diag.ReportNonGenericType(genericType.Name, location);
-                return TypeSymbol.Error;
-            }
+        {
+            _diag.ReportNonGenericType(genericType.Name, location);
+            return TypeSymbol.Error;
+        }
         var baseTypeParameters = baseInfo.TypeParameters.Value;
         if (baseTypeParameters.Length != typeArguments.Count)
         {
@@ -570,7 +570,7 @@ public sealed class BinderTypeScope
                 GetOrCreateListType(MakeConcrete(lst.NestedType, concreteOf, location)),
             GenericTypeInformation gt =>
                 GetOrCreateTypeApplication(gt.SpecializedFrom, gt.TypeArguments.Select(t => MakeConcrete(t, concreteOf, location)).ToList(), location),
-            FunctionTypeInformation f => 
+            FunctionTypeInformation f =>
                 CreateFunctionType(f.Parameters.Select(t => MakeConcrete(t, concreteOf, location)).ToList(),
                                    MakeConcrete(f.ReturnType, concreteOf, location)).Item1,
             null => throw new Exception($"{nameof(MakeConcrete)} - tried to concretify '{param}' with no information"),
@@ -635,12 +635,24 @@ public sealed class BinderTypeScope
         bool treatNullAsPlaceholder = false
     )
     {
+        return CreateParameterSymbols(parsedParameters, out _, treatNullAsPlaceholder);
+    }
+
+    private ImmutableArray<ParameterSymbol> CreateParameterSymbols(
+        IList<(TypeSyntaxNode, WarmLangLexerParser.SyntaxToken)> parsedParameters,
+        out bool anyNonNulls, 
+        bool treatNullAsPlaceholder = false
+    )
+    {
+        anyNonNulls = false;
         var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
         var uniqueParameterNames = new HashSet<string>();
 
         for (int i = 0; i < parsedParameters.Count; i++)
         {
             var (type, name) = parsedParameters[i];
+            
+            anyNonNulls =  anyNonNulls || type is not null;
             var paramType = type is null && treatNullAsPlaceholder ? CreatePlacerHolderType() : GetTypeOrErrorType(type);
 
             //missing names have been reported by the parser
@@ -680,7 +692,7 @@ public sealed class BinderTypeScope
         {
             sb.Append('<').AppendJoin(", ", typeParameters.Value).Append('>');
         }
-        
+
         sb.Append('(')
           .AppendJoin(", ", parameterTypes)
           .Append(") => ")
@@ -699,6 +711,36 @@ public sealed class BinderTypeScope
         return (typeInfo.Type, typeInfo);
     }
 
+    //tries to infer the type from the expected type, but it is not always possible to do so... i.e. explicitly typed parameters
+    public (TypeSymbol, FunctionTypeInformation) CreateLambdaFunctionType(
+        WarmLangLexerParser.AST.LambdaExpression lambda,
+        out ImmutableArray<ParameterSymbol> parameters,
+        out TypeSymbol returnType,
+        TypeSymbol? expectedType
+    )
+    {
+        parameters = CreateParameterSymbols(lambda.Parameters!, out var anyExplicityTyped, treatNullAsPlaceholder: true);
+        returnType = CreatePlacerHolderType();
+
+        //when no expected proceed as normal...
+        if (anyExplicityTyped || expectedType is null) return CreateFunctionType(parameters, returnType);
+        if (!TryGetTypeInformation(expectedType, out var expectedInfo)
+            || expectedInfo is not FunctionTypeInformation fi
+            || fi.Parameters.Count != parameters.Length
+            )
+            return CreateFunctionType(parameters, returnType);
+
+        Unify(returnType, fi.ReturnType);
+        returnType = GetActualType(returnType);
+        var paramTypes = new List<TypeSymbol>(parameters.Length);
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var paramType = fi.Parameters[i];
+            Unify(parameters[i].Type, paramType);
+            paramTypes.Add(GetActualType(parameters[i].Type));
+        }
+        return CreateFunctionType(paramTypes, returnType);
+    }
 
     private enum AddTo
     {
@@ -726,4 +768,6 @@ public sealed class BinderTypeScope
                 return;
         }
     }
+    
+
 }
