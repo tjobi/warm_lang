@@ -6,6 +6,7 @@ function main() {
     q.enqueue(1);
     q.enqueue(2);
     stdWriteLine(q.toString());
+    stdWriteLine("with sum of: " + string(q.sum()));
     stdWriteLine("dequeued: " + string(q.dequeue()));
     stdWriteLine(q.toString());
 
@@ -15,11 +16,13 @@ function main() {
     //TODO: why does this need an explicit int - hmm
     //      `LinkedList<int> someInts = fromList<int>([1,2,3,4]);`
     //      it is fixed by var but there is a buuuuuug here ;(
-    var someInts = fromList([1,2,3,4]);
-    stdWriteLine(someInts.toString());
-    someInts.reverse();
-    stdWriteLine(someInts.toString());
-    var target = 2;
+    var someStrings = fromList(["how", "is", "it", "going", "?"]);
+    stdWriteLine(someStrings.toString());
+    someStrings.reverse();
+    stdWriteLine(someStrings.toString());
+    //Same as doing someStrings.map(...)
+    var someInts = LinkedList.map(someStrings, (string s) => s.len);
+    var target = 3;
     stdWriteLine(someInts.filter((i) => i >= target).toString());
 }
 
@@ -31,7 +34,7 @@ function fromList<T>(T[] ts) LinkedList<T> {
     var lst = createLinkedList<T>();
     var i = 0;
     while i < ts.len : i = i + 1 {
-        lst.push(ts[i]);
+        lst.enqueue(ts[i]);
     }
     return lst;
 }
@@ -110,4 +113,26 @@ function LinkedList<T>.filter<T>(LinkedList<T> self, Func<T, bool> predicate) Li
         if predicate(cur.value) { l.enqueue(cur.value); }
     }
     return l;
+}
+
+function LinkedList<A>.fold<A, B>(LinkedList<A> self, B z, Func<B, A, B> op) B {
+    var acc = z;
+    var cur = self.head;
+    while cur != null : cur = cur.next {
+        acc = op(acc, cur.value);
+    }
+    return acc;
+}
+
+function LinkedList<int>.sum(LinkedList<int> self) int {
+    return self.fold(0, (int a, int b) => a + b);
+}
+
+function LinkedList<A>.map<A,B>(LinkedList<A> self, Func<A,B> mapper) LinkedList<B> {
+    var hd = createLinkedList<B>();
+    var cur = self.head;
+    while cur != null : cur = cur.next{
+        hd.enqueue(mapper(cur.value));
+    }
+    return hd;
 }
