@@ -205,24 +205,28 @@ public sealed class Binder
     {
         var name = varDecl.Identifier.Name!;
         var rightHandSide = BindExpression(varDecl.RightHandSide);
+        TypeSymbol? type = null;
         if (varDecl.Type is not null)
         {
-            var type = _typeScope.GetTypeOrErrorType(varDecl.Type);
+            type = _typeScope.GetTypeOrErrorType(varDecl.Type);
             rightHandSide = BindTypeConversion(rightHandSide, type);
-            if(type == TypeSymbol.Void)
+
+            if (type == TypeSymbol.Void)
             {
                 _diag.ReportTypeVoidIsNotValidHere(varDecl.Type.Location);
             }
         }
+
 
         if (varDecl.Type is null && _typeScope.GetActualType(rightHandSide.Type) == TypeSymbol.Void)
         {
             _diag.ReportCannotAssignVoidToImplicitlyTypedVariable(varDecl.Identifier, rightHandSide.Location);
         }
 
+        type ??= rightHandSide.Type;
         VariableSymbol variable = isGlobalScope
-                                ? new GlobalVariableSymbol(name, rightHandSide.Type)
-                                : new LocalVariableSymbol(name, rightHandSide.Type, _functionStack.Peek());
+                                ? new GlobalVariableSymbol(name, type)
+                                : new LocalVariableSymbol(name, type, _functionStack.Peek());
 
         if (!_scope.TryDeclareVariable(variable))
         {
