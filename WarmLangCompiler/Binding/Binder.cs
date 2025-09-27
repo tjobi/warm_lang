@@ -621,14 +621,17 @@ public sealed class Binder
             };
             if (bma is { Target: not BoundTypeAccess, Member: MemberFuncSymbol })
             {
-                arguments.Add(new BoundAccessExpression(ce, bma.Target));
+                var synthAcess = new BoundAccessExpression(ce, bma.Target);
+                var boundSelfArg = BindTypeConversion(synthAcess, funcTypeInfo.Parameters[0]);
+                arguments.Add(boundSelfArg);
             }
         }
-        
-        arguments.AddRange(ce.Arguments.Select(BindExpression));
-        for (int i = 0; i < argsSize; i++)
+
+        //startIndex is 1 if we have a member function, 0 otherwise
+        var startIndex = argsSize - ce.Arguments.Count;
+        for (int i = startIndex; i < argsSize; i++)
         {
-            arguments[i] = BindTypeConversion(arguments[i], funcTypeInfo.Parameters[i]);
+            arguments.Add(BindTypeConversion(ce.Arguments[i-startIndex], funcTypeInfo.Parameters[i]));
         }
 
         //After all unifies have happend
