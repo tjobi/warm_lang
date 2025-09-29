@@ -77,10 +77,10 @@ public sealed class CilTypeManager
     public MethodReference GetSpecializedMethod(TypeSymbol type, string name, int arity)
     {
         var signature = new CachedSignature(type, name, arity);
-        if (methodCache.ContainsKey(signature)) return methodCache[signature];
+        if (methodCache.TryGetValue(signature, out MethodReference? value)) return value;
 
         //FIXME: Should we add some sort of check to make sure only valid "GenericTypeInformation" or "ListTypeInformation" goes here?
-        var info = infoOf[type];
+        
         //Needs be here because GetType has side effects - it creates TypeReferences ... nasty ;(
         var specializedType = GetType(type);
         TypeReference baseType = infoOf[type] switch

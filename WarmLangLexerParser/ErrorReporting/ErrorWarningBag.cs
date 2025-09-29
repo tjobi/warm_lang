@@ -100,4 +100,10 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         var message = "Trailing comma in parameter list - please remove the comma";
         Report(message, true, location);
     }
+
+    public void ReportInvalidNumber(TextLocation location, string text)
+    {
+        var message = $"The number '{text}' is not a valid integer";
+        Report(message, true, location);
+    }
 }

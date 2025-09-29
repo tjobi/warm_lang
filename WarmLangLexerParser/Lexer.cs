@@ -272,8 +272,13 @@ public class Lexer
         {
             sb.Append(Current);
         }
-        var number = int.Parse(sb.ToString());
+        var num = sb.ToString();
         var location = new TextLocation(startLine, startColumn, Line, Column);
+        if (!int.TryParse(num, out var number))
+        {
+            _diag.ReportInvalidNumber(new TextLocation(startLine, startColumn, Line, Column), num);
+            return SyntaxToken.MakeToken(TConst, location, intValue: 0);
+        }
         return SyntaxToken.MakeToken(TConst, location, intValue: number);
     }
 

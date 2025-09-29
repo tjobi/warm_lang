@@ -59,7 +59,7 @@ public sealed class FileWindow : TextWindow
     {
         if(!IsEndOfFile)
             return _cur;
-        Console.WriteLine((string?)$"LEXER Failed: on line: {Line+1}, column: {Column+1}");
+        Console.WriteLine($"LEXER Failed: on line: {Line+1}, column: {Column+1}");
         return '\0';
     }
 
