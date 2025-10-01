@@ -689,8 +689,8 @@ public sealed class Binder
                         if (symbol is VariableSymbol variable)
                         {
                             //Have we reached a free variable?
-                            var currentFunction = _functionStack.Peek();
-                            if (variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
+                            if (_functionStack.TryPeek(out var currentFunction) && 
+                                variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
                             {
                                 var fv = currentFunction.FreeVariables;
                                 //Create a new mapping for this free variable
