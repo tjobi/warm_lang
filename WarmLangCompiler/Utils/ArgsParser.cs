@@ -1,16 +1,33 @@
 namespace WarmLangCompiler.Utils;
 
-public record struct ParsedArgs(
-    string Program, 
-    bool ParserDebug = false, 
-    bool LexerDebug = false, 
-    bool BinderDebug = false,
-    bool TraceExceptions = false,
-    bool Interactive = false,
-    bool Evaluate = false,
-    bool EmitterDebug = false,
+[Flags]
+public enum CompilerOptions
+{
+    None = 0,
+    ParserDebug = 1 << 0,
+    LexerDebug = 1 << 1,
+    BinderDebug = 1 << 2,
+    TraceExceptions = 1 << 3,
+    Interactive = 1 << 4,
+    Evaluate = 1 << 5,
+    EmitterDebug = 1 << 6
+}
+
+public readonly record struct ParsedArgs(
+    string Program,
+    CompilerOptions Options = CompilerOptions.None,
     string? OutPath = null
-    );
+)
+{
+    public bool ParserDebug => (Options & CompilerOptions.ParserDebug) != 0;
+    public bool LexerDebug => (Options & CompilerOptions.LexerDebug) != 0;
+    public bool BinderDebug => (Options & CompilerOptions.BinderDebug) != 0;
+    public bool EmitterDebug => (Options & CompilerOptions.EmitterDebug) != 0;
+    public bool TraceExceptions => (Options & CompilerOptions.TraceExceptions) != 0;
+    public bool Interactive => (Options & CompilerOptions.Interactive) != 0;
+    public bool Evaluate => (Options & CompilerOptions.Evaluate) != 0;
+}
+
 public static class ArgsParser
 {
     private static void Help()
@@ -32,109 +49,90 @@ public static class ArgsParser
 
     public static ParsedArgs? ParseArgs(string[] args, string defaultProgram)
     {
-        var parsedArgs = new ParsedArgs(defaultProgram);
+        var program = defaultProgram;
+        string? outPath = null;
+        CompilerOptions options = CompilerOptions.None;
         var isLookingForFile = true;
         for (int i = 0; i < args.Length; i++)
         {
             var arg = args[i];
-            switch(arg)
+            switch (arg)
             {
                 case "-lh": //short for "lang help" otherwise it is caught by "dotnet run"
-                case "--lang-help": 
-                {
-                    Help();
-                    return null;
-                }
+                case "--lang-help":
+                    {
+                        Help();
+                        return null;
+                    }
                 case "-o":
                 case "--out":
-                {
-                    if(i+1 < args.Length)
                     {
-                        i++;
-                        parsedArgs.OutPath = args[i];
-                    } else
-                    {
-                        ReportError($"Must provide an output path when using \"{arg}\"");
-                        Help();
-                        return null;
+                        if (i + 1 < args.Length)
+                        {
+                            i++;
+                            outPath = args[i];
+                        }
+                        else
+                        {
+                            ReportError($"Must provide an output path when using \"{arg}\"");
+                            Help();
+                            return null;
+                        }
                     }
-                } break;
+                    break;
                 case "-is":
                 case "--interactive":
-                {
-                    parsedArgs.Interactive = true;
-                } break;
+                    options |= CompilerOptions.Interactive;
+                    break;
                 case "--lex-debug":
-                {
-                    parsedArgs.LexerDebug = true;
-                } break;
+                    options |= CompilerOptions.LexerDebug;
+                    break;
                 case "--emitter-debug":
-                {
-                    parsedArgs.EmitterDebug = true;
-                } break;
+                    options |= CompilerOptions.EmitterDebug;
+                    break;
                 case "--parser-debug":
-                {
-                    parsedArgs.ParserDebug = true;
-                } break;
+                    options |= CompilerOptions.ParserDebug;
+                    break;
                 case "--binder-debug":
-                {
-                    parsedArgs.BinderDebug = true;
-                } break;
+                    options |= CompilerOptions.BinderDebug;
+                    break;
                 case "--trace":
-                {
-                    parsedArgs.TraceExceptions = true;
-                } break;
+                    options |= CompilerOptions.TraceExceptions;
+                    break;
                 case "--eval":
-                {
-                    parsedArgs.Evaluate = true;
-                } break;
-                default: 
-                {
-                    if(arg.StartsWith("-"))
+                    options |= CompilerOptions.Evaluate;
+                    break;
+                default:
                     {
-                        ReportError($"Unrecognized command-line option \"{arg}\"");
-                        Help();
-                        return null;
+                        if (arg.StartsWith("-"))
+                        {
+                            ReportError($"Unrecognized command-line option \"{arg}\"");
+                            Help();
+                            return null;
+                        }
+                        if (!isLookingForFile)
+                        {
+                            ReportError($"At most 1 input file may be provided");
+                            return null;
+                        }
+                        program = arg;
+                        isLookingForFile = false;
                     }
-                    if(!isLookingForFile)
-                    {
-                        ReportError($"At most 1 input file may be provided");
-                        return null;
-                    }
-                    parsedArgs.Program = arg;
-                    isLookingForFile = false;
-                } break;
+                    break;
             }
         }
-        if(isLookingForFile)
+        if (isLookingForFile)
         {
             ReportError("No input file provided");
             return null;
         }
-        if(!File.Exists(parsedArgs.Program)) 
+        if (!File.Exists(program))
         {
-            ReportError($"No such file '{parsedArgs.Program}'");
+            ReportError($"No such file '{program}'");
             return null;
         }
-        return parsedArgs;
+        return new ParsedArgs(program, options, outPath);
     }
 
-    public static void ReportError(string msg) => Console.WriteLine("ERROR: " + msg);
-
-    public static void Deconstruct(this ParsedArgs args, out string program, out bool parserDebug,
-                                   out bool lexerDebug, out bool binderDebug,
-                                   out bool longExceptions, out bool interactive, out bool shouldEvaluate,
-                                   out bool emitterDebug, out string? outPath)
-    {
-        program = args.Program;
-        parserDebug = args.ParserDebug;
-        lexerDebug = args.LexerDebug;
-        longExceptions = args.TraceExceptions;
-        interactive = args.Interactive;
-        binderDebug = args.BinderDebug;
-        shouldEvaluate = args.Evaluate;
-        emitterDebug = args.EmitterDebug;
-        outPath = args.OutPath;
-        return;
-    }
+    public static void ReportError(string msg) => Console.Error.WriteLine("ERROR: " + msg);
 }

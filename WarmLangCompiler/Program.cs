@@ -8,17 +8,11 @@ using WarmLangLexerParser.ErrorReporting;
 
 var DEFAULT_PROGRAM = "SyntaxTest/test.wl";
 
-ParsedArgs? parsedArgs = ArgsParser.ParseArgs(args, DEFAULT_PROGRAM); 
-if(parsedArgs is null)
-{
-    return 16;
-}
+ParsedArgs? parsedArgs = ArgsParser.ParseArgs(args, DEFAULT_PROGRAM);
+if (parsedArgs is null) return (int)ExitCodes.InvalidArgs;
 ParsedArgs pArgs = parsedArgs.Value;
 
-if(pArgs.Interactive) 
-{
-    return Interactive.Loop();
-}
+if(pArgs.Interactive) return Interactive.Loop();
 
 var program = pArgs.Program;
 var outfile = pArgs.OutPath ?? Path.Combine(Directory.GetCurrentDirectory(), Path.GetFileName(program));
@@ -62,7 +56,7 @@ if(diagnostics.AnyError())
     Console.WriteLine("--Compilation failed on: --");
     DisplayErrorsAndWarnings();
     Console.WriteLine("Exitting...");
-    return 1;
+    return (int)ExitCodes.CompilationError;
 }
 
 if (pArgs.Evaluate)
@@ -70,7 +64,7 @@ if (pArgs.Evaluate)
     DisplayErrorsAndWarnings();
     var res = BoundInterpreter.Run(boundProgram);
     Console.WriteLine($"Evaluated '{program}' -> {res}");
-    return 0;
+    return (int)ExitCodes.Success;
 }
 else
 {
@@ -80,11 +74,11 @@ else
     if (diagnostics.AnyError())
     {
         Console.WriteLine("Exitting...");
-        return 1;
+        return (int)ExitCodes.CompilationError;
     }
     DefaultRuntimeConfig.Write(outfile);
     Console.WriteLine($"Compiled '{program}' to '{outfile}'");
-    return 0;
+    return (int)ExitCodes.Success;
 }
 
 void DisplayErrorsAndWarnings()
