@@ -3,15 +3,18 @@ bool z = true;
 int xi = 0;
 
 if z {
-    int g  = 10;
+    int g = 10;
+    var lazyAddG = (int i) => g + i; 
     if 0 + g > 0 {
         xi = xi + 25;
+        stdWriteLine(string(lazyAddG(2)));
     }
     else {
         xi = xi + 5; 
     }
 }
 else {
+    // g = 2;
     xi = 25;
 }
 if z { 

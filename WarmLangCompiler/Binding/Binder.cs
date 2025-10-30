@@ -46,7 +46,7 @@ public sealed class Binder
         if (node is not ASTRoot root)
             throw new NotImplementedException($"{nameof(Binder)}.{nameof(BindProgram)} only allows root to be '{nameof(ASTRoot)}'");
 
-        var (bound, globalVariables, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
+        var (main, scriptMain, globalVariables) = BindASTRoot(root);
 
         // var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
         foreach (var function in _scope.GetFunctions())
@@ -65,27 +65,10 @@ public sealed class Binder
                 _typeScope.AddMethodBody(type, func, boundBody);
             }
         }
-
-        FunctionSymbol? main = null;
-        FunctionSymbol? scriptMain = null;
-        if (_functionToBody.Where(kv => kv.Key.Name == "main").FirstOrDefault() is { Key: FunctionSymbol mainSymbol, Value: BoundBlockStatement mainBody })
-        {
-            main = mainSymbol;
-        }
-
-        if (hasGlobalNonDeclarationStatements || main is null)
-        {
-            if (main is not null)
-                _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
-
-            scriptMain = FunctionFactory.CreateMain("__wl_script_main");
-            var scriptMainBody = LowerAndCheckControlFlow(scriptMain, bound);
-            _functionToBody[scriptMain] = scriptMainBody;
-        }
         return new BoundProgram(main, scriptMain, _functionToBody.ToImmutableDictionary(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
     }
 
-    private (BoundBlockStatement boundRoot, ImmutableArray<BoundVarDeclaration> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
+    private (FunctionSymbol? main, FunctionSymbol? scriptMain, ImmutableArray<BoundVarDeclaration> globals) BindASTRoot(ASTRoot root)
     {
         var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>();
         var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>(); //NON-function delcarations
@@ -96,30 +79,46 @@ public sealed class Binder
         {
             BindTopLevelStatement(func);
         }
-        foreach (var toplevel in root.Children)
+
+        foreach (var declaration in root.GetChildrenOf<TopLevelVarDeclaration>())
         {
-            switch (toplevel)
-            {
-                case TopLevelTypeDeclaration:
-                case TopLevelFuncDeclaration:
-                case TopLevelError:
-                    continue;
-                case TopLevelStamentNode top: //ArbitraryStatementNode and VarDeclaration
-                    var bound = BindTopLevelStatement(top);
-                    if (bound is BoundErrorStatement) continue;
-
-                    topLevelstatments.Add(bound);
-                    if (bound is BoundVarDeclaration var)
-                        globalVariables.Add(var);
-                    break;
-                default: throw new NotImplementedException($"{nameof(Binder)} does not yet allow {toplevel.GetType().Name}");
-            }
+            var boundDecl = (BoundVarDeclaration)BindTopLevelStatement(declaration);
+            globalVariables.Add(boundDecl);
         }
-        //What if we parsed an empty file?
-        var rootNode = topLevelstatments.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
-        var boundChildren = new BoundBlockStatement(rootNode, topLevelstatments.ToImmutable());
 
-        return (boundChildren, globalVariables.ToImmutable(), topLevelstatments.Count != globalVariables.Count);
+        //TODO: could probably do typdecls + funcs + declaration < root.Children.length
+        var globalStatements = root.GetChildrenOf<TopLevelArbitraryStament>().ToArray();
+
+        FunctionSymbol? main = null;
+        FunctionSymbol? scriptMain = null;
+        if (_scope.GetFunctions().Where(f => f.Name == "main").FirstOrDefault() is FunctionSymbol mainSymbol)
+        {
+            main = mainSymbol;
+        }
+
+        if (globalStatements.Length > 0 || main is null)
+        {
+            if (main is not null)
+                _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
+
+            //What if we parsed an empty file?
+            var startLoc = EmptyStatment.Get.Location;
+            var endLoc = EmptyStatment.Get.Location;
+            if (globalStatements.Length > 0)
+            {
+                startLoc = globalStatements[0].Location;
+                endLoc = globalStatements[^1].Location;
+            }
+            scriptMain = FunctionFactory.CreateMain("__wl_script_main");
+            var start = WarmLangLexerParser.SyntaxToken.MakeToken(WarmLangLexerParser.TokenKind.TCurLeft,  startLoc);
+            var end = WarmLangLexerParser.SyntaxToken.MakeToken(WarmLangLexerParser.TokenKind.TCurRight, endLoc);
+            var stmnts = globalStatements.Select(s => s.Statement).ToImmutableArray();
+            var body = new BlockStatement(start, stmnts, end);
+            _scope.TryDeclareFunction(scriptMain);
+            _unBoundBodyOf[scriptMain] = body;
+        }
+
+        return (main, scriptMain, globalVariables.ToImmutable());
     }
 
     private void BindTypeDeclarations(ASTRoot root)
@@ -226,7 +225,7 @@ public sealed class Binder
         type ??= rightHandSide.Type;
         VariableSymbol variable = isGlobalScope
                                 ? new GlobalVariableSymbol(name, type)
-                                : new LocalVariableSymbol(name, type, _functionStack.Peek());
+                                : new LocalVariableSymbol(name, type, _functionStack.TryPeek(out var f) ? f : null!);
 
         if (!_scope.TryDeclareVariable(variable))
         {
