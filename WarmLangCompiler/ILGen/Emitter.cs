@@ -1136,7 +1136,20 @@ public sealed class Emitter
 
     private void EmitFunctionAccess(ILProcessor processor, FunctionSymbol f, TypeSymbol funcType, BoundAccess? target = null)
     {
-        if (target is not null) EmitMethodClosureAccess(processor, funcType, target, _funcs[f]);
+        if (target is not null)
+        {
+            if (f is SpecializedFunctionSymbol sp)
+            {
+                var methodRef = new GenericInstanceMethod(_funcs[sp.SpecializedFrom]);
+                foreach (var typeParam in sp.TypeArguments)
+                {
+                    methodRef.GenericArguments.Add(CilTypeOf(typeParam));
+                }
+                EmitMethodClosureAccess(processor, funcType, target, methodRef);
+                return;
+            }
+            EmitMethodClosureAccess(processor, funcType, target, _funcs[f]);  
+        } 
         else if (f.HasFreeVariables) EmitFunctionClosure(processor, f);
         else EmitStaticFuncAccess(processor, funcType, _funcs[f]);
     }

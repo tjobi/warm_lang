@@ -261,4 +261,18 @@ internal static class BinderErrorWarnings
         var message = $"Cannot mix implicit and explicit parameters in lambda expression";
         bag.Report(message, true, location);
     }
+
+    internal static void ReportGenericMethodCannotBeUsedWithoutTypeArgumentsForNonGenericType(
+        this ErrorWarrningBag bag, TextLocation location, FunctionSymbol func, TypeSymbol ownerType)
+    {
+        var message = $"Unable to infer type arguments for generic method '{func.Name}' for non-generic type '{ownerType.Name}'";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportCannotInferTypeArgumentsForGenericMethodAccess(
+        this ErrorWarrningBag bag, TextLocation location, FunctionSymbol func)
+    {
+        var message = $"Unable to infer type arguments of generic method '{func.Name}'";
+        bag.Report(message, true, location);
+    }
 }

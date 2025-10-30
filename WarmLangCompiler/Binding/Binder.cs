@@ -508,14 +508,14 @@ public sealed class Binder
         if (typeArguments is not null && funcInfo.HasTypeParameters && funcInfo.TypeParameters.Value.Length != typeArguments.Count)
             throw new Exception($"Compiler bug - do not allow inferring parameters when any are explicitly defined");
 
-        if(!funcInfo.HasTypeParameters)
+        if (!funcInfo.HasTypeParameters)
             throw new Exception($"Compiler bug - cannot specialize a non-generic function");
 
         var funcInfoParameters = funcInfo.Parameters;
         var funcInfoTypeParameters = funcInfo.TypeParameters.Value;
-
         var instantiatedParameters = ImmutableArray.CreateBuilder<ParameterSymbol>(funcInfo.Parameters.Count);
         var instantiatedTypeParameters = new List<TypeSymbol>();
+
         //FIXME: Honestly, a rewrite from typesymbol to a typeId is due...
         //       => pretty nasty using strings - but type parameters are unique within a function so should be fine... 
         var typeParametersMap = new Dictionary<string, TypeSymbol>();
@@ -738,10 +738,32 @@ public sealed class Binder
                             _diag.ReportFeatureNotImplemented(ma.Location, "Cannot create closures for methods on value types");
                             return new BoundInvalidAccess();
                         }
-                        if(!allowGeneric && fs.Function.TypeParameters.Length > 0)
+                        if (fs.Function.TypeParameters.Length > 0)
                         {
-                            _diag.ReportFeatureNotImplemented(ma.Location, "Cannot use generic functions without applying type parameters");
-                            return new BoundInvalidAccess();
+                            if (fs.Function.Parameters.Length == 0
+                                 || _typeScope.GetTypeInformation(fs.Function.Parameters[0].Type) is not GenericTypeInformation selfType
+                                 || _typeScope.GetTypeInformation(boundTarget.Type) is not GenericTypeInformation boundTargetInfo)
+                            {
+                                _diag.ReportGenericMethodCannotBeUsedWithoutTypeArgumentsForNonGenericType(
+                                    ma.Location, fs.Function, boundTargetType
+                                );
+                                return new BoundInvalidAccess();
+                            }
+
+                            if (!allowGeneric && fs.Function.TypeParameters.Length != boundTargetInfo.TypeArguments.Count)
+                            {
+                                _diag.ReportCannotInferTypeArgumentsForGenericMethodAccess(ma.Location, fs.Function);
+                                return new BoundInvalidAccess();
+                            }
+                            if (allowGeneric)
+                            {
+                                _diag.ReportFeatureNotImplemented(ma.Location, "Cannot use generic methods with explicit type arguments yet");
+                                return new BoundInvalidAccess();
+                            }
+                            if (selfType.TypeArguments.Count != boundTargetInfo.TypeArguments.Count)
+                                throw new Exception($"Compiler bug - mismatching type argument counts when trying to infer args of {fs.Function} defined on {selfType.Type} and applied to {boundTargetInfo.Type}");
+                            var (specializedFuncType, specailized) = InferMethodClosure(ma, fs, selfType, boundTargetInfo);
+                            return new BoundFuncAccess(boundTarget, specailized, specializedFuncType);
                         }
 
                         //TODO: Please, put the "target" into the free variables, so we can reuse closure logic!
@@ -777,6 +799,63 @@ public sealed class Binder
             default:
                 throw new NotImplementedException($"Binder doesn't allow: BindAccess of '{access}' yet");
         }
+    }
+
+    private (TypeSymbol, SpecializedFunctionSymbol) InferMethodClosure(
+        MemberAccess ma, MemberFuncSymbol fs,
+        GenericTypeInformation selfType, GenericTypeInformation boundTargetInfo)
+    {
+        if (selfType.TypeArguments.Count != boundTargetInfo.TypeArguments.Count)
+            throw new Exception($"Compiler bug - mismatching type argument counts when trying to infer args of {fs.Function} defined on {selfType.Type} and applied to {boundTargetInfo.Type}");
+
+        var toReplace = new Dictionary<string, TypeSymbol>();
+        foreach (var (selfArgType, boundArgType) in selfType.TypeParameters!.Value.Zip(boundTargetInfo.TypeArguments))
+        {
+            toReplace[selfArgType.Name] = boundArgType;
+        }
+        var validTypeParams = ImmutableArray.CreateBuilder<TypeSymbol>();
+        foreach (var tp in fs.Function.TypeParameters)
+        {
+            if (!toReplace.ContainsKey(tp.Name))
+            {
+                toReplace[tp.Name] = tp;
+                validTypeParams.Add(tp);
+            }
+        }
+
+        var cntParam = fs.Function.Parameters.Length - 1;
+
+        var funcReturnType = _typeScope.MakeConcrete(fs.Function.ReturnType, toReplace, ma.Location);
+        var functionParams = ImmutableArray.CreateBuilder<TypeSymbol>(cntParam);
+        foreach (var param in fs.Function.Parameters.Skip(1))
+        {
+            var concreteParamType = _typeScope.MakeConcrete(param.Type, toReplace, ma.Location);
+            functionParams.Add(concreteParamType);
+        }
+
+        var (specializedFuncType, specailizedFuncInfo) = _typeScope.CreateFunctionType(
+            functionParams.MoveToImmutable(),
+            funcReturnType,
+            validTypeParams.ToImmutable(),
+            isMemberFunc: false
+        );
+        var parameterSymbols = ImmutableArray.CreateBuilder<ParameterSymbol>(cntParam);
+        for (int i = 0; i < cntParam; i++)
+        {
+            var oldParam = fs.Function.Parameters[i + 1];
+            var paramType = specailizedFuncInfo.Parameters[i];
+            parameterSymbols.Add(new ParameterSymbol(oldParam.Name, paramType, oldParam.Placement));
+        }
+        
+        var specialized = new SpecializedFunctionSymbol(
+            fs.Function,
+            boundTargetInfo.TypeArguments,
+            parameterSymbols.MoveToImmutable(),
+            specializedFuncType,
+            funcReturnType,
+            ma.Location
+        );
+        return (specializedFuncType, specialized);
     }
 
     private BoundExpression BindUnaryExpression(UnaryExpression ue)
