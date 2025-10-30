@@ -363,7 +363,6 @@ public sealed class Emitter
 
         EmitBlockStatement(ilProcessor, body);
 
-
         foreach (var (instrIdx, label) in thisState.AwaitingLabels)
         {
             var instr = ilProcessor.Body.Instructions[instrIdx];
@@ -598,10 +597,10 @@ public sealed class Emitter
             funcDefintion.Parameters.Add(paramDef);
         }
 
-        if (_boundProgram.Functions[lambda.Symbol] is null)
+        if (!_boundProgram.Functions.TryGetValue(lambda.Symbol, out var body))
             throw new Exception($"{nameof(EmitLambdaExpression)} - compiler bug, lambda '{lambda}' has no body");
 
-        EmitFunctionBody(lambda.Symbol, _boundProgram.Functions[lambda.Symbol]);
+        EmitFunctionBody(lambda.Symbol, body);
         EmitFunctionAccess(processor, lambda.Symbol, funcTypeInfo.Type);
     }
 
@@ -685,8 +684,7 @@ public sealed class Emitter
         {
             case BoundNameAccess name:
                 var instrBefore = GetLastInstruction(processor);
-                var isVariableInClosure = _funcClosure.TryGetValue(BodyState.Func, out var closureState)
-                                          && closureState.HasField(name.Symbol);
+                var isVariableInClosure = IsVariableInCurrentFuncClosure(name.Symbol);
 
                 EmitExpression(processor, assignment.RightHandSide);
 
@@ -1064,7 +1062,7 @@ public sealed class Emitter
         {
             case BoundNameAccess name:
                 var nameSymbol = name.Symbol;
-                if (nameSymbol is ScopedVariableSymbol sv && IsVariableInAClosure(sv))
+                if (nameSymbol is ScopedVariableSymbol sv && IsVariableInCurrentFuncClosure(sv))
                 {
                     var (closureLoad, fieldLoad) = GetClosureVariableAccess(processor, sv, OpCodes.Ldfld);
                     processor.Append(closureLoad);
@@ -1286,8 +1284,14 @@ public sealed class Emitter
         foreach (var (sv, local) in func.FreeVariables)
         {
             processor.Emit(OpCodes.Dup);
-            var ld = GetInstructionForDirectVariableAccess(processor, sv, load: true);
-            processor.Append(ld); 
+            //Recall, we are currently in the outer function, so we need to check if the needed variable is current closure context
+            if (IsVariableInCurrentFuncClosure(sv))
+            {
+                var (ldClosure, ldfld) = GetClosureVariableAccess(processor, sv, OpCodes.Ldfld);
+                processor.Append(ldClosure);
+                processor.Append(ldfld);
+            }
+            else processor.Append(GetInstructionForDirectVariableAccess(processor, sv, load: true)); 
             processor.Emit(OpCodes.Stfld, closure.GetFieldOrThrow(local));
         }
         processor.Emit(OpCodes.Ldftn, closure.FuncDef);
@@ -1295,7 +1299,7 @@ public sealed class Emitter
         processor.Emit(OpCodes.Newobj, funcCtr);
     }
 
-    private bool IsVariableInAClosure(VariableSymbol variable) =>
+    private bool IsVariableInCurrentFuncClosure(VariableSymbol variable) =>
         variable is ScopedVariableSymbol sv &&
         _funcClosure.TryGetValue(BodyState.Func, out var closureState)
         && closureState.HasField(sv);
