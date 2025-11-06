@@ -67,6 +67,6 @@ public static class EmitterClosureHelper
         return TryGetAvailableClosureLoadInstruction(state, closure.ReferenceType, processor, out instruction);
     }
 
-    public static bool HasReachedOwnerOrIsAlreadyKnown(this FunctionBodyState body, ClosureState closure)
-    => body.Func is not LocalFunctionSymbol || body == closure.BelongsTo || body.TryGetAvailableClosure(closure, out var _);
+    // public static bool HasReachedOwnerOrIsAlreadyKnown(this FunctionBodyState body, ClosureState closure)
+    // => body.Func is not LocalFunctionSymbol || body == closure.BelongsTo || body.TryGetAvailableClosure(closure, out var _);
 }

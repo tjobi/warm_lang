@@ -1,127 +1,110 @@
-// Next step could easily be adding support for generic types
-// That is to allow us to do 
-//    type myType<T> = { T myField1; T[] myTs; } etc.
-// Also, if we could manage
-//    function myType<T>.add(myType<T> self, T t) { self.myTs :: t; }
-// I am not sold on the syntax - but the idea is there :)
-//
-// A next step could also be nuking removing the TypeParameterSymbol :)
-
-function main() {
-    int[] xs = [];
-    int ads = (<- xs) + 1;
 
 
+//Why does List` have to have List`x (surely we can find T by name)
+// How do we differentiate List`<T> and List`<T> ... 
 
-    first<int>(listId([]) :: 2, 0);
-    string x = "hi";
-    stdWriteLine(string(f<int, string>(2, x)));
-    stdWriteLine(string(safeIndex<int>([1,2,3,4,5,6], 5, -1)));
-    
-    B b = new B{};
-    function id<T>(T t) T { return t; }
-    id<int>(1);
+// function myFunc(int i) int {
+//     return i;
+// }
 
-    f<int, int[]>(0, []);
+// function int.print(int self) {
+//     stdWriteLine(string(self));
+// }
 
-    stdWriteLine(string([b][0].id<int>(1)));
+// function generic<T>(T t) T { return t; }
 
+type List<T> = { T hd; List<T> tail; }
+
+function List<T>.count<T>(List<T> self) int {
+    if self == null { return 0; }
+    int res = 1;
+    while self.tail != null : self = self.tail, res = res + 1{ }
+    return res;
 }
 
-function f<T,X>(T t, X x) X[] {
-    return [x];
+function T[].count<T>(T[] self) int {
+    return self.len;
 }
 
-function listId(int[] is) int[] { return is; }
+function List<T>.next<T>(List<T> self) List<T> { 
+    return self.tail;
+}
 
-//Imagine anonymous functions - and we are back in scala land !!
-function first<T>(T[] xs, T orElse) T { 
-    if xs.len > 0 {
-        return xs[0];
+function List<T>.toList<T>(List<T> self) T[] {
+    T[] res = [self.hd];
+    while (self = self.next()) != null : res :: self.hd { }
+    return res;
+}
+
+function listobjFromList<T>(T[] l) List<T> {
+    var front = new List<T>{tail = null};
+    var tail = front;
+    var i = 0;
+    while i < l.len : i = i + 1 {
+        tail.hd = l[i];
+        if i < l.len - 1 {
+            tail = tail.tail = new List<T>{ tail = null };
+        }
     }
-    return orElse;
+    return front;
 }
 
-function safeIndex<T>(T[] xs, int i, T orElse) T {
-    if xs.len > i && i >= 0 {
-        return xs[i];
+function List<T>.toString<T>(List<T> self) string {
+    if self == null { return "[[]]"; }
+    var out = "[[";
+    while self != null : self = self.tail {
+        out = out + string(self.hd);
+        if self.tail != null {
+            out = out + ", ";
+        }
     }
-    return orElse;
+    return out + "]]";
 }
 
-type B = {}
+function List<T>.filter<T>(List<T> self, Func<T, bool> predicate) List<T> {
+    List<T> head = null;
+    List<T> tail = null;
 
-function B.id<T>(B self, T t) T { return t; }
+    while self != null : self = self.tail {
+        if predicate(self.hd) {
+            var newNode = new List<T> {hd = self.hd, tail = null };
 
-// // function main() {
-// //     // id<int[]>([]);
-// //     int[] xs = [1];
-// //     //The emitter doesn't know what to do with type list<T> that is created as the parameter of id2...
-// //     id2<int>(xs, 1);
-// //     stdWriteLine(string(id2<int>(xs, 1)));
-// //     stdWriteLine(string(id<int>(2)));
+            if head == null {
+                head = tail = newNode;
+            } else {
+                tail = tail.tail = newNode;
+            }
+        }
+        
+    }
+    return head;
+}
+
+function greaterEqualsTwo(int i) bool  { return i >= 2; }
+
+//TODO: not yet
+//function myFilterGenerator(int treshold) Func<int,bool> { return (int i) => i >= treshold; }
+function greaterEquals5Generator() Func<int,bool> { return (int i) => i >= 5; }
+
+function main() { 
+    var l = listobjFromList([1,2,3,4,5]);
     
-// //     Bingo b = new Bingo{};
-// //     b.setValue(42);
-// //     BingoConsumer(b);
+    stdWriteLine(string( (int i) => true )); //TODO: pretty printing?
+    stdWriteLine(l.filter((int i) => i >= 1).toString());
+    stdWriteLine(l.filter(greaterEquals5Generator()).toString());
+    stdWriteLine(l.filter(greaterEqualsTwo).toString());
+    stdWriteLine(l.filter((i) => false).toString());
+
+    //TODO: Fix parser, it parses as ((generic < int) > ParseErr(48,26)) ... cringe
+    // var id = generic<int>;
+
+    //TODO: create closures!
+    // FAILS - but shouldn't it just lock-in the 2? and then it becomes a function of () -> void
+    // var twoPrinter = 2.print;
+    // twoPrinter();
+
     
-// //     string(2);
-// //     stdWriteLine(id<Bingo>(b).toString());
-
-// //     //id<int[]>([]);
-// //     ID([]);
-// //     return;
-// // }
-
-// // function id2<T>(T[] ts, T t) T {
-// //     return t;
-// // }
-
-// // function add<T>(T[] xs, T x) T[] {
-// //     return xs :: x;
-// // }
-
-// // FIXME: May want BinderTypeScope to handle the list<unknown>, the unify:
-
-// // function id<T>(T t) T {
-// //     return t;
-// // }
-// // type Bingo = { int value; } 
-
-// // type Bingos = {Bingo[] bs; }
-
-// // function BingoConsumer(Bingo b) int {
-// //     stdWriteLine(string(b.value));
-// //     return b.value;
-// // }
-
-// // function Bingo.setValue(Bingo self, int val) {
-// //     self.value = val;
-// //     return;
-// // }
-
-// // function int.toString(int self) string { return string(self); }
-
-// // function Bingo.toString(Bingo self) string {
-// //     return "Bingo{ value=" + string(self.value) + " }";
-// // }
-
-// // function int[].length(int[] self) int {return self.len;}
-
-
-// // function ID(int[] is) int[] { return is; }
-
-// // function main() {
-// //     [1,2,3].length();
-// //     Bingo b = new Bingo{};
-// //     b.setValue(42);
-// //     BingoConsumer(b);
-    
-// //     string(2);
-// //     string(id<Bingo>(b));
-
-
-
-// //     // string(id<int>(2));
-
-// // }
+    //TODO: Closure goes wrong - it loops infinitely on the outer i...
+    //int i = 5;
+    //function inner(int i) int { if i < 10 { return inner(i+1); } else { return i; } }
+}

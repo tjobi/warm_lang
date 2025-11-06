@@ -37,7 +37,7 @@ public sealed class MemberFuncSymbol : MemberSymbol
         Function = function;
     }
 
-    public override string ToString() => $"memberFunc({Type} {Function})";
+    public override string ToString() => $"memberFunc({Function})";
     
     public FunctionSymbol Function { get; }
 }

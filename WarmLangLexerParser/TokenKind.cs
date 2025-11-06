@@ -13,7 +13,7 @@ public enum TokenKind
     TQuote, TTick, // " and '
     TSeqAND, TSeqOR, // '&&' and '||' -> Logical AND OR. 
     TAmp, TBar, // '&' and '|'
-
+    TArrow, // =>
 
     //Keyword
     TFunc, //function keyword 

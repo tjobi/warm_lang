@@ -6,12 +6,10 @@ namespace WarmLangLexerParser.ErrorReporting;
 public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
 {
     private readonly List<ReportedErrorWarning> _reported;
-    private bool isMuted;
 
     public ErrorWarrningBag()
     {
-        _reported = new List<ReportedErrorWarning>();
-        isMuted = false;
+        _reported = [];
     }
 
     public IEnumerator<ReportedErrorWarning> GetEnumerator() => _reported.GetEnumerator();
@@ -20,21 +18,17 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
 
     public void Clear() => _reported.Clear();
 
-    public void Mute() => isMuted = true;
-    public void UnMute() => isMuted = false;
-
     public void Report(string message, bool isError, int line, int col)
     {
-        if(!isMuted)
-        {
-            _reported.Add(new ReportedErrorWarning(message, isError, line, col));
-        }
+        _reported.Add(new ReportedErrorWarning(message, isError, line, col));
     }
 
     public void Report(string message, bool isError, TextLocation location)
     {
         Report(message, isError, location.StartLine, location.StartColumn);
     }
+
+    public bool AnyError() => _reported.Any(r => r.IsError);
 
     public void ReportInvalidCharacter(char c, int line, int col)
     {
@@ -67,7 +61,7 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         {
             var kind = kinds[i];
             sb.Append(kind);
-            if(i < kinds.Length-1)
+            if (i < kinds.Length - 1)
             {
                 sb.Append(", ");
             }
@@ -95,9 +89,21 @@ public sealed class ErrorWarrningBag : IEnumerable<ReportedErrorWarning>
         Report(message, true, textLocation);
     }
 
-    public void ReportKeywordOnlyAllowedInTopScope(TokenKind keyword, TextLocation location) 
+    public void ReportKeywordOnlyAllowedInTopScope(TokenKind keyword, TextLocation location)
     {
         var message = $"The keyword '{keyword.AsString()}' may only appear in the top level";
+        Report(message, true, location);
+    }
+
+    public void ReportTrailingCommaInParameterList(TextLocation location)
+    {
+        var message = "Trailing comma in parameter list - please remove the comma";
+        Report(message, true, location);
+    }
+
+    public void ReportInvalidNumber(TextLocation location, string text)
+    {
+        var message = $"The number '{text}' is not a valid integer";
         Report(message, true, location);
     }
 }

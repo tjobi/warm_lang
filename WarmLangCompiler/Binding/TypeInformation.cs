@@ -12,12 +12,14 @@ public class TypeInformation
     public Dictionary<FunctionSymbol, BoundBlockStatement> MethodBodies { get; }
 
     [MemberNotNullWhen(true, nameof(TypeParameters))]
-    public bool HasTypeParameters => TypeParameters.HasValue;
+    public bool HasTypeParameters => TypeParameters.HasValue && TypeParameters.Value.Length > 0;
     public ImmutableArray<TypeSymbol>? TypeParameters { get; }
 
-    public TypeInformation(TypeSymbol type, List<MemberSymbol>? members = null, 
+    public bool IsCallable => this is FunctionTypeInformation;
+
+    public TypeInformation(TypeSymbol type, List<MemberSymbol>? members = null,
                            Dictionary<FunctionSymbol, BoundBlockStatement>? methodBodies = null,
-                           ImmutableArray<TypeSymbol>? typeParameters = null)  
+                           ImmutableArray<TypeSymbol>? typeParameters = null)
     {
         Type = type;
         Members = members ?? new();
@@ -86,9 +88,28 @@ public class TypeParamaterInformation : TypeInformation
 {
     public TextLocation Location { get; }
 
-    public TypeParamaterInformation(TypeSymbol tp, TextLocation location) 
+    public TypeParamaterInformation(TypeSymbol tp, TextLocation location)
     : base(tp)
     {
         Location = location;
     }
+}
+
+public sealed class FunctionTypeInformation : TypeInformation
+{
+    public FunctionTypeInformation(TypeSymbol type,
+                                   IList<TypeSymbol> parameters,
+                                   TypeSymbol returnType,
+                                   ImmutableArray<TypeSymbol>? typeParameters = null,
+                                   bool isMemberFunc = false)
+    : base(type, typeParameters: typeParameters)
+    {
+        Parameters = parameters;
+        ReturnType = returnType;
+        IsMemberFunc = isMemberFunc;
+    }
+    
+    public bool IsMemberFunc { get; }
+    public IList<TypeSymbol> Parameters { get; }
+    public TypeSymbol ReturnType { get; }
 }

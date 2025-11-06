@@ -12,12 +12,16 @@ public sealed class Binder
 {
     private readonly ErrorWarrningBag _diag;
     private readonly SymbolEnvironment _scope;
-    // private readonly BinderTypeHelper _typeHelper;
     private readonly BinderTypeScope _typeScope;
     private readonly Dictionary<FunctionSymbol, BlockStatement> _unBoundBodyOf;
 
     private readonly Stack<FunctionSymbol> _functionStack;
-    private readonly Stack<HashSet<ScopedVariableSymbol>> _closureStack;
+
+    private readonly Dictionary<FunctionSymbol, BoundBlockStatement> _functionToBody;
+
+    //TODO: limitation comes from the System.Func delegate definitions in mscorlib, 
+    //      apperently it can do at most 9 generic parameters (8 parameters + 1 return type)
+    private const int MAX_LOCAL_PARAMETERS = 8;
 
     public Binder(ErrorWarrningBag bag)
     {
@@ -26,62 +30,45 @@ public sealed class Binder
         _typeScope = new(_diag);
         _scope = new(_typeScope);
         _functionStack = new();
-        _unBoundBodyOf = new();
-        _closureStack = new();
+        _unBoundBodyOf = [];
+        _functionToBody = [];
 
         _scope.PushScope(); //Push scope to contain builtin stuff
-        foreach(var func in BuiltInFunctions.GetBuiltInFunctions())
+        foreach (var func in BuiltInFunctions.GetBuiltInFunctions())
         {
-            if(!_scope.TryDeclareFunction(func))
+            if (!_scope.TryDeclareFunction(func))
                 throw new Exception($"Couldn't push built in {func}");
         }
     }
 
     public BoundProgram BindProgram(ASTNode node)
     {
-        if(node is not ASTRoot root)
+        if (node is not ASTRoot root)
             throw new NotImplementedException($"{nameof(Binder)}.{nameof(BindProgram)} only allows root to be '{nameof(ASTRoot)}'");
 
-        var (bound, globalVariables, hasGlobalNonDeclarationStatements) = BindASTRoot(root);
+        var (main, scriptMain, globalVariables) = BindASTRoot(root);
 
-        var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
-        foreach(var function in _scope.GetFunctions())
+        // var functions = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
+        foreach (var function in _scope.GetFunctions())
         {
-            if(function.IsBuiltInFunction())
+            if (function.IsBuiltInFunction())
                 continue;
             var boundBody = BindFunctionBody(function, _unBoundBodyOf[function]);
-            functions.Add(function, boundBody);
+            _functionToBody.Add(function, boundBody);
         }
 
-        foreach(var (type, memberFuncs) in _typeScope.GetFunctionMembers())
+        foreach (var (type, memberFuncs) in _typeScope.GetFunctionMembers())
         {
-            foreach(var func in memberFuncs)
+            foreach (var func in memberFuncs)
             {
                 var boundBody = BindFunctionBody(func, _unBoundBodyOf[func]);
                 _typeScope.AddMethodBody(type, func, boundBody);
             }
         }
-
-        FunctionSymbol? main = null;
-        FunctionSymbol? scriptMain = null;
-        if(functions.Where(kv => kv.Key.Name == "main").FirstOrDefault() is {Key: FunctionSymbol mainSymbol, Value: BoundBlockStatement mainBody})
-        {
-            main = mainSymbol;
-        }
-        
-        if(hasGlobalNonDeclarationStatements || main is null)
-        {  
-            if(main is not null)
-                _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
-            
-            scriptMain = FunctionSymbol.CreateMain("__wl_script_main");
-            var scriptMainBody = Lowerer.LowerBody(scriptMain, bound);
-            functions[scriptMain] = scriptMainBody;
-        }
-        return new BoundProgram(main, scriptMain, functions.ToImmutable(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
+        return new BoundProgram(main, scriptMain, _functionToBody.ToImmutableDictionary(), _typeScope.ToProgramTypeMemberInformation(), globalVariables);
     }
 
-    private (BoundBlockStatement boundRoot, ImmutableArray<BoundVarDeclaration> globals, bool hasGlobalArbitraries) BindASTRoot(ASTRoot root)
+    private (FunctionSymbol? main, FunctionSymbol? scriptMain, ImmutableArray<BoundVarDeclaration> globals) BindASTRoot(ASTRoot root)
     {
         var topLevelstatments = ImmutableArray.CreateBuilder<BoundStatement>();
         var globalVariables = ImmutableArray.CreateBuilder<BoundVarDeclaration>(); //NON-function delcarations
@@ -92,29 +79,46 @@ public sealed class Binder
         {
             BindTopLevelStatement(func);
         }
-        foreach (var toplevel in root.Children)
+
+        foreach (var declaration in root.GetChildrenOf<TopLevelVarDeclaration>())
         {
-            switch (toplevel)
-            {
-                case TopLevelTypeDeclaration:
-                case TopLevelFuncDeclaration:
-                    continue;
-                case TopLevelStamentNode top: //ArbitraryStatementNode and VarDeclaration
-                    var bound = BindTopLevelStatement(top);
-                    topLevelstatments.Add(bound);
-
-                    if (bound is BoundVarDeclaration var)
-                        globalVariables.Add(var);
-                    break;
-                case TopLevelError: continue;
-                default: throw new NotImplementedException($"{nameof(Binder)} does not yet allow {toplevel.GetType().Name}");
-            }
+            var boundDecl = (BoundVarDeclaration)BindTopLevelStatement(declaration);
+            globalVariables.Add(boundDecl);
         }
-        //What if we parsed an empty file?
-        var rootNode = topLevelstatments.Count > 0 ? topLevelstatments[0].Node : EmptyStatment.Get;
-        var boundChildren = new BoundBlockStatement(rootNode, topLevelstatments.ToImmutable());
 
-        return (boundChildren, globalVariables.ToImmutable(), topLevelstatments.Count != globalVariables.Count);
+        //TODO: could probably do typdecls + funcs + declaration < root.Children.length
+        var globalStatements = root.GetChildrenOf<TopLevelArbitraryStament>().ToArray();
+
+        FunctionSymbol? main = null;
+        FunctionSymbol? scriptMain = null;
+        if (_scope.GetFunctions().Where(f => f.Name == "main").FirstOrDefault() is FunctionSymbol mainSymbol)
+        {
+            main = mainSymbol;
+        }
+
+        if (globalStatements.Length > 0 || main is null)
+        {
+            if (main is not null)
+                _diag.ReportProgramHasBothMainAndTopLevelStatements(main.Location);
+
+            //What if we parsed an empty file?
+            var startLoc = EmptyStatment.Get.Location;
+            var endLoc = EmptyStatment.Get.Location;
+            if (globalStatements.Length > 0)
+            {
+                startLoc = globalStatements[0].Location;
+                endLoc = globalStatements[^1].Location;
+            }
+            scriptMain = FunctionFactory.CreateMain("__wl_script_main");
+            var start = WarmLangLexerParser.SyntaxToken.MakeToken(WarmLangLexerParser.TokenKind.TCurLeft,  startLoc);
+            var end = WarmLangLexerParser.SyntaxToken.MakeToken(WarmLangLexerParser.TokenKind.TCurRight, endLoc);
+            var stmnts = globalStatements.Select(s => s.Statement).ToImmutableArray();
+            var body = new BlockStatement(start, stmnts, end);
+            _scope.TryDeclareFunction(scriptMain);
+            _unBoundBodyOf[scriptMain] = body;
+        }
+
+        return (main, scriptMain, globalVariables.ToImmutable());
     }
 
     private void BindTypeDeclarations(ASTRoot root)
@@ -126,7 +130,7 @@ public sealed class Binder
             var declaration = typeDecls[i];
             var typeSyntax = typeDecls[i].Type;
             ImmutableArray<TypeSymbol>? typeParams = null;
-            if(declaration.TypeParameters is not null)
+            if (declaration.TypeParameters is not null)
             {
                 typeParams = _typeScope.CreateTypeParameterSymbols(declaration.TypeParameters);
             }
@@ -135,16 +139,16 @@ public sealed class Binder
             {
                 declaredTypes.Add((typeSymbol, typeDecls[i]));
             }
-            else 
+            else
             {
                 _diag.ReportTypeAlreadyDeclared(typeSyntax.Location, typeSyntax.Name);
                 //Skip the declaring it again
             }
         }
-        foreach(var (typeSymbol, decl) in declaredTypes)
+        foreach (var (typeSymbol, decl) in declaredTypes)
         {
             _typeScope.Push();
-            if(_typeScope.GetTypeInformation(typeSymbol) is {TypeParameters: not null} info)
+            if (_typeScope.GetTypeInformation(typeSymbol) is { TypeParameters: not null } info)
             {
                 _typeScope.AddTypeParametersToScope(info.TypeParameters);
             }
@@ -167,7 +171,7 @@ public sealed class Binder
 
     private BoundStatement BindStatement(StatementNode statement, bool isGlobalScope = false)
     {
-        return statement switch 
+        return statement switch
         {
             BlockStatement st => BindBlockStatement(st),
             VarDeclaration varDecl => BindVarDeclaration(varDecl, isGlobalScope),
@@ -176,7 +180,7 @@ public sealed class Binder
             WhileStatement wile => BindWhileStatement(wile),
             ReturnStatement ret => BindReturnStatement(ret),
             ExprStatement expr => BindExprStatement(expr),
-            ErrorStatement error => new BoundStatementExpression(error),
+            ErrorStatement error => new BoundErrorStatement(error),
             _ => throw new NotImplementedException($"Bind statement for {statement}"),
         };
     }
@@ -184,29 +188,46 @@ public sealed class Binder
     private BoundBlockStatement BindBlockStatement(BlockStatement st, bool pushScope = true)
     {
         var boundStatements = ImmutableArray.CreateBuilder<BoundStatement>();
-        if(pushScope)
+        if (pushScope)
             _scope.PushScope();
-        foreach(var stmnt in st.Children)
+        foreach (var stmnt in st.Children)
         {
             var bound = BindStatement(stmnt);
             boundStatements.Add(bound);
         }
-        if(pushScope)
+        if (pushScope)
             _scope.PopScope();
         return new BoundBlockStatement(st, boundStatements.ToImmutable());
     }
 
     private BoundStatement BindVarDeclaration(VarDeclaration varDecl, bool isGlobalScope)
     {
-        var type = _typeScope.GetTypeOrErrorType(varDecl.Type);
         var name = varDecl.Identifier.Name!;
-        var rightHandSide = BindTypeConversion(varDecl.RightHandSide, type);
+        var rightHandSide = BindExpression(varDecl.RightHandSide);
+        TypeSymbol? type = null;
+        if (varDecl.Type is not null)
+        {
+            type = _typeScope.GetTypeOrErrorType(varDecl.Type);
+            rightHandSide = BindTypeConversion(rightHandSide, type);
 
-        VariableSymbol variable = isGlobalScope 
-                                ? new GlobalVariableSymbol(name, rightHandSide.Type)
-                                : new LocalVariableSymbol(name, rightHandSide.Type, _functionStack.Peek());
+            if (type == TypeSymbol.Void)
+            {
+                _diag.ReportTypeVoidIsNotValidHere(varDecl.Type.Location);
+            }
+        }
 
-        if(!_scope.TryDeclareVariable(variable))
+
+        if (varDecl.Type is null && _typeScope.GetActualType(rightHandSide.Type) == TypeSymbol.Void)
+        {
+            _diag.ReportCannotAssignVoidToImplicitlyTypedVariable(varDecl.Identifier, rightHandSide.Location);
+        }
+
+        type ??= rightHandSide.Type;
+        VariableSymbol variable = isGlobalScope
+                                ? new GlobalVariableSymbol(name, type)
+                                : new LocalVariableSymbol(name, type, _functionStack.TryPeek(out var f) ? f : null!);
+
+        if (!_scope.TryDeclareVariable(variable))
         {
             _diag.ReportNameAlreadyDeclared(varDecl.Identifier);
             return new BoundErrorStatement(varDecl);
@@ -216,49 +237,51 @@ public sealed class Binder
 
     private BoundStatement BindFunctionDeclaration(FuncDeclaration funcDecl, bool isGlobalScope = false)
     {
-        if(!isGlobalScope) return BindLocalFunctionDeclaration(funcDecl);
+        if (!isGlobalScope) return BindLocalFunctionDeclaration(funcDecl);
         var nameToken = funcDecl.NameToken;
         var typeParameters = _typeScope.CreateTypeParameterSymbols(funcDecl.TypeParams);
-        
+
         _typeScope.Push();
-        if(_typeScope.AddTypeParametersToScope(typeParameters))
+        if (_typeScope.AddTypeParametersToScope(typeParameters))
         {
             _typeScope.Pop();
             return new BoundErrorStatement(funcDecl);
         }
 
-        var parameters = CreateParameterSymbols(funcDecl);
+        var parameters = _typeScope.CreateParameterSymbols(funcDecl.Params);
         var returnType = _typeScope.GetTypeOrErrorType(funcDecl.ReturnType);
 
-        var function = new FunctionSymbol(nameToken, typeParameters, parameters, returnType);
-        
-        var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
-        
-        if(funcDecl.OwnerType is not null)
+        TypeInformation? ownerTypeInfo = null;
+        if (funcDecl.OwnerType is not null)
         {
-            if(!_typeScope.TryGetTypeInformation(funcDecl.OwnerType, out var ownerTypeInfo)) 
+            if (!_typeScope.TryGetTypeInformation(funcDecl.OwnerType, out ownerTypeInfo))
             {
                 _diag.ReportTypeNotFound(funcDecl.OwnerType.ToString(), funcDecl.OwnerType.Location);
                 _typeScope.Pop();
                 return new BoundErrorStatement(funcDecl);
             }
             var ownerType = ownerTypeInfo.Type;
-            var symbol = new MemberFuncSymbol(function);
-            _typeScope.AddMember(ownerTypeInfo, symbol);
-            function.SetOwnerType(ownerType); //TODO: this is quite ugly
-            
-            if(parameters.Length < 1)
+            if (parameters.Length < 1)
             {
-                _diag.ReportMemberFuncNoParameters(function.Location, function.Name, ownerType);
+                _diag.ReportMemberFuncNoParameters(funcDecl.Location, funcDecl.NameToken.Name!, ownerType);
             }
-            else if(parameters[0].Type is TypeSymbol t && t != ownerType && ownerType != TypeSymbol.Error)
+            else if (parameters[0].Type is TypeSymbol t && !_typeScope.TypeEquality(t, ownerType) && ownerType != TypeSymbol.Error)
             {
-                _diag.ReportMemberFuncFirstParameterMustMatchOwner(function.Location, function.Name, ownerType, t);
+                _diag.ReportMemberFuncFirstParameterMustMatchOwner(funcDecl.Location, funcDecl.NameToken.Name!, ownerType, t);
             }
         }
+
+        var (functionType, _) = _typeScope.CreateFunctionType(parameters, returnType, typeParameters, isMemberFunc: funcDecl.OwnerType is not null);
+        var function = new FunctionSymbol(nameToken, typeParameters,
+                                          parameters, functionType,
+                                          returnType, ownerType: ownerTypeInfo?.Type);
+        var boundDeclaration = new BoundFunctionDeclaration(funcDecl, function);
+
         _typeScope.Pop();
 
-        if(!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
+        if (ownerTypeInfo is not null) _typeScope.AddMember(ownerTypeInfo, new MemberFuncSymbol(function));
+
+        if (!function.IsMemberFunc && !_scope.TryDeclareFunction(function))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
             return new BoundErrorStatement(funcDecl);
@@ -272,105 +295,68 @@ public sealed class Binder
         var nameToken = funcDecl.NameToken;
         var typeParameters = _typeScope.CreateTypeParameterSymbols(funcDecl.TypeParams);
         _typeScope.Push();
-        if(_typeScope.AddTypeParametersToScope(typeParameters))
+        if (_typeScope.AddTypeParametersToScope(typeParameters))
         {
             _typeScope.Pop();
             return new BoundErrorStatement(funcDecl);
         }
-
-        var parameters = CreateParameterSymbols(funcDecl);
-        var returnType = _typeScope.GetTypeOrErrorType(funcDecl.ReturnType);
-
-        var symbol = new LocalFunctionSymbol(nameToken, typeParameters, parameters, returnType);
-
-        if(funcDecl.OwnerType is not null)
+        if (funcDecl.OwnerType is not null)
         {
             var ownerType = _typeScope.GetTypeOrErrorType(funcDecl.OwnerType);
             _diag.ReportLocalMemberFuncDeclaration(nameToken, funcDecl.OwnerType.Location, ownerType);
         }
 
-        if(!_scope.TryDeclareFunction(symbol))
+        var parameters = _typeScope.CreateParameterSymbols(funcDecl.Params);
+        var returnType = _typeScope.GetTypeOrErrorType(funcDecl.ReturnType);
+
+        var (functionType, _) = _typeScope.CreateFunctionType(parameters, returnType, typeParameters);
+
+        var symbol = FunctionFactory.CreateLocalFunction(nameToken, typeParameters, parameters, functionType, returnType);
+
+        if (!_scope.TryDeclareFunction(symbol))
         {
             _diag.ReportNameAlreadyDeclared(funcDecl.NameToken);
             _typeScope.Pop();
             return new BoundErrorStatement(funcDecl);
         }
-        
-        _closureStack.Push(new());
-        var boundBody = BindFunctionBody(symbol, funcDecl.Body);
-        symbol.Body = boundBody;
-        _typeScope.Pop();
-        if(symbol.Closure is null)  symbol.Closure = _closureStack.Pop();
-        else                        symbol.Closure.UnionWith(_closureStack.Pop());
 
-        if(symbol.RequiresClosure)
+        var boundBody = BindFunctionBody(symbol, funcDecl.Body);
+        _functionToBody[symbol] = boundBody;
+        _typeScope.Pop();
+
+        PushFreeVariablesUpwards(symbol);
+
+        //TODO: can we get around this?
+        if (symbol.Parameters.Length > MAX_LOCAL_PARAMETERS)
         {
-            foreach(var func in _functionStack)
-            {
-                foreach(var variable in symbol.Closure)
-                {
-                    if(func is not LocalFunctionSymbol && func == variable.BelongsTo) func.SharedLocals.Add(variable);
-                    else if(func is LocalFunctionSymbol local) 
-                    {
-                        local.Closure ??= new();
-                        if(variable.BelongsTo == local) local.SharedLocals.Add(variable);
-                        else                            local.Closure.Add(variable);
-                    }
-                    
-                }
-            }
-        }  
+            _diag.ReportTooManyParametersInLocal(symbol, funcDecl.Location, MAX_LOCAL_PARAMETERS);
+        }
 
         return new BoundFunctionDeclaration(funcDecl, symbol);
     }
 
-    private ImmutableArray<ParameterSymbol> CreateParameterSymbols(FuncDeclaration func)
-    {
-        var parameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
-        var uniqueParameterNames = new HashSet<string>();
-        
-        for (int i = 0; i < func.Params.Count; i++)
-        {
-            var (type, name) = func.Params[i];
-            var paramType = _typeScope.GetTypeOrErrorType(type);
-            
-            //missing names have been reported by the parser
-            var paramName = name.Name ?? "NO_NAME"; 
-            if(uniqueParameterNames.Contains(paramName))
-            {
-                _diag.ReportParameterDuplicateName(name);
-            } else
-            {
-                parameters.Add(new ParameterSymbol(paramName, paramType, i));
-            }
-        }
-        return parameters.ToImmutable();
-    }
-
-    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body)
+    private BoundBlockStatement BindFunctionBody(FunctionSymbol function, BlockStatement body, bool lower = true)
     {
         _functionStack.Push(function);
         _scope.PushScope();
         _typeScope.Push();
-        foreach(var typeParam in function.TypeParameters) 
+        foreach (var typeParam in function.TypeParameters)
         {
             //no need to check the return - this has already run on function declaration
             // but we have since lost the scope, so define it again!
-            _typeScope.TryAddType(typeParam, out var _); 
+            _typeScope.TryAddType(typeParam, out var _);
         }
-        
+
         BoundBlockStatement boundBody;
         {   /* scope of function body */
-            foreach(var @param in function.Parameters)
+            foreach (var @param in function.Parameters)
             {
-                _scope.TryDeclareVariable(@param);
+                _scope.TryDeclareVariable(@param, allowShadowing: true);
             }
             boundBody = BindBlockStatement(body, pushScope: false);
-            boundBody = Lowerer.LowerBody(function, boundBody);
-            if(!ControlFlowGraph.AllPathsReturn(boundBody))
-                _diag.ReportNotAllCodePathsReturn(function);
+            if (lower) boundBody = LowerAndCheckControlFlow(function, boundBody);
         }
-        
+
         _typeScope.Pop();
         _scope.PopScope();
         _functionStack.Pop();
@@ -390,7 +376,7 @@ public sealed class Binder
     {
         var condition = BindExpression(wile.Condition, TypeSymbol.Bool);
         var boundContinue = ImmutableArray.CreateBuilder<BoundExpression>(wile.Continue.Count);
-        foreach(var cont in wile.Continue)
+        foreach (var cont in wile.Continue)
         {
             var boundCont = BindExpression(cont);
             boundContinue.Add(boundCont);
@@ -403,30 +389,31 @@ public sealed class Binder
 
     private BoundStatement BindReturnStatement(ReturnStatement ret)
     {
-        if(_functionStack.Count == 0)
+        if (_functionStack.Count == 0)
         {
             _diag.ReportCannotReturnOutsideFunction(ret.ReturnToken);
             return new BoundErrorStatement(ret);
         }
         var function = _functionStack.Peek();
         BoundExpression? expr = null;
-        
-        if(function.Type == TypeSymbol.Void)
+
+        if (function.Type == TypeSymbol.Void)
         {
-            if(ret.Expression is not null)
+            if (ret.Expression is not null)
             {
                 _diag.ReportReturnWithValueInVoidFunction(ret.ReturnToken, function);
                 return new BoundErrorStatement(ret);
             }
-        } else
+        }
+        else
         {
             //we're in a function that returns some value
-            if(ret.Expression is null) //if the return does not contain such a value uh oh
+            if (ret.Expression is null) //if the return does not contain such a value uh oh
             {
-                _diag.ReportReturnIsMissingExpression(ret.ReturnToken, function.Type);
+                _diag.ReportReturnIsMissingExpression(ret.ReturnToken, function.ReturnType);
                 return new BoundErrorStatement(ret);
             }
-            expr = BindTypeConversion(ret.Expression, function.Type);
+            expr = BindTypeConversion(ret.Expression, function.ReturnType);
         }
         return new BoundReturnStatement(ret, expr);
     }
@@ -437,10 +424,13 @@ public sealed class Binder
         return new BoundExprStatement(expr, bound);
     }
 
-    private BoundExpression BindExpression(ExpressionNode expression, TypeSymbol targetType) 
+    private BoundExpression BindExpression(ExpressionNode expression, TypeSymbol targetType)
     => BindTypeConversion(expression, targetType);
 
-    private BoundExpression BindExpression(ExpressionNode expression)
+    private BoundExpression BindExpression(ExpressionNode expression) => BindExpression(expression, expectCallable: false);
+
+    //expectedType is here to push down the expected type for better type inference
+    private BoundExpression BindExpression(ExpressionNode expression, bool expectCallable = false, TypeSymbol? expectedType = null)
     {
         return expression switch
         {
@@ -453,86 +443,123 @@ public sealed class Binder
             AssignmentExpression assignment => BindAssignmentExpression(assignment),
             ObjectInitExpression se => BindObjectInitExpression(se),
             NullExpression @null => BindNullExpression(@null),
-            TypeApplication application => BindTypeApplication(application),
+            FuncTypeApplication application => BindFuncTypeApplication(application, expectCallable),
+            LambdaExpression expr => BindLambdaExpression(expr, expectedType),
             ErrorExpression => new BoundErrorExpression(expression),
             _ => throw new NotImplementedException($"{nameof(BindExpression)} failed on ({expression.Location})-'{expression}'")
         };
     }
 
-    private BoundExpression BindTypeApplication(TypeApplication application)
+    private BoundExpression BindFuncTypeApplication(FuncTypeApplication application, bool expectCallable)
     {
-        var funcDef = BindAccessCallExpression(application.AppliedOn, out var access);
-        
-        if(funcDef is null) return new BoundErrorExpression(application);
-        
-        if(funcDef.TypeParameters.Length != application.TypeParams.Count) 
+        var funcTypeInfo = BindAccessToCallableExpression(
+            application.AppliedOn, out var access, out var funcSymbol,
+            callImmediately: expectCallable
+        );
+        if (funcTypeInfo is null) return new BoundErrorExpression(application);
+
+        if(!funcTypeInfo.HasTypeParameters) //FuncTypeApplication only exists if count of appleid type args > 0
         {
-            _diag.ReportFunctionMismatchingTypeParameters(application.Location, application.TypeParams.Count, funcDef.TypeParameters.Length, funcDef);
+            _diag.ReportFunctionCannotBeUsedWithTypeArguments(application.Location, funcTypeInfo.Type);
             return new BoundErrorExpression(application);
         }
-        
-        // TypeParameters of the original function can be retrieved from the BoundTypeApplication
-        var typeArgs = application.TypeParams.Select(_typeScope.GetTypeOrErrorType).ToList();
-        var specailized = CreateSpecializedFunction(funcDef, application.Location, typeArgs);
 
-        return new BoundTypeApplication(application, access, specailized);
+        if (funcTypeInfo.TypeParameters.Value.Length != application.TypeParams.Count)
+        {
+            var expected = funcTypeInfo.TypeParameters.Value.Length;
+            _diag.ReportFunctionMismatchingTypeParameters(application.Location,
+                                                          application.TypeParams.Count,
+                                                          expected);
+            return new BoundErrorExpression(application);
+        }
+
+        if (funcSymbol is null)
+        {
+            _diag.ReportFeatureNotImplemented(application.Location, "Cannot apply type arguments to anonymous functions");
+            return new BoundErrorExpression(application);
+        }
+
+        // TypeParameters of the original function can be retrieved from the BoundTypeApplication
+        List<TypeSymbol> typeArgs = [];
+        foreach (var typeParam in application.TypeParams)
+        {
+            var typeArg = _typeScope.GetTypeOrErrorType(typeParam);
+            typeArgs.Add(typeArg);
+            if (typeArg == TypeSymbol.Void)
+            {
+                _diag.ReportFunctionIllegalVoidTypeArgument(funcSymbol, typeParam.Location);
+                return new BoundErrorExpression(application);
+            }
+        }
+        var specailized = CreateSpecializedFunction(funcTypeInfo, funcSymbol, application.Location, typeArgs);
+
+        return new BoundFuncTypeApplication(application, access, specailized);
     }
 
     //Nullable typeArguments because you may want to call a generic function "id<T>(T t)" by doing just "id(1)"
     //  which is then inferred to id<int>(1);
     private SpecializedFunctionSymbol CreateSpecializedFunction(
-        FunctionSymbol func, 
+        FunctionTypeInformation funcInfo,
+        FunctionSymbol specalizedFrom,
         WarmLangLexerParser.TextLocation location,
         List<TypeSymbol>? typeArguments = null
     )
     {
-        if(typeArguments is not null && func.TypeParameters.Length != typeArguments.Count)
+        if (typeArguments is not null && funcInfo.HasTypeParameters && funcInfo.TypeParameters.Value.Length != typeArguments.Count)
             throw new Exception($"Compiler bug - do not allow inferring parameters when any are explicitly defined");
-        
-        var instantiatedParameters     = ImmutableArray.CreateBuilder<ParameterSymbol>(func.Parameters.Length);
+
+        if (!funcInfo.HasTypeParameters)
+            throw new Exception($"Compiler bug - cannot specialize a non-generic function");
+
+        var funcInfoParameters = funcInfo.Parameters;
+        var funcInfoTypeParameters = funcInfo.TypeParameters.Value;
+        var instantiatedParameters = ImmutableArray.CreateBuilder<ParameterSymbol>(funcInfo.Parameters.Count);
         var instantiatedTypeParameters = new List<TypeSymbol>();
+
         //FIXME: Honestly, a rewrite from typesymbol to a typeId is due...
         //       => pretty nasty using strings - but type parameters are unique within a function so should be fine... 
         var typeParametersMap = new Dictionary<string, TypeSymbol>();
         // We have to create a concrete version of the definition. Any TypeParameterSymbol is replaced by its concrete...
-        for (int i = 0; i < func.TypeParameters.Length; i++)
+        for (int i = 0; i < funcInfoTypeParameters.Length; i++)
         {
-            var typeParam = func.TypeParameters[i];
+            var typeParam = funcInfoTypeParameters[i];
             var concrete = typeArguments?[i] ?? _typeScope.CreatePlacerHolderType();
             instantiatedTypeParameters.Add(concrete);
             typeParametersMap[typeParam.Name] = concrete;
         }
 
         //Let's also concretize the actual parameters + return type
-        var concreteReturn = _typeScope.MakeConcrete(func.Type, typeParametersMap, location);
-        for (int i = 0; i < func.Parameters.Length; i++)
+        var concreteReturn = _typeScope.MakeConcrete(funcInfo.ReturnType, typeParametersMap, location);
+        for (int i = 0; i < funcInfoParameters.Count; i++)
         {
-            var param = func.Parameters[i];
-            var concrete = _typeScope.MakeConcrete(param.Type, typeParametersMap, location);
-            instantiatedParameters.Add(new ParameterSymbol(param.Name, concrete, param.Placement));
+            var paramType = funcInfoParameters[i];
+            var concrete = _typeScope.MakeConcrete(paramType, typeParametersMap, location);
+            instantiatedParameters.Add(new ParameterSymbol("$"+i, concrete, i));
         }
 
-        var specailized = new SpecializedFunctionSymbol(func, instantiatedTypeParameters, 
-                                                        instantiatedParameters.MoveToImmutable(), concreteReturn,
-                                                        location);
+        var concreteParameters = instantiatedParameters.MoveToImmutable();
+        var (specializedFunctionType, _) = _typeScope.CreateFunctionType(concreteParameters, concreteReturn, isMemberFunc: funcInfo.IsMemberFunc);
+        var specailized = new SpecializedFunctionSymbol(specalizedFrom, instantiatedTypeParameters,
+                                                        concreteParameters, specializedFunctionType,
+                                                        concreteReturn, location);
         return specailized;
     }
 
     private BoundExpression BindAssignmentExpression(AssignmentExpression assignment)
     {
-        var boundAccess = BindAccess(assignment.Access);
-        if(boundAccess is BoundExprAccess)
+        var boundAccess = BindAccess(assignment.Access, expectWriteable: true);
+        if (boundAccess is BoundExprAccess)
         {
             _diag.ReportInvalidLeftSideOfAssignment(assignment.Location);
             return new BoundErrorExpression(assignment);
         }
-        if(boundAccess is BoundSubscriptAccess sa)
+        if (boundAccess is BoundSubscriptAccess sa)
         {
             var targetType = sa.Target.Type;
-            if(targetType == TypeSymbol.String)
+            if (targetType == TypeSymbol.String)
                 _diag.ReportSubscriptTargetIsReadOnly(targetType, assignment.Access.Location);
         }
-        if(boundAccess is BoundMemberAccess bma && bma.Member.IsReadOnly)
+        if (boundAccess is BoundMemberAccess bma && bma.Member.IsReadOnly)
         {
             //TODO: Should we create error state instead?
             _diag.ReportCannotAssignToReadonlyMember(bma.Target.Type, bma.Member.Name, assignment.Access.Location);
@@ -549,133 +576,224 @@ public sealed class Binder
             var predefinedType = _typeScope.GetTypeOrErrorType(predefined.Syntax);
             return BindTypeConversion(ce.Arguments[0], predefinedType, allowExplicit: true);
         }
-        
-        var function = BindAccessCallExpression(ce.Called, out var accessToCall);
-        
-        if(function is null) return new BoundErrorExpression(ce);
+        var funcTypeInfo = BindAccessToCallableExpression(ce.Called, out var accessToCall, out var calledFuncSymbol);
 
-        if(function.TypeParameters.Length > 0 && function is not SpecializedFunctionSymbol)
+        if (funcTypeInfo is null) return new BoundErrorExpression(ce);
+
+        var typeArgEnv = ImmutableDictionary<TypeSymbol, TypeSymbol>.Empty;
+        if (funcTypeInfo.HasTypeParameters && funcTypeInfo.TypeParameters.Value.Length > 0)
         {
-            function = CreateSpecializedFunction(function, ce.Location);
+            if (calledFuncSymbol is null)
+            {
+                _diag.ReportFeatureNotImplemented(ce.Location, "Cannot call generic functions that are not applied at call");
+                return new BoundErrorExpression(ce);
+            }
+            if (calledFuncSymbol is not SpecializedFunctionSymbol specialized)
+            {
+                calledFuncSymbol = specialized = CreateSpecializedFunction(funcTypeInfo, calledFuncSymbol, ce.Location);
+            }
+            typeArgEnv = specialized.TypeParameters.Zip(specialized.TypeArguments).ToImmutableDictionary(kv => kv.First, kv => kv.Second);
+            funcTypeInfo = (FunctionTypeInformation)_typeScope.GetTypeInformationOrThrow(specialized.Type);
+            accessToCall = new BoundExprAccess(new BoundFuncTypeApplication(ce, accessToCall, specialized));
         }
-        
-        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(function.Parameters.Length);
-        if(function.IsMemberFunc || function is SpecializedFunctionSymbol { SpecializedFrom.IsMemberFunc: true })
+
+        //account for implicit 'self' argument in methods
+        var argsSize = ce.Arguments.Count + accessToCall switch {
+            BoundMemberAccess { Target: BoundTypeAccess or BoundPredefinedTypeAccess } => 0,
+            BoundExprAccess {
+                Expression: BoundFuncTypeApplication {
+                    Access: BoundMemberAccess {
+                        Target: BoundTypeAccess or BoundPredefinedTypeAccess } } } => 0,
+            _ when funcTypeInfo.IsMemberFunc => 1,
+            _ => 0
+        };
+
+        if (argsSize != funcTypeInfo.Parameters.Count)
         {
-            BoundMemberAccess bma = accessToCall switch 
+            _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, ce.Called.ToString(), funcTypeInfo.Parameters.Count, argsSize);
+            return new BoundErrorExpression(ce);
+        }
+
+        var arguments = ImmutableArray.CreateBuilder<BoundExpression>(argsSize);
+        if (funcTypeInfo.IsMemberFunc && accessToCall is not BoundFuncAccess)
+        {
+            BoundMemberAccess? bma = accessToCall switch
             {
                 BoundMemberAccess b => b,
-                BoundExprAccess { Expression: BoundTypeApplication { Access: BoundMemberAccess b}} => b,
-                _ => throw new Exception($"{nameof(Binder)} - has reached an exception state. Trying to call member function '{function}' on non-member-access '{accessToCall}")
+                BoundExprAccess { Expression: BoundFuncTypeApplication { Access: BoundMemberAccess b } } => b,
+                _ => null
             };
-            
-            if(bma.Target is not BoundTypeAccess && bma.Member is MemberFuncSymbol)
+            if (bma is { Target: not BoundTypeAccess, Member: MemberFuncSymbol })
             {
-                arguments.Add(new BoundAccessExpression(ce, bma.Target));
-            }   
-        }
-
-        foreach (var arg in ce.Arguments)
-        {
-            var bound = BindExpression(arg);
-            arguments.Add(bound);
-        }
-
-        if(arguments.Count != function.Parameters.Length)
-        {
-            _diag.ReportFunctionCallMismatchArguments(ce.Called.Location, function.Name, function.Parameters.Length, arguments.Count);
-        } 
-        else
-        {
-            for (int i = 0; i < arguments.Count; i++)
-            {
-                var boundArg = arguments[i];
-                var functionParameter = function.Parameters[i];
-                arguments[i] = BindTypeConversion(boundArg, functionParameter.Type);
+                var synthAcess = new BoundAccessExpression(ce, bma.Target);
+                var boundSelfArg = BindTypeConversion(synthAcess, funcTypeInfo.Parameters[0]);
+                arguments.Add(boundSelfArg);
             }
-        } 
-        
-        return new BoundCallExpression(ce, function, arguments.ToImmutable());
+        }
+
+        //startIndex is 1 if we have a member function, 0 otherwise
+        var startIndex = argsSize - ce.Arguments.Count;
+        for (int i = startIndex; i < argsSize; i++)
+        {
+            arguments.Add(BindTypeConversion(ce.Arguments[i-startIndex], funcTypeInfo.Parameters[i]));
+        }
+
+        //After all unifies have happend
+        if (calledFuncSymbol is SpecializedFunctionSymbol sfs)
+        {
+            var voidTypeArg = sfs.TypeArguments.FirstOrDefault(t => _typeScope.GetActualType(t) == TypeSymbol.Void);
+            if(voidTypeArg is not null)
+            {
+                _diag.ReportFunctionIllegalVoidTypeArgument(calledFuncSymbol, ce.Location);
+                return new BoundErrorExpression(ce);
+            }
+        }
+
+
+        return new BoundCallExpression(ce, accessToCall, arguments.MoveToImmutable(), funcTypeInfo.ReturnType, typeArgEnv);
     }
 
     private BoundExpression BindAccessExpression(AccessExpression ae)
     {
         var boundAccess = BindAccess(ae.Access);
-        if(boundAccess is BoundInvalidAccess)
-        {
-            return new BoundErrorExpression(ae);
-        }
+        if (boundAccess is BoundInvalidAccess) return new BoundErrorExpression(ae);
         return new BoundAccessExpression(ae, boundAccess.Type, boundAccess);
     }
 
-    private BoundAccess BindAccess(Access access, bool expectFunc = false)
+    /*
+        immediateCall  : indicates whether the access is to be called immediately
+        allowGeneric   : indicates whether the caller is going to apply generic type parameters or not
+        expectWriteable: indicates whether we are in a writeablt context (left hand side of assignment)     
+    */
+    private BoundAccess BindAccess(
+        Access access, bool immediateCall = false,
+        bool allowGeneric = false, bool expectWriteable = false)
     {
-        switch(access)
+        switch (access)
         {
             case NameAccess na:
-            {
-                if(_scope.TryLookup(na.Name, out var symbol) && symbol is not null)
                 {
-                    if(symbol is VariableSymbol variable)
+                    if (_scope.TryLookup(na.Name, out var symbol))
                     {
-                        //Are we inside of a local function? Then remember any variables that aren't bound in scope or a parameter
-                        if(_closureStack.TryPeek(out var closure) 
-                            && variable is ScopedVariableSymbol scopedVar
-                            && scopedVar.BelongsToOrThrow != _functionStack.Peek())
+                        if (symbol is FunctionSymbol func)
                         {
-                            closure.Add(scopedVar);
+                            if (!allowGeneric && func.TypeParameters.Length > 0)
+                            {
+                                _diag.ReportFeatureNotImplemented(access.Location, "Cannot use generic functions without applying type parameters");
+                                return new BoundInvalidAccess();
+                            }
+                            return new BoundFuncAccess(func);
                         }
-                        return new BoundNameAccess(variable);
-                    }
-                    if(symbol is FunctionSymbol func)
-                    {
-                        if(!expectFunc)
+
+                        if (symbol is VariableSymbol variable)
                         {
-                            _diag.ReportExpectedVariableName(na.Location, na.Name);
+                            //Have we reached a free variable?
+                            if (_functionStack.TryPeek(out var currentFunction) && 
+                                variable is ScopedVariableSymbol scoped && scoped.BelongsToOrThrow != currentFunction)
+                            {
+                                var fv = currentFunction.FreeVariables;
+                                //Create a new mapping for this free variable
+                                if (!fv.TryGetValue(scoped, out var local))
+                                {
+                                    fv[scoped] = local = new LocalVariableSymbol(scoped.Name, scoped.Type, currentFunction);
+                                }
+                                variable = local;
+
+                                if (expectWriteable)
+                                {
+                                    _diag.ReportVariablesCapturedByClosureAreLocal(na.Location, na.Name);
+                                }
+                            }
+                            return new BoundNameAccess(variable);
+                        }
+                    }
+                    if (_typeScope.TryGetType(na.Name, out var type))
+                        return new BoundTypeAccess(type);
+
+                    _diag.ReportNameDoesNotExist(na.Location, na.Name);
+                    return new BoundInvalidAccess();
+                }
+            case AccessPredefinedType predefined:
+                {
+                    var type = _typeScope.GetTypeOrErrorType(predefined.Syntax);
+                    return new BoundPredefinedTypeAccess(type);
+                }
+            case MemberAccess ma:
+                {
+                    var boundTarget = BindAccess(ma.Target);
+                    var boundTargetType = _typeScope.GetActualType(boundTarget.Type);
+                    if (boundTargetType == TypeSymbol.Error || ma.MemberToken.Name is null)
+                        return new BoundInvalidAccess();
+
+                    if (!_typeScope.TryFindMember(boundTargetType, ma.MemberToken.Name!, out var boundMember))
+                    {
+                        _diag.ReportCouldNotFindMemberForType(ma.Location, boundTargetType, ma.MemberToken.Name);
+                        return new BoundInvalidAccess();
+                    }
+                    if (boundMember is MemberFuncSymbol fs && !immediateCall)
+                    {
+                        if (boundTargetType.IsValueType)
+                        {
+                            //TODO: could be cool to just lock in the '2' in 'var twoStr = 2.toString();'
+                            _diag.ReportFeatureNotImplemented(ma.Location, "Cannot create closures for methods on value types");
                             return new BoundInvalidAccess();
                         }
-                        return new BoundFuncAccess(func);
+                        if (fs.Function.TypeParameters.Length > 0)
+                        {
+                            if (fs.Function.Parameters.Length == 0
+                                 || _typeScope.GetTypeInformation(fs.Function.Parameters[0].Type) is not GenericTypeInformation selfType
+                                 || _typeScope.GetTypeInformation(boundTarget.Type) is not GenericTypeInformation boundTargetInfo)
+                            {
+                                _diag.ReportGenericMethodCannotBeUsedWithoutTypeArgumentsForNonGenericType(
+                                    ma.Location, fs.Function, boundTargetType
+                                );
+                                return new BoundInvalidAccess();
+                            }
+
+                            if (!allowGeneric && fs.Function.TypeParameters.Length != boundTargetInfo.TypeArguments.Count)
+                            {
+                                _diag.ReportCannotInferTypeArgumentsForGenericMethodAccess(ma.Location, fs.Function);
+                                return new BoundInvalidAccess();
+                            }
+                            if (allowGeneric)
+                            {
+                                _diag.ReportFeatureNotImplemented(ma.Location, "Cannot use generic methods with explicit type arguments yet");
+                                return new BoundInvalidAccess();
+                            }
+                            if (selfType.TypeArguments.Count != boundTargetInfo.TypeArguments.Count)
+                                throw new Exception($"Compiler bug - mismatching type argument counts when trying to infer args of {fs.Function} defined on {selfType.Type} and applied to {boundTargetInfo.Type}");
+                            var (specializedFuncType, specailized) = InferMethodClosure(ma, fs, selfType, boundTargetInfo);
+                            return new BoundFuncAccess(boundTarget, specailized, specializedFuncType);
+                        }
+
+                        //TODO: Please, put the "target" into the free variables, so we can reuse closure logic!
+                        //TODO: Use the type information instead of function symbol
+                        var (funcType, _) = _typeScope.CreateFunctionType(
+                            fs.Function.Parameters.Skip(1).Select(p => p.Type).ToImmutableArray(),
+                            fs.Function.ReturnType,
+                            fs.Function.TypeParameters,
+                            isMemberFunc: false
+                        );
+                        return new BoundFuncAccess(boundTarget, fs.Function, funcType);
                     }
+                    return new BoundMemberAccess(boundTarget, boundMember);
                 }
-                if(_typeScope.TryGetType(na.Name, out var type))
-                    return new BoundTypeAccess(type);
-                
-                _diag.ReportNameDoesNotExist(na.Location, na.Name);
-                return new BoundInvalidAccess();
-            }
-            case AccessPredefinedType predefined: {
-                var type = _typeScope.GetTypeOrErrorType(predefined.Syntax);
-                return new BoundPredefinedTypeAccess(type);
-            }
-            case MemberAccess ma:
-            {
-                var boundTarget = BindAccess(ma.Target);
-                if(boundTarget.Type == TypeSymbol.Error || ma.MemberToken.Name is null)
-                    return new BoundInvalidAccess();
-                
-                if(!_typeScope.TryFindMember(boundTarget.Type, ma.MemberToken.Name!, out var boundMember))
+            case ExprAccess exprAccess:
                 {
-                    _diag.ReportCouldNotFindMemberForType(ma.Location, boundTarget.Type, ma.MemberToken.Name);
-                    return new BoundInvalidAccess();
+                    var expr = BindExpression(exprAccess.Expression, expectCallable: immediateCall);
+                    return new BoundExprAccess(expr);
                 }
-                return new BoundMemberAccess(boundTarget, boundMember);
-            }
-            case ExprAccess exprAccess: 
-            {
-                var expr = BindExpression(exprAccess.Expression);
-                return new BoundExprAccess(expr);
-            }
             case SubscriptAccess sa:
-            {
-                var boundTarget = BindAccess(sa.Target);
-                if(_typeScope.IsSubscriptable(boundTarget.Type, out var resultType))
                 {
-                    var boundIndexExpr = BindExpression(sa.Index);
-                    return new BoundSubscriptAccess(boundTarget, boundIndexExpr, resultType);
+                    var boundTarget = BindAccess(sa.Target);
+                    if (_typeScope.IsSubscriptable(boundTarget.Type, out var resultType))
+                    {
+                        var boundIndexExpr = BindExpression(sa.Index);
+                        return new BoundSubscriptAccess(boundTarget, boundIndexExpr, resultType);
+                    }
+                    _diag.ReportCannotSubscriptIntoType(sa.Location, boundTarget.Type);
+                    return new BoundInvalidAccess();
                 }
-                _diag.ReportCannotSubscriptIntoType(sa.Location, boundTarget.Type);
-                return new BoundInvalidAccess();
-            }
             case InvalidAccess:
                 return new BoundInvalidAccess();
             default:
@@ -683,15 +801,72 @@ public sealed class Binder
         }
     }
 
+    private (TypeSymbol, SpecializedFunctionSymbol) InferMethodClosure(
+        MemberAccess ma, MemberFuncSymbol fs,
+        GenericTypeInformation selfType, GenericTypeInformation boundTargetInfo)
+    {
+        if (selfType.TypeArguments.Count != boundTargetInfo.TypeArguments.Count)
+            throw new Exception($"Compiler bug - mismatching type argument counts when trying to infer args of {fs.Function} defined on {selfType.Type} and applied to {boundTargetInfo.Type}");
+
+        var toReplace = new Dictionary<string, TypeSymbol>();
+        foreach (var (selfArgType, boundArgType) in selfType.TypeParameters!.Value.Zip(boundTargetInfo.TypeArguments))
+        {
+            toReplace[selfArgType.Name] = boundArgType;
+        }
+        var validTypeParams = ImmutableArray.CreateBuilder<TypeSymbol>();
+        foreach (var tp in fs.Function.TypeParameters)
+        {
+            if (!toReplace.ContainsKey(tp.Name))
+            {
+                toReplace[tp.Name] = tp;
+                validTypeParams.Add(tp);
+            }
+        }
+
+        var cntParam = fs.Function.Parameters.Length - 1;
+
+        var funcReturnType = _typeScope.MakeConcrete(fs.Function.ReturnType, toReplace, ma.Location);
+        var functionParams = ImmutableArray.CreateBuilder<TypeSymbol>(cntParam);
+        foreach (var param in fs.Function.Parameters.Skip(1))
+        {
+            var concreteParamType = _typeScope.MakeConcrete(param.Type, toReplace, ma.Location);
+            functionParams.Add(concreteParamType);
+        }
+
+        var (specializedFuncType, specailizedFuncInfo) = _typeScope.CreateFunctionType(
+            functionParams.MoveToImmutable(),
+            funcReturnType,
+            validTypeParams.ToImmutable(),
+            isMemberFunc: false
+        );
+        var parameterSymbols = ImmutableArray.CreateBuilder<ParameterSymbol>(cntParam);
+        for (int i = 0; i < cntParam; i++)
+        {
+            var oldParam = fs.Function.Parameters[i + 1];
+            var paramType = specailizedFuncInfo.Parameters[i];
+            parameterSymbols.Add(new ParameterSymbol(oldParam.Name, paramType, oldParam.Placement));
+        }
+        
+        var specialized = new SpecializedFunctionSymbol(
+            fs.Function,
+            boundTargetInfo.TypeArguments,
+            parameterSymbols.MoveToImmutable(),
+            specializedFuncType,
+            funcReturnType,
+            ma.Location
+        );
+        return (specializedFuncType, specialized);
+    }
+
     private BoundExpression BindUnaryExpression(UnaryExpression ue)
     {
         var bound = BindExpression(ue.Expression);
-        if(bound.Type == TypeSymbol.Error)
+        if (bound.Type == TypeSymbol.Error)
         {
             return new BoundErrorExpression(ue);
         }
         var boundOperator = BoundUnaryOperator.Bind(_typeScope, ue.Operator.Kind, bound);
-        if(boundOperator is null)
+        if (boundOperator is null)
         {
             _diag.ReportUnaryOperatorCannotBeApplied(ue.Location, ue.Operator, bound.Type);
             return new BoundErrorExpression(ue);
@@ -703,28 +878,28 @@ public sealed class Binder
     {
         var boundLeft = BindExpression(binaryExpr.Left);
         var boundRight = BindExpression(binaryExpr.Right);
-        if(boundLeft.Type == TypeSymbol.Error || boundRight.Type == TypeSymbol.Error)
+        if (boundLeft.Type == TypeSymbol.Error || boundRight.Type == TypeSymbol.Error)
         {
             //this mutes any errors that follow as a result of left/right being errors
             return new BoundErrorExpression(binaryExpr);
         }
         _typeScope.Unify(boundLeft.Type, boundRight.Type);
         var boundOperator = BoundBinaryOperator.Bind(_typeScope, binaryExpr.Operator.Kind, boundLeft, boundRight);
-        if(boundOperator is null)
+        if (boundOperator is null)
         {
             _diag.ReportBinaryOperatorCannotBeApplied(binaryExpr.Location, binaryExpr.Operator, boundLeft.Type, boundRight.Type);
             return new BoundErrorExpression(binaryExpr);
         }
-        return new BoundBinaryExpression(binaryExpr,boundLeft, boundOperator, boundRight);
+        return new BoundBinaryExpression(binaryExpr, boundLeft, boundOperator, boundRight);
     }
 
     private BoundExpression BindListInitExpression(ListInitExpression le)
     {
-        if(le.IsEmptyList)
+        if (le.IsEmptyList)
         {
             TypeSymbol inner;
             //It was an implicitly typed empty list []
-            if(le.ElementType is null) inner = _typeScope.CreatePlacerHolderType();
+            if (le.ElementType is null) inner = _typeScope.CreatePlacerHolderType();
             else inner = _typeScope.GetTypeOrErrorType(le.ElementType);
 
             var type = _typeScope.GetOrCreateListType(inner);
@@ -733,7 +908,7 @@ public sealed class Binder
 
         var elements = ImmutableArray.CreateBuilder<BoundExpression>(le.Elements.Count);
         TypeSymbol? innerType = null;
-        foreach(var elm in le.Elements)
+        foreach (var elm in le.Elements)
         {
             var bound = BindExpression(elm);
             innerType ??= bound.Type;
@@ -746,7 +921,7 @@ public sealed class Binder
 
     private static BoundExpression BindConstantExpression(ConstExpression ce)
     {
-        var type = ce.Value switch 
+        var type = ce.Value switch
         {
             int => TypeSymbol.Int,
             bool => TypeSymbol.Bool,
@@ -759,15 +934,15 @@ public sealed class Binder
     private BoundExpression BindObjectInitExpression(ObjectInitExpression se)
     {
         TypeSymbol type;
-        if(!_typeScope.TryGetTypeInformation(se.ObjectType, out var typeInfo))
+        if (!_typeScope.TryGetTypeInformation(se.ObjectType, out var typeInfo))
         {
             _diag.ReportTypeNotFound(se.Name, se.ObjectType.Location);
             type = TypeSymbol.Error;
         }
         else type = typeInfo.Type;
-        
-        if(type == TypeSymbol.Int || type == TypeSymbol.Bool || type == TypeSymbol.String 
-           || typeInfo is TypeParamaterInformation)
+
+        if (type == TypeSymbol.Int || type == TypeSymbol.Bool || type == TypeSymbol.String
+           || typeInfo is TypeParamaterInformation || typeInfo is FunctionTypeInformation)
         {
             //The "name" part of struct init is not an identifier, for example: "new int {...};"
             //TODO: Do we want to allow "int x = new int{5};"?
@@ -775,11 +950,11 @@ public sealed class Binder
             return new BoundErrorExpression(se);
         }
         var members = ImmutableArray.CreateBuilder<(MemberSymbol, BoundExpression)>(se.Members.Count);
-        foreach(var (mNameToken, mExpr) in se.Members)
+        foreach (var (mNameToken, mExpr) in se.Members)
         {
             var mName = mNameToken.Name!;
             BoundExpression bound;
-            if(_typeScope.TryFindMember(type, mName, out var memberSymbol))
+            if (_typeScope.TryFindMember(type, mName, out var memberSymbol))
             {
                 bound = BindExpression(mExpr);
                 bound = BindTypeConversion(bound, memberSymbol.Type);
@@ -789,29 +964,64 @@ public sealed class Binder
                 bound = new BoundErrorExpression(mExpr);
                 memberSymbol = ErrorMemberSymbol.Instance;
                 _diag.ReportTypeHasNoSuchMember(type, mNameToken);
-            };
-            members.Add( (memberSymbol, bound) );
+            }
+            ;
+            members.Add((memberSymbol, bound));
         }
         return new BoundObjectInitExpression(se, type, members.MoveToImmutable());
     }
 
-    private static BoundExpression BindNullExpression(NullExpression @null) 
+    private BoundExpression BindLambdaExpression(LambdaExpression expr, TypeSymbol? expectedType)
+    {
+        //Check if parameters mixed explicit types and implicit types
+        bool seenImplicit = false, seenExplicit = false;
+        foreach (var p in expr.Parameters)
+        {
+            if (p.type is null) seenImplicit = true;
+            else seenExplicit = true;
+        }
+        if(seenImplicit && seenExplicit)
+            _diag.ReportMixImplicitAndExplicitLambdaParameters(expr.Location);
+
+        var (lambdaType, _) = _typeScope.CreateLambdaFunctionType(expr, out var parameters, out var returnType, expectedType);
+        var lambdaSymbol = FunctionFactory.CreateLambda(expr.Location, parameters, lambdaType, returnType);
+
+        var lambdaBody = BindFunctionBody(lambdaSymbol, expr.Body, lower: false);
+        if (_typeScope.GetTypeInformation(returnType) is PlaceHolderInformation)
+        {
+            //We weren't able to infer the return type - make it void
+            _typeScope.Unify(returnType, TypeSymbol.Void);
+        }
+        _functionToBody[lambdaSymbol] = LowerAndCheckControlFlow(lambdaSymbol, lambdaBody);
+        
+        PushFreeVariablesUpwards(lambdaSymbol);
+
+        //TODO: can we get around this?
+        if (lambdaSymbol.Parameters.Length > MAX_LOCAL_PARAMETERS)
+        {
+            _diag.ReportTooManyParametersInLocal(lambdaSymbol, expr.Location, MAX_LOCAL_PARAMETERS);
+        }
+
+        return new BoundLambdaExpression(expr, lambdaSymbol);
+    }
+
+    private static BoundExpression BindNullExpression(NullExpression @null)
         => new BoundNullExpression(@null);
 
     private BoundExpression BindTypeConversion(ExpressionNode expr, TypeSymbol to, bool allowExplicit = false)
     {
-        var boundExpression = BindExpression(expr);
+        var boundExpression = BindExpression(expr, expectedType: to);
         return BindTypeConversion(boundExpression, to, allowExplicit);
     }
 
     private BoundExpression BindTypeConversion(BoundExpression expr, TypeSymbol to, bool allowExplicit = false)
     {
         _typeScope.Unify(expr.Type, to);
-        
+
         var conversion = Conversion.GetConversion(expr.Type, to, _typeScope.TypeEquality);
-        if(!conversion.Exists)
+        if (!conversion.Exists)
         {
-            if(to != TypeSymbol.Error && expr.Type != TypeSymbol.Error)
+            if (to != TypeSymbol.Error && expr.Type != TypeSymbol.Error)
             {
                 var actualTo = _typeScope.GetActualType(to);
                 var actualFrom = _typeScope.GetActualType(expr.Type);
@@ -819,42 +1029,73 @@ public sealed class Binder
             }
             return new BoundErrorExpression(expr.Node);
         }
-        if(conversion.IsExplicit && !allowExplicit)
+        if (conversion.IsExplicit && !allowExplicit)
         {
-            _diag.ReportCannotImplicitlyConvertToType(expr. Location, to, expr.Type);
+            _diag.ReportCannotImplicitlyConvertToType(expr.Location, to, expr.Type);
             return new BoundErrorExpression(expr.Node);
         }
-        if(conversion.IsIdentity)
+        if (conversion.IsIdentity)
             return expr;
         return new BoundTypeConversionExpression(expr.Node, to, expr);
     }
 
-    private FunctionSymbol? BindAccessCallExpression(Access access, out BoundAccess accessSymbol)
+    private FunctionTypeInformation? BindAccessToCallableExpression(
+        Access access, out BoundAccess accessSymbol,
+        out FunctionSymbol? symbol,
+        bool callImmediately = true, bool allowGeneric = true)
     {
-        accessSymbol = BindAccess(access, expectFunc: true);
-        switch(accessSymbol)
-        {
-            case BoundFuncAccess acc:
-                return acc.Func;
-            case BoundMemberAccess { Member: MemberFuncSymbol acc}:
-                return acc.Function;
-            case BoundExprAccess { Expression: BoundTypeApplication app}:
-                return app.Specialized;
+        symbol = null;
+        accessSymbol = BindAccess(access, immediateCall: callImmediately, allowGeneric: allowGeneric);
+        if (accessSymbol is BoundInvalidAccess) return null;
+        var typeInfo = _typeScope.GetTypeInformation(accessSymbol.Type);
+        if (typeInfo is null || typeInfo.Type == TypeSymbol.Error) return null;
 
-            case BoundNameAccess acc:
-                _diag.ReportNameIsNotAFunction(access.Location, acc.Symbol.Name);
-                break;
-            case BoundMemberAccess bma:
-                _diag.ReportNameIsNotAFunction(access.Location, bma.Member.Name);
-                break;
-            case BoundInvalidAccess:
-            case BoundExprAccess {Expression : BoundErrorExpression}:
-                break;
-            default: 
-                //TODO: comeback for higher-order functions
-                _diag.ReportExpectedFunctionName(access.Location);
-                break;
+        if (typeInfo is not FunctionTypeInformation funcInfo)
+        {
+            _diag.ReportExpectedFunctionName(access.Location);
+            return null;
         }
-        return null;
+        
+        symbol = accessSymbol switch
+        {
+            BoundFuncAccess acc => acc.Func,
+            BoundMemberAccess { Member: MemberFuncSymbol acc } => acc.Function,
+            BoundExprAccess { Expression: BoundFuncTypeApplication app } => app.Specialized,
+            _ => null
+        };
+        return funcInfo;
     }
+
+    private void PushFreeVariablesUpwards(FunctionSymbol target)
+    {
+        //Create a copy - so we can remove from the original ... oof
+        if (target.FreeVariables.Count == 0) return;
+
+        var fvMap = target.FreeVariables.ToDictionary();
+        var missingLinkUpwards = target.FreeVariables.Keys.ToHashSet();
+        foreach (var func in _functionStack)
+        {
+            if (func.IsGlobal) continue;
+            foreach (var (v, l) in fvMap)
+            {
+                if (v.BelongsTo != func && !func.FreeVariables.ContainsKey(v))
+                    func.FreeVariables[v] = new LocalVariableSymbol(l.Name, l.Type, func);
+
+                if (func.FreeVariables.TryGetValue(v, out var upperLocal) && missingLinkUpwards.Remove(v))
+                {
+                    target.FreeVariables.Remove(v);
+                    target.FreeVariables[upperLocal] = l;
+                }
+            }
+        }
+    }
+
+    private BoundBlockStatement LowerAndCheckControlFlow(FunctionSymbol func, BoundBlockStatement blockStatement)
+    {
+        blockStatement = Lowerer.LowerBody(func, blockStatement, _typeScope);
+
+        if (!ControlFlowGraph.AllPathsReturn(blockStatement))
+            _diag.ReportNotAllCodePathsReturn(func);
+        return blockStatement;
+    }    
 }

@@ -1,0 +1,49 @@
+using System.Text;
+using WarmLangLexerParser.AST.TypeSyntax;
+
+namespace WarmLangLexerParser.AST;
+
+public sealed class LambdaExpression : ExpressionNode
+{
+    public LambdaExpression(TextLocation location,
+                            IList<(TypeSyntaxNode? type, SyntaxToken nameToken)> parameters,
+                            BlockStatement body)
+    : base(location)
+    {
+        Parameters = parameters;
+        Body = body;
+    }
+
+    public IList<(TypeSyntaxNode? type, SyntaxToken nameToken)> Parameters { get; }
+    public BlockStatement Body { get; }
+
+    public override string ToString()
+    {
+        var sb = new StringBuilder().Append("((");
+
+        for (int i = 0; i < Parameters.Count; i++)
+        {
+            var (type, nameToken) = Parameters[i];
+            if (type is not null) sb.Append(type).Append(' ');
+            sb.Append(nameToken.Name);
+            if (i < Parameters.Count - 1) sb.Append(", ");
+        }
+        sb.Append(") => ").Append(Body).Append(')');
+        return sb.ToString();
+    }
+}
+
+
+public class C
+{
+    public void M()
+    {
+        var s = "hello";
+        var f = s.ExCount;
+    }
+}
+
+public static class Extensions
+{
+    public static int ExCount(this String s,int i) => s.Length + i;
+}

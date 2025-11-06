@@ -25,7 +25,7 @@ internal static class BinderErrorWarnings
     }
 
     internal static void ReportNameAlreadyDeclared(this ErrorWarrningBag bag, SyntaxToken token)
-    => ReportNameAlreadyDeclared(bag,token.Location, token.Name!);
+    => ReportNameAlreadyDeclared(bag, token.Location, token.Name!);
 
     internal static void ReportTypeAlreadyDeclared(this ErrorWarrningBag bag, TextLocation location, string name)
     {
@@ -72,11 +72,11 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportNameIsNotAFunction(this ErrorWarrningBag bag, TextLocation location, string name)
+    internal static void ReportNameIsNotAFunction(this ErrorWarrningBag bag, TextLocation location, string name, TypeSymbol type)
     {
-        var message = $"The name '{name}' is not a function and cannot be called";
+        var message = $"The name '{name}' of type '{type}' cannot be called";
         bag.Report(message, true, location);
-    }    
+    }
 
     internal static void ReportCannotReturnOutsideFunction(this ErrorWarrningBag bag, SyntaxToken retToken)
     {
@@ -92,7 +92,7 @@ internal static class BinderErrorWarnings
 
     internal static void ReportNotAllCodePathsReturn(this ErrorWarrningBag bag, FunctionSymbol function)
     {
-        var message = $"All code paths of '{function}' must return value of type '{function.Type}'";
+        var message = $"All code paths of '{function}' must return value of type '{function.ReturnType}'";
         bag.Report(message, true, function.Location);
     }
 
@@ -149,10 +149,10 @@ internal static class BinderErrorWarnings
         var message = $"Function members cannot be declared in a local scope, move '{type}.{funcNameToken.Name}' outside of function body";
         bag.Report(message, true, TextLocation.FromTo(typeLocation, funcNameToken.Location));
     }
-    
+
     internal static void ReportMemberFuncFirstParameterMustMatchOwner(this ErrorWarrningBag bag, TextLocation funcLocation, string name, TypeSymbol owner, TypeSymbol paramType)
     {
-        var message = $"The first parameter of member function '{name}' must same as the owner type '{owner}' and not '{paramType}'. Did you forgot the owner?";
+        var message = $"The first parameter of member function '{name}' must same as the owner type '{owner}' and not '{paramType}'. Did you forget the owner?";
         bag.Report(message, true, funcLocation);
     }
 
@@ -192,15 +192,87 @@ internal static class BinderErrorWarnings
         bag.Report(message, true, location);
     }
 
-    internal static void ReportFunctionMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int received, int expected, FunctionSymbol func)
+    internal static void ReportFunctionMismatchingTypeParameters(this ErrorWarrningBag bag, TextLocation location, int received, int expected)
     {
-        var message = $"Using generic '{func.Name}' requires {expected} type arguments but got {received}";
+        var message = $"Generic function required {expected} type arguments but got {received}";
         bag.Report(message, true, location);
     }
 
     internal static void ReportGenericTypeMismatchingTypeArguments(this ErrorWarrningBag bag, string name, int received, int expected, TextLocation location)
     {
         var message = $"Using the generic type '{name}' requires {expected} type arguments but got {received}";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportFeatureNotImplemented(this ErrorWarrningBag bag, TextLocation location, string msg)
+    {
+        bag.Report("FEATURE MISSING - " + msg, true, location);
+    }
+
+    internal static void ReportVariablesCapturedByClosureAreLocal(this ErrorWarrningBag bag, TextLocation location, string name)
+    {
+        var message = $"'{name}' is captured by a closure, if you want mutability consider using a reference type (object, list).";
+        bag.Report(message, false, location);
+    }
+    internal static void ReportTooManyParametersInLocal(this ErrorWarrningBag bag, FunctionSymbol symbol, TextLocation location, int maxLocalParameters)
+    {
+        var message = $"Local function '{symbol.Name}' has more than {maxLocalParameters} parameters, consider using an object";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportCannotAssignVoidToImplicitlyTypedVariable(this ErrorWarrningBag bag, SyntaxToken nameToken, TextLocation location)
+    {
+        var message = $"Cannot assign void to implicitly typed variable '{nameToken.Name}'";
+        bag.Report(message, true, TextLocation.FromTo(nameToken.Location, location));
+    }
+
+    internal static void ReportTypeVoidIsNotValidHere(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = $"The type 'void' is not valid in this context";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportFunctionIllegalVoidTypeArgument(this ErrorWarrningBag bag, FunctionSymbol called, TextLocation location)
+    {
+        var message = $"A type argument applied to function '{called.Name}' has type '{TypeSymbol.Void}' which is illegal";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportTypeIllegalVoidTypeArgument(this ErrorWarrningBag bag, TypeSymbol type, TextLocation location)
+    {
+        var message = $"'{TypeSymbol.Void}' was passed as a type argument for generic type '{type.Name}' which is illegal";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportCannotInstantiateGenericTypeWithoutTypeArguments(this ErrorWarrningBag bag, TextLocation location, TypeSymbol type, int requiedTypeArgs)
+    {
+        var message = $"The generic type '{type.Name}' requires '{requiedTypeArgs}' type arguments";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportFunctionCannotBeUsedWithTypeArguments(this ErrorWarrningBag bag, TextLocation location, TypeSymbol type)
+    {
+        var message = $"Non-generic function type '{type.Name}' cannot be used with type arguments";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportMixImplicitAndExplicitLambdaParameters(this ErrorWarrningBag bag, TextLocation location)
+    {
+        var message = $"Cannot mix implicit and explicit parameters in lambda expression";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportGenericMethodCannotBeUsedWithoutTypeArgumentsForNonGenericType(
+        this ErrorWarrningBag bag, TextLocation location, FunctionSymbol func, TypeSymbol ownerType)
+    {
+        var message = $"Unable to infer type arguments for generic method '{func.Name}' for non-generic type '{ownerType.Name}'";
+        bag.Report(message, true, location);
+    }
+
+    internal static void ReportCannotInferTypeArgumentsForGenericMethodAccess(
+        this ErrorWarrningBag bag, TextLocation location, FunctionSymbol func)
+    {
+        var message = $"Unable to infer type arguments of generic method '{func.Name}'";
         bag.Report(message, true, location);
     }
 }

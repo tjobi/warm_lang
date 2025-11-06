@@ -15,7 +15,7 @@ public record SyntaxToken
     }
 
     public SyntaxToken(TokenKind kind, TextLocation location, 
-                       string? name, int intValue) 
+                       string? name, int? intValue) 
     : this(kind, location)
     { 
         Name = name;
@@ -57,8 +57,8 @@ public record SyntaxToken
     {
         return kind switch 
         {
-            TokenKind.TIdentifier or TokenKind.TConst => new SyntaxToken(kind, location, name, intValue ?? 0),
-            _ => new SyntaxToken(kind, location, null, 0)
+            TokenKind.TIdentifier or TokenKind.TConst => new SyntaxToken(kind, location, name, intValue),
+            _ => new SyntaxToken(kind, location, null, intValue)
         };
     }
 }

@@ -44,35 +44,19 @@ public sealed class SymbolEnvironment
         return false;
     }
 
-    public bool IsUnboundInCurrentAndGlobalScope(string name)
-    {
-        var curScope = _scopeStack[^1];
-        return !(curScope.ContainsKey(name) || GlobalScope.ContainsKey(name));
-    }
+    
 
-    public bool IsUnboundInCurrentAndGlobalScope(Symbol symbol) => IsUnboundInCurrentAndGlobalScope(symbol.Name);
+    public bool TryDeclareVariable(VariableSymbol variable, bool allowShadowing = false) => TryDeclare(variable, allowShadowing);
 
-    public bool TryDeclareVariable(VariableSymbol variable) => TryDeclare(variable.Name, variable);
-
-    public bool TryDeclareFunction(FunctionSymbol function) => TryDeclare(function.Name, function);
+    public bool TryDeclareFunction(FunctionSymbol function) => TryDeclare(function, allowShadowing:false);
 
     //TODO: Should this instead return the reason it failed? it is a function, variable, type...
-    public bool TryDeclare(string name, EntitySymbol type)
+    private bool TryDeclare(EntitySymbol symbol, bool allowShadowing)
     {
-        if(type is GlobalVariableSymbol)
-            return TryDeclareGlobal(name, type);
-        if(AnyScopeContainsOrIsAType(name)) return false;
-
-        var mostRecentScope = _scopeStack[^1];
-        mostRecentScope.Add(name, type);
-        return true;
-    }
-
-    private bool TryDeclareGlobal(string name, EntitySymbol type)
-    {
-        if(GlobalScope.ContainsKey(name))
-            return false;
-        GlobalScope.Add(name, type);
+        if(!allowShadowing && AnyScopeContainsOrIsAType(symbol.Name)) return false;
+        var scope = _scopeStack[^1];
+        if (symbol is GlobalVariableSymbol) scope = GlobalScope;
+        scope.Add(symbol.Name, symbol);
         return true;
     }
 

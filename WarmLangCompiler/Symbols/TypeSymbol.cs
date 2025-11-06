@@ -13,6 +13,7 @@ public class TypeSymbol : Symbol
     public static readonly TypeSymbol Bool = new("bool", isValueType:true);
     public static readonly TypeSymbol String = new("string");
     public static readonly TypeSymbol List = new("List`");
+    public static readonly TypeSymbol Func = new("Func");
 
     public bool IsValueType { get; }
     public int ID { get; }

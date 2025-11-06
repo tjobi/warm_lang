@@ -7,32 +7,41 @@ namespace WarmLangCompiler.Symbols;
 
 public class FunctionSymbol : EntitySymbol
 {
-    //Function symbol contains: name, parameters, returnType
-    public FunctionSymbol(SyntaxToken nameToken, 
+    //Function symbol contains: name, typeParmaeters, parameters, returnType
+    public FunctionSymbol(SyntaxToken nameToken,
                           ImmutableArray<TypeSymbol> typeParameters,
-                          ImmutableArray<ParameterSymbol> parameters, 
-                          TypeSymbol type)
-    :this(nameToken.Name!, typeParameters, parameters, type, nameToken.Location) { }
+                          ImmutableArray<ParameterSymbol> parameters,
+                          TypeSymbol type, TypeSymbol returnType,
+                          TypeSymbol? ownerType = null,
+                          bool isGlobal = true)
+    : this(nameToken.Name!, typeParameters, parameters, type, returnType, nameToken.Location, ownerType, isGlobal: isGlobal) { }
 
-    internal FunctionSymbol(string name, 
+    internal FunctionSymbol(string name,
                             ImmutableArray<TypeSymbol> typeParameters,
-                            ImmutableArray<ParameterSymbol> parameters, 
-                            TypeSymbol type, TextLocation location, bool connectParams = true) 
-    : base(name, type)
+                            ImmutableArray<ParameterSymbol> parameters,
+                            TypeSymbol functionType, TypeSymbol returnType,
+                            TextLocation location,
+                            TypeSymbol? ownerType = null,
+                            bool connectParams = true,
+                            bool isGlobal = true)
+    : base(name, functionType)
     {
         TypeParameters = typeParameters;
         Parameters = parameters;
         Location = location;
+        OwnerType = ownerType;
+        IsGlobal = isGlobal;
+        ReturnType = returnType;
         SharedLocals = new HashSet<ScopedVariableSymbol>();
-        if(connectParams) foreach(var p in parameters) p.BelongsTo = this;
+        if (connectParams) foreach (var p in parameters) p.BelongsTo = this;
         //^^ TODO: object publication - could see a function symbol where the parameters aren't all updated. 
     }
 
-    public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken, 
-                          ImmutableArray<TypeSymbol> typeParameters, 
-                          ImmutableArray<ParameterSymbol> parameters, 
-                          TypeSymbol type)
-    :this(nameToken.Name!, typeParameters, parameters, type, nameToken.Location)
+    public FunctionSymbol(TypeSymbol ownerType, SyntaxToken nameToken,
+                          ImmutableArray<TypeSymbol> typeParameters,
+                          ImmutableArray<ParameterSymbol> parameters,
+                          TypeSymbol type, TypeSymbol returnType)
+    : this(nameToken.Name!, typeParameters, parameters, type, returnType, nameToken.Location)
     {
         OwnerType = ownerType;
     }
@@ -40,7 +49,9 @@ public class FunctionSymbol : EntitySymbol
     public ImmutableArray<TypeSymbol> TypeParameters { get; }
     public ImmutableArray<ParameterSymbol> Parameters { get; }
     public TextLocation Location { get; }
-    public TypeSymbol? OwnerType { get; private set; }
+    public TypeSymbol ReturnType { get; }
+    public TypeSymbol? OwnerType { get; }
+    public bool IsGlobal { get; }
 
     [MemberNotNullWhen(true, nameof(OwnerType))]
     public bool IsMemberFunc => OwnerType is not null;
@@ -48,19 +59,19 @@ public class FunctionSymbol : EntitySymbol
     //Locals that are shared with any nested functions - could be parameters or local variables
     public ISet<ScopedVariableSymbol> SharedLocals { get; set; }
 
-    public void SetOwnerType(TypeSymbol type) 
-    {
-        OwnerType ??= type;
-    }
+    //IImmutableSet<ScopedVariableSymbol>
+    public IDictionary<ScopedVariableSymbol, LocalVariableSymbol> FreeVariables { get; } = new Dictionary<ScopedVariableSymbol, LocalVariableSymbol>();
+
+    public bool HasFreeVariables => FreeVariables.Count > 0;
     public override string ToString()
     {
         var sb = new StringBuilder();
-        if(IsMemberFunc)
+        if (IsMemberFunc)
         {
             sb.Append($"{OwnerType}.");
         }
         sb.Append(Name);
-        if(TypeParameters.Length > 0)
+        if (TypeParameters.Length > 0)
         {
             sb.Append('<');
             sb.Append(string.Join(", ", TypeParameters));
@@ -69,43 +80,47 @@ public class FunctionSymbol : EntitySymbol
         return sb.Append('(').AppendJoin(", ", Parameters.Select(p => p.Type.Name)).Append(')').ToString();
     }
 
-    public static FunctionSymbol CreateMain(string name = "wl_main")
-     => new(
-            name,
-            ImmutableArray<TypeSymbol>.Empty,
-            ImmutableArray<ParameterSymbol>.Empty,
-            TypeSymbol.Void,
-            new TextLocation(0,0)
-        );
-    
+    //closureBelongsToThis: if true, the closure is a 1-1 match of the free variables of this function, otherwise whatever is referenced may or may not belong to this function
+    public void MergeFreeVariablesWith(IDictionary<ScopedVariableSymbol, LocalVariableSymbol> closure, bool closureBelongsToThis = false)
+    {
+        foreach (var (v, l) in closure)
+            if (!FreeVariables.ContainsKey(v) && (closureBelongsToThis || v.BelongsTo != this))
+                FreeVariables[v] = closureBelongsToThis ? l : new LocalVariableSymbol(l.Name, l.Type, this);
+    }
 }
 
-
-public sealed class SpecializedFunctionSymbol : FunctionSymbol
+public static class FunctionFactory
 {
-    public List<TypeSymbol> TypeArguments { get; }
-    public FunctionSymbol SpecializedFrom { get; }
+    private static int lambdaID = 0;
+    private static readonly TextLocation BUILT_IN_LOCATION = new(0, 0);
 
-    private static string FuncName(FunctionSymbol func, List<TypeSymbol> typeParams)
+    public static FunctionSymbol CreateMain(string name = "wl_main")
+     => new(
+            name, [], [],
+            TypeSymbol.Void, //TODO: fix function type
+            TypeSymbol.Void,
+            BUILT_IN_LOCATION
+        );
+
+    public static FunctionSymbol CreateLambda(TextLocation location, ImmutableArray<ParameterSymbol> parameters, TypeSymbol funcType, TypeSymbol returnType)
     {
-        var sb = new StringBuilder(func.Name);
-        sb.Append('<');
-        sb.AppendJoin(", ", typeParams);
-        sb.Append('>');
-        return sb.ToString();
-    }
-    public SpecializedFunctionSymbol(FunctionSymbol func, List<TypeSymbol> typeArguments,
-                                     ImmutableArray<ParameterSymbol> parameters, TypeSymbol returnType,
-                                     TextLocation location) 
-    : base(FuncName(func, typeArguments), func.TypeParameters, 
-           parameters, returnType, location)
-    {
-        TypeArguments = typeArguments;
-        SpecializedFrom = func;
+        return new FunctionSymbol(
+            $"__#$lambda{lambdaID++}",
+            [],
+            parameters,
+            funcType,
+            returnType,
+            location,
+            isGlobal: false
+        );
     }
 
-    public override string ToString()
-    {
-        return Name;
-    }
+    public static FunctionSymbol CreateLocalFunction(
+        SyntaxToken nameToken,
+        ImmutableArray<TypeSymbol> typeParameters,
+        ImmutableArray<ParameterSymbol> parameters,
+        TypeSymbol funcType, TypeSymbol returnType)
+    => new(nameToken, typeParameters, parameters, funcType, returnType, isGlobal: false);
+    public static FunctionSymbol CreateBuiltinFunction(string name, TypeSymbol returnType, params Span<ParameterSymbol> parameters)
+    => new(name, [], parameters.ToImmutableArray(), new TypeSymbol("BUILTIN:" + name), returnType, BUILT_IN_LOCATION);
 }

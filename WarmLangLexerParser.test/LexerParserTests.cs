@@ -7,7 +7,7 @@ using WarmLangLexerParser.ErrorReporting;
 using WarmLangLexerParser.AST.TypeSyntax;
 
 public class LexerParserTests
-{ 
+{
     private readonly IFileReader _reader;
     private readonly ErrorWarrningBag _diag;
 
@@ -39,22 +39,23 @@ public class LexerParserTests
     }
 
     private BlockStatement MakeEntryBlock(string input, params StatementNode[] statements)
-    => MakeEntryBlock(new TextLocation(1,1), new TextLocation(1,input.Length+1), statements);
+    => MakeEntryBlock(new TextLocation(1, 1), new TextLocation(1, input.Length + 1), statements);
 
     private static ASTRoot MakeRoot(params StatementNode[] topLevelStatements)
     {
-        var children = topLevelStatements.Select(s => (TopLevelNode) (s switch {
-                                                VarDeclaration var => new TopLevelVarDeclaration(var),
-                                                FuncDeclaration func => new TopLevelFuncDeclaration(func),
-                                                _ => new TopLevelArbitraryStament(s)
-                                                })).ToList();
+        var children = topLevelStatements.Select(s => (TopLevelNode)(s switch
+        {
+            VarDeclaration var => new TopLevelVarDeclaration(var),
+            FuncDeclaration func => new TopLevelFuncDeclaration(func),
+            _ => new TopLevelArbitraryStament(s)
+        })).ToList();
         return new ASTRoot(children);
     }
 
     [Fact]
     public void TestLexerCommentShouldSucceed()
     {
-        string input = 
+        string input =
 @"//This here is my comment 1
 2 + 2;
 //comment two
@@ -82,8 +83,8 @@ public class LexerParserTests
 
 x;
 
-"; 
-                       
+";
+
         var expectedRes = new List<SyntaxToken>()
         {
             MakeToken(TInt,new TextLocation(1,1,length:3)),
@@ -209,14 +210,14 @@ x;
         string input = "int x = 5; x = 10;";
         var expected = MakeRoot(
             new VarDeclaration(
-                new TypeSyntaxInt(new TextLocation(1,1,length:3)),
-                MakeToken(TIdentifier,new TextLocation(1,5), "x"),
-                new ConstExpression(MakeToken(TConst, new TextLocation(1,9), intValue:5))),
+                new TypeSyntaxInt(new TextLocation(1, 1, length: 3)),
+                MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
+                new ConstExpression(MakeToken(TConst, new TextLocation(1, 9), intValue: 5))),
             new ExprStatement(
                 new AssignmentExpression(
-                    new NameAccess(MakeToken(TIdentifier,1,12, "x")),
-                    MakeToken(TEqual, 1,14),
-                    new ConstExpression(MakeToken(TConst, new TextLocation(1,16, length:2), intValue: 10))
+                    new NameAccess(MakeToken(TIdentifier, 1, 12, "x")),
+                    MakeToken(TEqual, 1, 14),
+                    new ConstExpression(MakeToken(TConst, new TextLocation(1, 16, length: 2), intValue: 10))
                     )
             )
         );
@@ -231,13 +232,13 @@ x;
     public void TestLexerParserVariableAssignment2()
     {
         string input = "x = 10;";
-        var expectedNameToken = MakeToken(TIdentifier,1,1, "x");
-        ExpressionNode expectedExpr = new ConstExpression(MakeToken(TConst, new TextLocation(1,5,length:2), intValue:10));
+        var expectedNameToken = MakeToken(TIdentifier, 1, 1, "x");
+        ExpressionNode expectedExpr = new ConstExpression(MakeToken(TConst, new TextLocation(1, 5, length: 2), intValue: 10));
         var expected = MakeRoot(
             new ExprStatement(
                 new AssignmentExpression(
                     new NameAccess(expectedNameToken),
-                    MakeToken(TEqual, new TextLocation(1,3)),
+                    MakeToken(TEqual, new TextLocation(1, 3)),
                     expectedExpr)
             )
         );
@@ -280,23 +281,23 @@ x;
         string input = "if 0 {2;} else {5;}";
         var expected = MakeRoot(
             new IfStatement(
-                MakeToken(TIf,1,1,1,3),
-                new ConstExpression(0, new TextLocation(1,4)),
+                MakeToken(TIf, 1, 1, 1, 3),
+                new ConstExpression(0, new TextLocation(1, 4)),
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,6),
+                    MakeToken(TCurLeft, 1, 6),
                     new List<StatementNode>()
                     {
                         new ExprStatement(new ConstExpression(2, new TextLocation(1,7)))
                     },
-                    MakeToken(TCurLeft,1,9)
+                    MakeToken(TCurLeft, 1, 9)
                 ),
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,16),
+                    MakeToken(TCurLeft, 1, 16),
                     new List<StatementNode>()
                     {
                         new ExprStatement(new ConstExpression(5, new TextLocation(1,17)))
                     },
-                    MakeToken(TCurLeft,1,19)
+                    MakeToken(TCurLeft, 1, 19)
                 )
             )
         );
@@ -314,15 +315,15 @@ x;
         string input = "if 0 { 2; }";
         var expected = MakeRoot(
             new IfStatement(
-                MakeToken(TIf,1,1),
-                new ConstExpression(MakeToken(TConst,1,4,intValue:0)),
+                MakeToken(TIf, 1, 1),
+                new ConstExpression(MakeToken(TConst, 1, 4, intValue: 0)),
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,6),
+                    MakeToken(TCurLeft, 1, 6),
                     new List<StatementNode>()
                     {
                         new ExprStatement(new ConstExpression(MakeToken(TConst,1,8, intValue:2))),
                     },
-                    MakeToken(TCurRight,1,11)
+                    MakeToken(TCurRight, 1, 11)
                 ),
                 null
             )
@@ -369,10 +370,10 @@ x;
         var input = "function f(){ int x = 10; x; }";
         var expected = MakeRoot(
             new FuncDeclaration(
-                MakeToken(TFunc,new TextLocation(1,1,length:8)),
-                MakeToken(TIdentifier,1,10,"f"),
+                MakeToken(TFunc, new TextLocation(1, 1, length: 8)),
+                MakeToken(TIdentifier, 1, 10, "f"),
                 new List<(TypeSyntaxNode, SyntaxToken)>(),
-                new BlockStatement(MakeToken(TCurLeft,1,13),
+                new BlockStatement(MakeToken(TCurLeft, 1, 13),
                 new List<StatementNode>()
                 {
                     new VarDeclaration(
@@ -382,7 +383,7 @@ x;
                     ),
                     new ExprStatement(new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,27,"x"))))
                 },
-                MakeToken(TCurRight,1,30))
+                MakeToken(TCurRight, 1, 30))
             )
         );
 
@@ -392,22 +393,22 @@ x;
         res.Should().BeEquivalentTo(expected, options => options.RespectingRuntimeTypes());
     }
 
-      [Fact]
+    [Fact]
     public void TestLexerParserFunctionDeclarationKeyword()
     {
         var input = "function f(int y, int z, int l){ int x = 10; x + y; }";
         var expected = MakeRoot(
             new FuncDeclaration(
-                MakeToken(TFunc,1,1,1,9),
-                MakeToken(TIdentifier,1,10,"f"),
-                new List<(TypeSyntaxNode, SyntaxToken)>() 
+                MakeToken(TFunc, 1, 1, 1, 9),
+                MakeToken(TIdentifier, 1, 10, "f"),
+                new List<(TypeSyntaxNode, SyntaxToken)>()
                 {
-                    (new TypeSyntaxInt(new TextLocation(1,12,length:3)), MakeToken(TIdentifier,1,16,"y")), 
-                    (new TypeSyntaxInt(new TextLocation(1,19,length:3)), MakeToken(TIdentifier,1,23,"z")), 
+                    (new TypeSyntaxInt(new TextLocation(1,12,length:3)), MakeToken(TIdentifier,1,16,"y")),
+                    (new TypeSyntaxInt(new TextLocation(1,19,length:3)), MakeToken(TIdentifier,1,23,"z")),
                     (new TypeSyntaxInt(new TextLocation(1,26,length:3)), MakeToken(TIdentifier,1,30,"l"))
                 },
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,32),
+                    MakeToken(TCurLeft, 1, 32),
                     new List<StatementNode>()
                     {
                         new VarDeclaration(
@@ -421,7 +422,7 @@ x;
                             new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,50,"y")))
                         ))
                     },
-                    MakeToken(TCurRight,1,53))
+                    MakeToken(TCurRight, 1, 53))
             )
         );
 
@@ -438,10 +439,10 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new CallExpression(
-                    new NameAccess(MakeToken(TIdentifier, 1,1, "f")),
-                    MakeToken(TParLeft,1,2),
+                    new NameAccess(MakeToken(TIdentifier, 1, 1, "f")),
+                    MakeToken(TParLeft, 1, 2),
                     new List<ExpressionNode>(),
-                    MakeToken(TParRight,1,3))
+                    MakeToken(TParRight, 1, 3))
             )
         );
 
@@ -458,8 +459,8 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new CallExpression(
-                    new NameAccess(MakeToken(TIdentifier, 1,1, "f")), 
-                    MakeToken(TParLeft,1,2),
+                    new NameAccess(MakeToken(TIdentifier, 1, 1, "f")),
+                    MakeToken(TParLeft, 1, 2),
                     new List<ExpressionNode>()
                     {
                         new BinaryExpression(
@@ -469,14 +470,14 @@ x;
                         ),
                         new ConstExpression(10, new TextLocation(1,7,1,9))
                     },
-                    MakeToken(TParRight,1,9))
+                    MakeToken(TParRight, 1, 9))
             )
         );
 
         var lexer = GetLexer(input);
         var res = GetParser(lexer).Parse();
 
-        res.Should().BeEquivalentTo(expected, options => 
+        res.Should().BeEquivalentTo(expected, options =>
             options.RespectingRuntimeTypes()
         );
     }
@@ -487,11 +488,11 @@ x;
         var input = "int x = -1;";
         var expected = MakeRoot(
             new VarDeclaration(
-                new TypeSyntaxInt(new TextLocation(1,1,length:3)),
-                MakeToken(TIdentifier,1,5,"x"),
+                new TypeSyntaxInt(new TextLocation(1, 1, length: 3)),
+                MakeToken(TIdentifier, 1, 5, "x"),
                 new UnaryExpression(
-                    MakeToken(TMinus, 1,9),
-                    new ConstExpression(1, new TextLocation(1,10)))
+                    MakeToken(TMinus, 1, 9),
+                    new ConstExpression(1, new TextLocation(1, 10)))
             )
         );
 
@@ -508,10 +509,10 @@ x;
         var input = "int x = - -1;";
         var expected = MakeRoot(
             new VarDeclaration(
-                new TypeSyntaxInt(new TextLocation(1,1,length:3)),
-                MakeToken(TIdentifier,1,5, "x"),
-                new UnaryExpression(MakeToken(TMinus,1,9), 
-                    new UnaryExpression(MakeToken(TMinus,1,11), new ConstExpression(1, new TextLocation(1,12)))
+                new TypeSyntaxInt(new TextLocation(1, 1, length: 3)),
+                MakeToken(TIdentifier, 1, 5, "x"),
+                new UnaryExpression(MakeToken(TMinus, 1, 9),
+                    new UnaryExpression(MakeToken(TMinus, 1, 11), new ConstExpression(1, new TextLocation(1, 12)))
                 )
             )
             );
@@ -522,21 +523,21 @@ x;
 
         res.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
     }
-    
+
     [Fact]
     public void TestLexerParserDoubleUnaryPlus()
     {
         var input = "int x = + + 1;";
         var expected = MakeRoot(
             new VarDeclaration(
-                new TypeSyntaxInt(new TextLocation(1,1, length:3)),
-                MakeToken(TIdentifier,1,5,"x"),
-                new UnaryExpression(MakeToken(TPlus,1,9), 
-                    new UnaryExpression(MakeToken(TPlus,1,11), new ConstExpression(1, new TextLocation(1,13)))
+                new TypeSyntaxInt(new TextLocation(1, 1, length: 3)),
+                MakeToken(TIdentifier, 1, 5, "x"),
+                new UnaryExpression(MakeToken(TPlus, 1, 9),
+                    new UnaryExpression(MakeToken(TPlus, 1, 11), new ConstExpression(1, new TextLocation(1, 13)))
                 )
             )
         );
-        
+
         var lexer = GetLexer(input);
         var parser = GetParser(lexer);
         var res = parser.Parse();
@@ -550,11 +551,11 @@ x;
         var input = "int[] xs = [1,2,3+5];";
         var expected = MakeRoot(
             new VarDeclaration(
-                new TypeSyntaxList(new TextLocation(1,1,length:5),
-                    new TypeSyntaxInt(new TextLocation(1,1,length:3))),
-                MakeToken(TIdentifier,new TextLocation(1,7,length:2), "xs"),
+                new TypeSyntaxList(new TextLocation(1, 1, length: 5),
+                    new TypeSyntaxInt(new TextLocation(1, 1, length: 3))),
+                MakeToken(TIdentifier, new TextLocation(1, 7, length: 2), "xs"),
                 new ListInitExpression(
-                    MakeToken(TBracketLeft,1,12),
+                    MakeToken(TBracketLeft, 1, 12),
                     new List<ExpressionNode>()
                     {
                         new ConstExpression(1, new TextLocation(1,13)),
@@ -565,7 +566,7 @@ x;
                             new ConstExpression(5, new TextLocation(1,19))
                         )
                     },
-                    MakeToken(TBracketRight,1,20)))
+                    MakeToken(TBracketRight, 1, 20)))
         );
 
         var parser = GetParser(GetLexer(input));
@@ -583,8 +584,8 @@ x;
             new ExprStatement(
                 new AccessExpression(
                     new SubscriptAccess(
-                        new NameAccess(MakeToken(TIdentifier,new TextLocation(1,1,length:2),"xs")),
-                        new ConstExpression(2, new TextLocation(1,4))
+                        new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 1, length: 2), "xs")),
+                        new ConstExpression(2, new TextLocation(1, 4))
                     )
                 )
             )
@@ -604,11 +605,11 @@ x;
             new ExprStatement(
                 new AssignmentExpression(
                     new SubscriptAccess(
-                        new NameAccess(MakeToken(TIdentifier,new TextLocation(1,1, length:2),"xs")),
-                        new ConstExpression(2, new TextLocation(1,4))
+                        new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 1, length: 2), "xs")),
+                        new ConstExpression(2, new TextLocation(1, 4))
                     ),
-                    MakeToken(TEqual,1,7),
-                    new ConstExpression(25, new TextLocation(1,9,length:2))
+                    MakeToken(TEqual, 1, 7),
+                    new ConstExpression(25, new TextLocation(1, 9, length: 2))
                 )
             )
         );
@@ -628,14 +629,14 @@ x;
             new ExprStatement(
                 new AssignmentExpression(
                     new SubscriptAccess(
-                        new NameAccess(MakeToken(TIdentifier,new TextLocation(1,1,length:2),"xs")),
-                        new ConstExpression(2, new TextLocation(1,4))
+                        new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 1, length: 2), "xs")),
+                        new ConstExpression(2, new TextLocation(1, 4))
                     ),
-                    MakeToken(TEqual,1,7),
+                    MakeToken(TEqual, 1, 7),
                     new AccessExpression(
                         new SubscriptAccess(
-                            new NameAccess(MakeToken(TIdentifier, new TextLocation(1,9,length:2),"xs")),
-                            new ConstExpression(10, new TextLocation(1,12,length:2)))
+                            new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 9, length: 2), "xs")),
+                            new ConstExpression(10, new TextLocation(1, 12, length: 2)))
                     )
                 )
             )
@@ -655,12 +656,12 @@ x;
         var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxList(
-                    new TextLocation(1,1,length:3+2), new TypeSyntaxInt(new TextLocation(1,1, length:3))),
-                MakeToken(TIdentifier,new TextLocation(1,7,length:2), "xs"),
+                    new TextLocation(1, 1, length: 3 + 2), new TypeSyntaxInt(new TextLocation(1, 1, length: 3))),
+                MakeToken(TIdentifier, new TextLocation(1, 7, length: 2), "xs"),
                 new ListInitExpression(
-                    MakeToken(TBracketLeft,1,12),
+                    MakeToken(TBracketLeft, 1, 12),
                     new List<ExpressionNode>(),
-                    MakeToken(TBracketRight,1,13))
+                    MakeToken(TBracketRight, 1, 13))
             )
         );
 
@@ -678,19 +679,19 @@ x;
         var expected = MakeRoot(
             new VarDeclaration(
                 new TypeSyntaxList(
-                    new TextLocation(1,1, length:3+2), 
-                    new TypeSyntaxInt(new TextLocation(1,1,length:3))),
-                MakeToken(TIdentifier,new TextLocation(1,7,length:2), "xs"),
+                    new TextLocation(1, 1, length: 3 + 2),
+                    new TypeSyntaxInt(new TextLocation(1, 1, length: 3))),
+                MakeToken(TIdentifier, new TextLocation(1, 7, length: 2), "xs"),
                 new ListInitExpression(
-                    MakeToken(TBracketLeft,1,12),
+                    MakeToken(TBracketLeft, 1, 12),
                     new List<ExpressionNode>(),
-                    MakeToken(TBracketRight,1,13))
+                    MakeToken(TBracketRight, 1, 13))
             ),
             new ExprStatement(
                 new BinaryExpression(
-                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,16,length:2),"xs"))),
-                    MakeToken(TDoubleColon,new TextLocation(1,19, length:2)),
-                    new ConstExpression(5, new TextLocation(1,22))
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 16, length: 2), "xs"))),
+                    MakeToken(TDoubleColon, new TextLocation(1, 19, length: 2)),
+                    new ConstExpression(5, new TextLocation(1, 22))
                 )
             )
         );
@@ -709,9 +710,9 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
+                    MakeToken(TLeftArrow, new TextLocation(1, 1, length: 2)),
                     new AccessExpression(
-                        new NameAccess(MakeToken(TIdentifier,new TextLocation(1,3,length:2), "xs")))
+                        new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 3, length: 2), "xs")))
             ))
         );
 
@@ -729,11 +730,11 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,new TextLocation(1,1,length:2)),
+                    MakeToken(TLeftArrow, new TextLocation(1, 1, length: 2)),
                     new BinaryExpression(
-                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,4,length:2), "xs"))),
-                        MakeToken(TDoubleColon,new TextLocation(1,7, length:2)),
-                        new ConstExpression(20, new TextLocation(1,10, length:2))
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 4, length: 2), "xs"))),
+                        MakeToken(TDoubleColon, new TextLocation(1, 7, length: 2)),
+                        new ConstExpression(20, new TextLocation(1, 10, length: 2))
                     )
                 )
             )
@@ -753,10 +754,10 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
+                    MakeToken(TLeftArrow, new TextLocation(1, 1, length: 2)),
                     new UnaryExpression(
-                        MakeToken(TLeftArrow,new TextLocation(1,4, length:2)),
-                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,7, length:2), "xs")))
+                        MakeToken(TLeftArrow, new TextLocation(1, 4, length: 2)),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 7, length: 2), "xs")))
                     )
                 )
             )
@@ -776,10 +777,10 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
+                    MakeToken(TLeftArrow, new TextLocation(1, 1, length: 2)),
                     new UnaryExpression(
-                        MakeToken(TMinus,1,4),
-                        new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,5, length:2), "xs")))
+                        MakeToken(TMinus, 1, 4),
+                        new AccessExpression(new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 5, length: 2), "xs")))
                     )
                 )
             )
@@ -799,11 +800,11 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TMinus,1,1),
+                    MakeToken(TMinus, 1, 1),
                     new UnaryExpression(
-                        MakeToken(TLeftArrow,new TextLocation(1,3, length:2)),
+                        MakeToken(TLeftArrow, new TextLocation(1, 3, length: 2)),
                         new AccessExpression(
-                            new NameAccess(MakeToken(TIdentifier,new TextLocation(1,6, length:2), "xs")))
+                            new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 6, length: 2), "xs")))
                     )
                 )
             )
@@ -823,12 +824,12 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TMinus,1,1),
+                    MakeToken(TMinus, 1, 1),
                     new CallExpression(
-                        new NameAccess(MakeToken(TIdentifier,new TextLocation(1,3,length:4), "func")),
-                        MakeToken(TParLeft,1,7),
-                        new List<ExpressionNode>(){new ConstExpression(2, new TextLocation(1,8))},
-                        MakeToken(TParRight,1,9)
+                        new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 3, length: 4), "func")),
+                        MakeToken(TParLeft, 1, 7),
+                        new List<ExpressionNode>() { new ConstExpression(2, new TextLocation(1, 8)) },
+                        MakeToken(TParRight, 1, 9)
                     )
                 )
             )
@@ -848,14 +849,14 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow, new TextLocation(1,1,length:2)),
+                    MakeToken(TLeftArrow, new TextLocation(1, 1, length: 2)),
                     new AssignmentExpression(
-                        new NameAccess(MakeToken(TIdentifier,new TextLocation(1,4,length:2), "xs")),
-                        MakeToken(TEqual,1,7),
+                        new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 4, length: 2), "xs")),
+                        MakeToken(TEqual, 1, 7),
                         new ListInitExpression(
-                            MakeToken(TBracketLeft,1,9),
+                            MakeToken(TBracketLeft, 1, 9),
                             new List<ExpressionNode>(),
-                            MakeToken(TBracketLeft,1,10))
+                            MakeToken(TBracketLeft, 1, 10))
                     )
                 )
             )
@@ -878,9 +879,9 @@ x;
                     new SubscriptAccess(
                         new SubscriptAccess(
                             new NameAccess(
-                                MakeToken(TIdentifier,new TextLocation(1,1, length:2), "xs")),
-                                new ConstExpression(1, new TextLocation(1,4))),
-                        new ConstExpression(1, new TextLocation(1,7))
+                                MakeToken(TIdentifier, new TextLocation(1, 1, length: 2), "xs")),
+                                new ConstExpression(1, new TextLocation(1, 4))),
+                        new ConstExpression(1, new TextLocation(1, 7))
                     )
                 )
             )
@@ -903,12 +904,12 @@ x;
                     new SubscriptAccess(
                         new ExprAccess(
                             new CallExpression(
-                                new NameAccess(MakeToken(TIdentifier,new TextLocation(1,1,1,12),"returnsList")),
-                                MakeToken(TParLeft,1,12),
+                                new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 1, 1, 12), "returnsList")),
+                                MakeToken(TParLeft, 1, 12),
                                 new List<ExpressionNode>(),
-                                MakeToken(TParLeft,1,13)
+                                MakeToken(TParLeft, 1, 13)
                                 )),
-                        new ConstExpression(1, new TextLocation(1,15))
+                        new ConstExpression(1, new TextLocation(1, 15))
                     )
                 )
             )
@@ -928,12 +929,12 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new UnaryExpression(
-                    MakeToken(TLeftArrow,new TextLocation(1,1, length:2)),
+                    MakeToken(TLeftArrow, new TextLocation(1, 1, length: 2)),
                     new CallExpression(
-                        new NameAccess(MakeToken(TIdentifier,1,4,"f")),
-                        MakeToken(TParLeft,1,5),
+                        new NameAccess(MakeToken(TIdentifier, 1, 4, "f")),
+                        MakeToken(TParLeft, 1, 5),
                         new List<ExpressionNode>(),
-                        MakeToken(TParRight,1,6)
+                        MakeToken(TParRight, 1, 6)
                     )
                 )
             )
@@ -953,14 +954,14 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new BinaryExpression(
-                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,1,"x"))),
-                    MakeToken(TPlus,1,2),
-                    new ConstExpression(2, new TextLocation(1,3))
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier, 1, 1, "x"))),
+                    MakeToken(TPlus, 1, 2),
+                    new ConstExpression(2, new TextLocation(1, 3))
                 )
             )
         );
         var expectedDiag = new ErrorWarrningBag();
-        expectedDiag.ReportUnexpectedToken(TSemiColon,TEOF, new TextLocation(1,4));
+        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, new TextLocation(1, 4));
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
@@ -977,16 +978,16 @@ x;
         var expected = MakeRoot(
             new ExprStatement(
                 new BinaryExpression(
-                    new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,1,"x"))),
-                    MakeToken(TPlus,1,2),
-                    new ErrorExpression(MakeToken(TSemiColon,1,3))
+                    new AccessExpression(new NameAccess(MakeToken(TIdentifier, 1, 1, "x"))),
+                    MakeToken(TPlus, 1, 2),
+                    new ErrorExpression(MakeToken(TSemiColon, 1, 3))
                 )
             )
         );
-    
+
         var expectedDiag = new ErrorWarrningBag();
-        expectedDiag.ReportInvalidExpression(MakeToken(TSemiColon,1,3));
-        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, new TextLocation(1,4));
+        expectedDiag.ReportInvalidExpression(MakeToken(TSemiColon, 1, 3));
+        expectedDiag.ReportUnexpectedToken(TSemiColon, TEOF, new TextLocation(1, 4));
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
@@ -1002,12 +1003,12 @@ x;
         var input = "while x {}";
         var expected = MakeRoot(
             new WhileStatement(
-                MakeToken(TWhile,1,1, 1,6),
-                new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,7),"x"))),
+                MakeToken(TWhile, 1, 1, 1, 6),
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 7), "x"))),
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,9),
+                    MakeToken(TCurLeft, 1, 9),
                     new List<StatementNode>(),
-                    MakeToken(TCurRight,1,10))
+                    MakeToken(TCurRight, 1, 10))
             )
         );
 
@@ -1024,10 +1025,10 @@ x;
         var input = "while x f();";
         var expected = MakeRoot(
             new WhileStatement(
-                MakeToken(TWhile,new TextLocation(1,1, length:6)),
-                new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,7,"x"))),
+                MakeToken(TWhile, new TextLocation(1, 1, length: 6)),
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier, 1, 7, "x"))),
                 new BlockStatement(
-                    MakeToken(TBadToken,1,9),
+                    MakeToken(TBadToken, 1, 9),
                     new List<StatementNode>()
                     {
                         new ExprStatement(
@@ -1039,13 +1040,13 @@ x;
                             )
                         )
                     },
-                    MakeToken(TBadToken,1,13))
+                    MakeToken(TBadToken, 1, 13))
             )
         );
         var expectedErrorBag = new ErrorWarrningBag();
-        expectedErrorBag.ReportWhileExpectedBlockStatement(MakeToken(TIdentifier,1,9));
-        expectedErrorBag.ReportUnexpectedToken(TCurLeft, TIdentifier, new TextLocation(1,9));
-        expectedErrorBag.ReportUnexpectedToken(TCurRight, TEOF, new TextLocation(1,13));
+        expectedErrorBag.ReportWhileExpectedBlockStatement(MakeToken(TIdentifier, 1, 9));
+        expectedErrorBag.ReportUnexpectedToken(TCurLeft, TIdentifier, new TextLocation(1, 9));
+        expectedErrorBag.ReportUnexpectedToken(TCurRight, TEOF, new TextLocation(1, 13));
 
 
         var parser = GetParser(GetLexer(input));
@@ -1062,12 +1063,12 @@ x;
         var input = "while x : 2+2 {}";
         var expected = MakeRoot(
             new WhileStatement(
-                MakeToken(TWhile,1,1,1,6),
-                new AccessExpression(new NameAccess(MakeToken(TIdentifier,1,7,"x"))),
+                MakeToken(TWhile, 1, 1, 1, 6),
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier, 1, 7, "x"))),
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,15),
+                    MakeToken(TCurLeft, 1, 15),
                     new List<StatementNode>(),
-                    MakeToken(TCurRight,1,16)),
+                    MakeToken(TCurRight, 1, 16)),
                 new List<ExpressionNode>()
                 {
                     new BinaryExpression(
@@ -1092,12 +1093,12 @@ x;
         var input = "while x : 2+2,5+5 {}";
         var expected = MakeRoot(
             new WhileStatement(
-                MakeToken(TWhile, new TextLocation(1,1,1,6)),
-                new AccessExpression(new NameAccess(MakeToken(TIdentifier,new TextLocation(1,7),"x"))),
+                MakeToken(TWhile, new TextLocation(1, 1, 1, 6)),
+                new AccessExpression(new NameAccess(MakeToken(TIdentifier, new TextLocation(1, 7), "x"))),
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,19),
+                    MakeToken(TCurLeft, 1, 19),
                     new List<StatementNode>(),
-                    MakeToken(TCurRight,1,20)),
+                    MakeToken(TCurRight, 1, 20)),
                 new List<ExpressionNode>()
                 {
                     new BinaryExpression(
@@ -1128,18 +1129,18 @@ x;
         var expected = MakeRoot(
             new FuncDeclaration(
                 null,
-                MakeToken(TFunc,new TextLocation(1,1,length:8)),
-                MakeToken(TIdentifier,1,10, "f"),
+                MakeToken(TFunc, new TextLocation(1, 1, length: 8)),
+                MakeToken(TIdentifier, 1, 10, "f"),
                 new List<TypeSyntaxParameterType>(),
                 new List<(TypeSyntaxNode, SyntaxToken)>(),
-                new TypeSyntaxInt(new TextLocation(1,14,1,17)),
+                new TypeSyntaxInt(new TextLocation(1, 14, 1, 17)),
                 new BlockStatement(
-                    MakeToken(TCurLeft,1,18),
+                    MakeToken(TCurLeft, 1, 18),
                     new List<StatementNode>()
                     {
                         new ExprStatement(new ConstExpression(2, new TextLocation(1,19))),
                     },
-                    MakeToken(TCurRight,1,21))
+                    MakeToken(TCurRight, 1, 21))
             )
         );
 
@@ -1156,7 +1157,7 @@ x;
     {
         var input = "return;";
         var expected = MakeRoot(
-            new ReturnStatement(MakeToken(TReturn, new TextLocation(1,1,length:6)), null)
+            new ReturnStatement(MakeToken(TReturn, new TextLocation(1, 1, length: 6)), null)
         );
 
         var parser = GetParser(GetLexer(input));
@@ -1172,11 +1173,11 @@ x;
         var input = "return 2+2;";
         var expected = MakeRoot(
             new ReturnStatement(
-                MakeToken(TReturn, new TextLocation(1,1,length:6)),
+                MakeToken(TReturn, new TextLocation(1, 1, length: 6)),
                 new BinaryExpression(
-                    new ConstExpression(2,new TextLocation(1,8)),
-                    MakeToken(TPlus, new TextLocation(1,9)),
-                    new ConstExpression(2,new TextLocation(1,10))
+                    new ConstExpression(2, new TextLocation(1, 8)),
+                    MakeToken(TPlus, new TextLocation(1, 9)),
+                    new ConstExpression(2, new TextLocation(1, 10))
                 )
             )
         );
@@ -1194,16 +1195,16 @@ x;
         var input = "if 0 { } else if 1 { }";
         var expected = MakeRoot(
             new IfStatement(
-                MakeToken(TIf, new TextLocation(1,1,length:2)),
-                new ConstExpression(0, new TextLocation(1,4)),
-                new BlockStatement(MakeToken(TCurLeft, 1,6), new List<StatementNode>(), MakeToken(TCurRight,1,8)),
+                MakeToken(TIf, new TextLocation(1, 1, length: 2)),
+                new ConstExpression(0, new TextLocation(1, 4)),
+                new BlockStatement(MakeToken(TCurLeft, 1, 6), new List<StatementNode>(), MakeToken(TCurRight, 1, 8)),
                 new IfStatement(
-                    MakeToken(TIf,new TextLocation(1,15,length:2)), 
-                    new ConstExpression(1, new TextLocation(1,18)),
-                    new BlockStatement(MakeToken(TCurLeft, 1,20), new List<StatementNode>(), MakeToken(TCurRight,1,22)),
+                    MakeToken(TIf, new TextLocation(1, 15, length: 2)),
+                    new ConstExpression(1, new TextLocation(1, 18)),
+                    new BlockStatement(MakeToken(TCurLeft, 1, 20), new List<StatementNode>(), MakeToken(TCurRight, 1, 22)),
                     null
                 )
-            ) 
+            )
         );
 
         var parser = GetParser(GetLexer(input));
@@ -1219,10 +1220,10 @@ x;
         var input = """string s = "hi there";""";
         var expected = MakeRoot(
             new VarDeclaration(
-                new TypeSyntaxString(new TextLocation(1,1,length:6)),
-                MakeToken(TIdentifier,1,8,"s"),
+                new TypeSyntaxString(new TextLocation(1, 1, length: 6)),
+                MakeToken(TIdentifier, 1, 8, "s"),
                 new ConstExpression(
-                    new SyntaxToken(TStringLiteral, new TextLocation(1,12,length:10), "hi there",0)
+                    new SyntaxToken(TStringLiteral, new TextLocation(1, 12, length: 10), "hi there", 0)
                 )
             )
         );
@@ -1240,15 +1241,15 @@ x;
         var input = """string s = "hi there" + "y";""";
         var expected = MakeRoot(
             new VarDeclaration(
-                new TypeSyntaxString(new TextLocation(1,1,length:6)),
-                MakeToken(TIdentifier,1,8,"s"),
+                new TypeSyntaxString(new TextLocation(1, 1, length: 6)),
+                MakeToken(TIdentifier, 1, 8, "s"),
                 new BinaryExpression(
                     new ConstExpression(
-                        new SyntaxToken(TStringLiteral, new TextLocation(1,12,length:10), "hi there",0)),
-                    MakeToken(TPlus,1,23),
+                        new SyntaxToken(TStringLiteral, new TextLocation(1, 12, length: 10), "hi there", 0)),
+                    MakeToken(TPlus, 1, 23),
                     new ConstExpression(
-                        new SyntaxToken(TStringLiteral, new TextLocation(1,25,length:3), "y",0))
-                )   
+                        new SyntaxToken(TStringLiteral, new TextLocation(1, 25, length: 3), "y", 0))
+                )
             )
         );
 
@@ -1278,7 +1279,7 @@ h"";";
         var lexer = GetLexer(input);
         var result = lexer.Lex();
         var expectedBag = new ErrorWarrningBag();
-        expectedBag.ReportNewLineStringLiteral(new TextLocation(1,12,2,1));
+        expectedBag.ReportNewLineStringLiteral(new TextLocation(1, 12, 2, 1));
 
         result.Should().BeEquivalentTo(expected);
         _diag.Should().BeEquivalentTo(expectedBag);
@@ -1326,8 +1327,8 @@ h"";";
             new ExprStatement(
             new AccessExpression(
                 new MemberAccess(
-                    new NameAccess(MakeToken(TIdentifier,1,1, "s")),    
-                    MakeToken(TIdentifier, new TextLocation(1,3, length: 3), "len")
+                    new NameAccess(MakeToken(TIdentifier, 1, 1, "s")),
+                    MakeToken(TIdentifier, new TextLocation(1, 3, length: 3), "len")
                 )
             )
         ));
@@ -1347,14 +1348,14 @@ h"";";
             new ExprStatement(
                 new CallExpression(
                     new MemberAccess(
-                        new NameAccess(MakeToken(TIdentifier,1,1, "s")),    
-                        MakeToken(TIdentifier, new TextLocation(1,3, length: 3), "Add")
+                        new NameAccess(MakeToken(TIdentifier, 1, 1, "s")),
+                        MakeToken(TIdentifier, new TextLocation(1, 3, length: 3), "Add")
                     ),
-                    MakeToken(TParLeft,1,6),
+                    MakeToken(TParLeft, 1, 6),
                     new List<ExpressionNode>(),
-                    MakeToken(TParRight,1,7)
+                    MakeToken(TParRight, 1, 7)
                 )
-            
+
         ));
 
         var parser = GetParser(GetLexer(input));
@@ -1375,24 +1376,130 @@ h"";";
                         new ExprAccess(
                             new CallExpression(
                                 new MemberAccess(
-                                    new NameAccess(MakeToken(TIdentifier,1,1, "s")),    
-                                    MakeToken(TIdentifier, new TextLocation(1,3, length: 6), "Filter")
+                                    new NameAccess(MakeToken(TIdentifier, 1, 1, "s")),
+                                    MakeToken(TIdentifier, new TextLocation(1, 3, length: 6), "Filter")
                                 ),
-                                MakeToken(TParLeft,1,9),
+                                MakeToken(TParLeft, 1, 9),
                                 new List<ExpressionNode>(),
-                                MakeToken(TParRight,1,10)
+                                MakeToken(TParRight, 1, 10)
                             )
-                        ), 
-                        MakeToken(TIdentifier, new TextLocation(1,12, length:3), "Map")
+                        ),
+                        MakeToken(TIdentifier, new TextLocation(1, 12, length: 3), "Map")
                     ),
-                    MakeToken(TParLeft,1,15),
+                    MakeToken(TParLeft, 1, 15),
                     new List<ExpressionNode>(),
-                    MakeToken(TParRight,1,16)
+                    MakeToken(TParRight, 1, 16)
                 )
         ));
 
         var parser = GetParser(GetLexer(input));
         var result = parser.Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    private static BlockStatement SynthLambdaBody(ExpressionNode expr)
+    {
+        var synthToken = MakeToken(TBadToken, expr.Location);
+        return new BlockStatement(synthToken, [new ReturnStatement(synthToken, expr)], synthToken);
+    }
+
+    [Fact]
+    public void LexerParserImplicitLambdaExpression()
+    {
+        var lambda = "(a) => 5";
+        var input = $"var x = {lambda};";
+
+        var declLoc = new TextLocation(1, 1, input.Length);
+        var lambdaLoc = new TextLocation(1, 9, lambda.Length);
+        var parameters = new List<(TypeSyntaxNode?, SyntaxToken)>()
+        {
+            (null, MakeToken(TIdentifier, new TextLocation(1,10), "a"))
+        };
+        var expected = MakeRoot(
+            new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 16))))
+            )
+        );
+
+        var result = GetParser(GetLexer(input)).Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LexerParserImplicitLambdaExpressionWithTrailingComma()
+    {
+        var lambda = "(a,) => 5";
+        var input = $"var x = {lambda};";
+
+        var declLoc = new TextLocation(1, 1, input.Length);
+        var lambdaLoc = new TextLocation(1, 9, lambda.Length);
+        var parameters = new List<(TypeSyntaxNode?, SyntaxToken)>()
+        {
+            (null, MakeToken(TIdentifier, new TextLocation(1,10), "a"))
+        };
+
+        var expected = MakeRoot(
+            new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 17))))
+            )
+        );
+
+        var expectedBag = new ErrorWarrningBag();
+        expectedBag.ReportTrailingCommaInParameterList(new TextLocation(1, 12));
+
+        var result = GetParser(GetLexer(input)).Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEquivalentTo(expectedBag);
+    }
+
+    [Fact]
+    public void LexerParserImplicitLambdaExpressionWithParenthesis()
+    {
+        var lambda = "((a) => 5)";
+        var input = $"var x = {lambda};";
+
+        var declLoc = new TextLocation(1, 1, input.Length);
+        var lambdaLoc = new TextLocation(1, 10, lambda.Length - 2);
+        var parameters = new List<(TypeSyntaxNode?, SyntaxToken)>()
+        {
+            (null, MakeToken(TIdentifier, new TextLocation(1,11), "a"))
+        };
+        var expected = MakeRoot(
+            new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 17))))
+            )
+        );
+
+        var result = GetParser(GetLexer(input)).Parse();
+
+        result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
+        _diag.Should().BeEmpty();
+    }
+    
+    [Fact]
+    public void LexerParserExplicitTypingLambdaExpressionWithParenthesis()
+    {
+        var lambda = "(int a) => 5";
+        var input = $"var x = {lambda};";
+
+        var declLoc = new TextLocation(1, 1, input.Length);
+        var lambdaLoc = new TextLocation(1, 9, lambda.Length);
+        var parameters = new List<(TypeSyntaxNode?, SyntaxToken)>()
+        {
+            (new TypeSyntaxInt(new TextLocation(1,10, length: 3)), MakeToken(TIdentifier, new TextLocation(1,14), "a"))
+        };
+        var expected = MakeRoot(
+            new VarDeclaration(declLoc, null, MakeToken(TIdentifier, new TextLocation(1, 5), "x"),
+                new LambdaExpression(lambdaLoc, parameters, SynthLambdaBody(new ConstExpression(5, new TextLocation(1, 20))))
+            )
+        );
+
+        var result = GetParser(GetLexer(input)).Parse();
 
         result.Should().BeEquivalentTo(expected, opt => opt.RespectingRuntimeTypes());
         _diag.Should().BeEmpty();

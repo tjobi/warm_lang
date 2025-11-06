@@ -16,8 +16,6 @@ public sealed class FunctionBodyState
 
     public ClosureState? Closure { get; private set; }
 
-    public ISet<ScopedVariableSymbol> SharedLocals {get;}
-
     public Dictionary<string, (VariableDefinition? variable, ParameterDefinition? parameter)>? AvailableClosures { get; private set;}
 
     public FunctionBodyState(FunctionSymbol func, ISet<ScopedVariableSymbol> sharedLocals)
@@ -26,10 +24,7 @@ public sealed class FunctionBodyState
         Locals = new();
         AwaitingLabels = new();
         Func = func;
-        SharedLocals = sharedLocals;
     }
-
-    public bool IsSharedVariable(VariableSymbol s) => s is ScopedVariableSymbol scoped && SharedLocals.Contains(scoped);
 
     public bool VariableOriginateOutside(ScopedVariableSymbol sv) => sv.BelongsToOrThrow != Func;
 
@@ -37,7 +32,7 @@ public sealed class FunctionBodyState
     {
         if(Closure is not null) throw new Exception($"'{nameof(AddClosureVariable)}' called twice - Can only set closuretype of a body once!");
         Closure = closure;
-        AvailableClosures ??= new();
+        AvailableClosures ??= [];
         AvailableClosures[closure.ReferenceType.FullName] = (closure.VariableDef, null);
     }
 
@@ -67,7 +62,7 @@ public sealed class FunctionBodyState
     [MemberNotNull(nameof(AvailableClosures))]
     private void EnsureCreated()
     {
-        AvailableClosures ??= new();
+        AvailableClosures ??= [];
     }
 
     public void AddClosureField(FieldDefinition @field) => Closure?.AddField(@field);

@@ -23,5 +23,5 @@ public abstract class BoundExpression
 
 public sealed class BoundNullExpression : BoundExpression
 {
-    public  BoundNullExpression(ExpressionNode node) : base(node, TypeSymbol.Null) {}
+    public BoundNullExpression(ExpressionNode node) : base(node, TypeSymbol.Null) { }
 }

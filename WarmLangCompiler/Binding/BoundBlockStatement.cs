@@ -16,7 +16,7 @@ public class BoundBlockStatement : BoundStatement
 
     public override string ToString()
     {
-        var sb = new StringBuilder().Append("Bound Block: {");
+        var sb = new StringBuilder().Append('{');
         foreach(var stmnt in Statements)
         {
             sb.Append(stmnt);

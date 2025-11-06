@@ -5,21 +5,14 @@ using WarmLangCompiler.Interpreter;
 using WarmLangLexerParser;
 using WarmLangLexerParser.AST;
 using WarmLangLexerParser.ErrorReporting;
-using System.Runtime.CompilerServices;
 
 var DEFAULT_PROGRAM = "SyntaxTest/test.wl";
 
-ParsedArgs? parsedArgs = ArgsParser.ParseArgs(args, DEFAULT_PROGRAM); 
-if(parsedArgs is null)
-{
-    return 16;
-}
+ParsedArgs? parsedArgs = ArgsParser.ParseArgs(args, DEFAULT_PROGRAM);
+if (parsedArgs is null) return (int)ExitCodes.InvalidArgs;
 ParsedArgs pArgs = parsedArgs.Value;
 
-if(pArgs.Interactive) 
-{
-    return Interactive.Loop();
-}
+if(pArgs.Interactive) return Interactive.Loop();
 
 var program = pArgs.Program;
 var outfile = pArgs.OutPath ?? Path.Combine(Directory.GetCurrentDirectory(), Path.GetFileName(program));
@@ -34,17 +27,11 @@ var tokens = lexer.Lex();
 
 if(pArgs.LexerDebug)
 {
-    foreach(var token in tokens)
-    {
-        Console.WriteLine(token);
-    }
+    foreach(var token in tokens) Console.WriteLine(token);
     if(diagnostics.Any())
     {
         Console.WriteLine("--Lexer problems--");
-        foreach(var err in diagnostics)
-        {
-            Console.WriteLine(err);
-        }
+        DisplayErrorsAndWarnings();
     }
 }
 
@@ -56,11 +43,7 @@ if(pArgs.ParserDebug)
     if(diagnostics.Any())
     {
         Console.WriteLine("--Parser problems--");
-        foreach(var err in diagnostics)
-        {
-            Console.WriteLine(err);
-        }
-
+        DisplayErrorsAndWarnings();
     }
 }
 
@@ -68,39 +51,43 @@ var binder = new Binder(diagnostics);
 var boundProgram = binder.BindProgram(root);
 if(pArgs.BinderDebug) Console.WriteLine($"Bound: {boundProgram}");
 
-if(ContainsErrors())
+if(diagnostics.AnyError())
 {
     Console.WriteLine("--Compilation failed on: --");
     DisplayErrorsAndWarnings();
     Console.WriteLine("Exitting...");
-    return 1;
+    return (int)ExitCodes.CompilationError;
 }
 
-if(pArgs.Evaluate)
-{
-    var res = BoundInterpreter.Run(boundProgram);
-    Console.WriteLine($"Evaluated '{program}' -> {res}");
-    return 0;
-}
-
-File.WriteAllText(outfile, string.Empty);
-Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
-if(ContainsErrors())
+if (pArgs.Evaluate)
 {
     DisplayErrorsAndWarnings();
-    Console.WriteLine("Exitting...");
-    return 1;
+    var res = BoundInterpreter.Run(boundProgram);
+    Console.WriteLine($"Evaluated '{program}' -> {res}");
+    return (int)ExitCodes.Success;
 }
-DefaultRuntimeConfig.Write(outfile);
-
-DisplayErrorsAndWarnings();
-
-Console.WriteLine($"Compiled '{program}' to '{outfile}'");
-return 0;
+else
+{
+    File.WriteAllText(outfile, string.Empty);
+    Emitter.EmitProgram(outfile, boundProgram, diagnostics, debug: pArgs.EmitterDebug);
+    DisplayErrorsAndWarnings();
+    if (diagnostics.AnyError())
+    {
+        Console.WriteLine("Exitting...");
+        return (int)ExitCodes.CompilationError;
+    }
+    DefaultRuntimeConfig.Write(outfile);
+    Console.WriteLine($"Compiled '{program}' to '{outfile}'");
+    return (int)ExitCodes.Success;
+}
 
 void DisplayErrorsAndWarnings()
 {
-    foreach(var err in diagnostics) Console.WriteLine(err);
+    foreach (var record in diagnostics)
+    {
+        if (record.IsError) Console.ForegroundColor = ConsoleColor.Red;
+        else Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(record);
+    }
+    Console.ResetColor();
 }
-
-bool ContainsErrors() => diagnostics.Any(reported => reported.IsError);

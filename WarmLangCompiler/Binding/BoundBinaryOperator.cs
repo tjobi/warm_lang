@@ -58,19 +58,19 @@ public sealed class BoundBinaryOperator
         }
 
         //TODO: Should we cache these?
-        return (op,left,right) switch
+        return (op, left, right) switch
         {
             //List add '::' operator
-            (TDoubleColon, _, _) when isLeftList && typeScope.TypeEquality(leftNested!, right) => new(op, ListAdd, left, right, left), 
+            (TDoubleColon, _, _) when isLeftList && typeScope.TypeEquality(leftNested!, right) => new(op, ListAdd, left, right, left),
             //Operators on null
-            (TEqualEqual, _,_) 
+            (TEqualEqual, _, _)
                 when left == Null && !right.IsValueType
                  || right == Null && !left.IsValueType => new(op, BoundBinaryOperatorKind.Equals, Bool),
-            (TBangEqual, _,_) 
+            (TBangEqual, _, _)
                 when left == Null && !right.IsValueType
                  || right == Null && !left.IsValueType => new(op, NotEquals, Bool),
             //No operator matches
-            _ => null, 
+            _ => null,
         };
     }
 
