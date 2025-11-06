@@ -3,7 +3,7 @@ The idea is to develop a compiled programming language. The compile target shoul
 
 ## Credit
 
-This project builds upon ideas and code from Immo Landwerth's [minsk](https://github.com/terrajobst/minsk) compiler project, so please do consider checking out the interesting [YouTube series](https://www.youtube.com/playlist?list=PLRAdsfhKI4OWNOSfS7EUu5GRAVmze1t2y) containg with vods of its development. My own contributions include: primitive list type, generics, type inference on these generics and list type, higher-order functions, (some bugs), and hopefully more features in the future.
+This project builds upon ideas and code from Immo Landwerth's [minsk](https://github.com/terrajobst/minsk) compiler project, so please do consider checking out the interesting [YouTube series](https://www.youtube.com/playlist?list=PLRAdsfhKI4OWNOSfS7EUu5GRAVmze1t2y) with vods of its development. My own contributions include: primitive list type, generics, type inference on these generics and list type, higher-order functions, (some bugs), and hopefully more features in the future.
 
 ## How to run
 
