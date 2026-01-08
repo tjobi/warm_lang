@@ -178,8 +178,8 @@ public sealed class BoundInterpreter
         if (call.AppliedTypeArguments.Count > 0)
         {
             var top = _typeArgumentEnvironment.Peek();
-            foreach (var (p, c) in call.AppliedTypeArguments) top.Add(p,c);
-        } 
+            foreach (var (p, c) in call.AppliedTypeArguments) top.Add(p, c);
+        }
 
         for (int i = 0; i < call.Arguments.Length; i++)
         {
@@ -215,10 +215,12 @@ public sealed class BoundInterpreter
             if (value is IntValue i)
                 return BoolValue.FromBool(i != 0);
         if (conv.Type == TypeSymbol.Int)
+        {
             if (value is BoolValue bv)
                 return new IntValue(bv ? 1 : 0);
-        if (value is StrValue str)
-            return int.TryParse(str, out int res) ? new IntValue(res) : new ErrValue($"Couldn't convert {str} to an int");
+            if (value is StrValue str)
+                return int.TryParse(str, out int res) ? new IntValue(res) : new ErrValue($"Couldn't convert {str} to an int");
+        }
         if (conv.Type == TypeSymbol.String)
         {
             return new StrValue(value.StdWriteString());

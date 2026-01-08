@@ -1,4 +1,5 @@
 namespace WarmLangCompiler.ILGen;
+
 using WarmLangCompiler.Binding;
 using WarmLangCompiler.Symbols;
 using WarmLangCompiler.Binding.Lower;
@@ -27,6 +28,7 @@ public sealed class Emitter
     private readonly ImmutableDictionary<FunctionSymbol, MethodReference> _builtInFunctions;
     private readonly MethodReference _stringConcat, _stringEqual, _stringSubscript;
     private readonly MethodReference _objectEquals, _objectCtor, _wlEquals, _wlToString;
+    private readonly MethodReference _int32parse;
 
     private readonly Dictionary<FunctionSymbol, MethodDefinition> _funcs;
     private readonly Dictionary<FunctionSymbol, ClosureState> _funcClosure;
@@ -115,6 +117,8 @@ public sealed class Emitter
         _objectEquals = GetMethodFromTypeDefinition(dotnetObject, "Equals", GetCilParamNames(CILBaseTypeSymbol, CILBaseTypeSymbol));
         _objectCtor = GetMethodFromTypeDefinition(dotnetObject, ".ctor", GetCilParamNames());
 
+        var dotnetint32 = _mscorlib.MainModule.GetType(CilTypeOf(TypeSymbol.Int).FullName);
+        _int32parse = GetMethodFromTypeDefinition(dotnetint32, "Parse", GetCilParamNames(TypeSymbol.String));
 
         // Needed for the implemenatation of __wl_tostring
         var dotnetConvert = _mscorlib.MainModule.GetType("System.Convert");
@@ -406,7 +410,7 @@ public sealed class Emitter
             case BoundReturnStatement ret:
                 EmitReturnStatement(processor, ret);
                 break;
-            case BoundFunctionDeclaration {Symbol: { IsGlobal:  false} func }:
+            case BoundFunctionDeclaration { Symbol: { IsGlobal: false } func }:
                 if (_boundProgram.Functions[func] is BoundBlockStatement body)
                 {
                     EmitLocalFunctionDeclaration(processor, func);
@@ -565,7 +569,7 @@ public sealed class Emitter
         }
         if (funcSymbol.SpecializedFrom.IsMemberFunc)
         {
-            if (application.Access is not BoundFuncAccess { Target : var t and not null } )
+            if (application.Access is not BoundFuncAccess { Target: var t and not null })
                 throw new Exception($"{nameof(Emitter)} - compiler bug, expected a member function access for '{application}'");
             EmitMethodClosureAccess(processor, application.Type, t, generic);
             return;
@@ -607,11 +611,19 @@ public sealed class Emitter
     private void EmitTypeConvesionExpression(ILProcessor processor, BoundTypeConversionExpression conv)
     {
         EmitExpression(processor, conv.Expression);
-        if (conv.Type == TypeSymbol.Int && conv.Expression.Type == TypeSymbol.Bool)
+        var convType = _cilTypeManager.GetActualTypeOrThrowCompilerBug(conv.Type);
+        var exprType = _cilTypeManager.GetActualTypeOrThrowCompilerBug(conv.Expression.Type);
+        if (convType == TypeSymbol.Int)
         {
-            return;
+            if (exprType == TypeSymbol.Bool) return;
+            if (exprType == TypeSymbol.String)
+            {
+                //TODO: This will throw a different exception than the interpreter.
+                processor.Emit(OpCodes.Call, _int32parse);
+                return;
+            }
         }
-        if (conv.Type == TypeSymbol.Bool && conv.Expression.Type == TypeSymbol.Int)
+        if (convType == TypeSymbol.Bool && exprType == TypeSymbol.Int)
         {
             //imagine 250 at top of stack
             processor.Emit(OpCodes.Ldc_I4_0);
@@ -620,20 +632,18 @@ public sealed class Emitter
             processor.Emit(OpCodes.Ceq);                 // 0 == 0 -> 1
             return;
         }
-        if (conv.Type == TypeSymbol.String)
+        if (convType == TypeSymbol.String)
         {
-            var convExprType = conv.Expression.Type;
             var wlToStringInstace = new GenericInstanceMethod(_wlToString);
-            wlToStringInstace.GenericArguments.Add(CilTypeOf(convExprType));
-            // if(convExprType.NeedsBoxing()) EmitBoxing(processor, convExprType);
+            wlToStringInstace.GenericArguments.Add(CilTypeOf(exprType));
             processor.Emit(OpCodes.Call, wlToStringInstace);
             return;
         }
 
-        if (_cilTypeManager.IsListType(conv.Type))
+        if (_cilTypeManager.IsListType(convType))
             return;
 
-        if (conv.Expression.Type == TypeSymbol.Null) return; //null is implicit
+        if (exprType == TypeSymbol.Null) return; //null is implicit
 
         throw new NotImplementedException($"{nameof(EmitTypeConvesionExpression)} didn't know how to handle conversion '{conv.Type}' to '{conv.Expression.Type}'");
     }
@@ -1148,8 +1158,8 @@ public sealed class Emitter
                 EmitMethodClosureAccess(processor, funcType, target, methodRef);
                 return;
             }
-            EmitMethodClosureAccess(processor, funcType, target, _funcs[f]);  
-        } 
+            EmitMethodClosureAccess(processor, funcType, target, _funcs[f]);
+        }
         else if (f.HasFreeVariables) EmitFunctionClosure(processor, f);
         else EmitStaticFuncAccess(processor, funcType, _funcs[f]);
     }
@@ -1220,7 +1230,8 @@ public sealed class Emitter
             | MethodAttributes.SpecialName
             | MethodAttributes.RTSpecialName,
             CilTypeOf(TypeSymbol.Void));
-        ctor.Body = new MethodBody(ctor) {
+        ctor.Body = new MethodBody(ctor)
+        {
             Instructions = {
                 Instruction.Create(OpCodes.Ldarg_0),
                 Instruction.Create(OpCodes.Call, _objectCtor),
@@ -1304,7 +1315,7 @@ public sealed class Emitter
                 processor.Append(ldClosure);
                 processor.Append(ldfld);
             }
-            else processor.Append(GetInstructionForDirectVariableAccess(processor, sv, load: true)); 
+            else processor.Append(GetInstructionForDirectVariableAccess(processor, sv, load: true));
             processor.Emit(OpCodes.Stfld, closure.GetFieldOrThrow(local));
         }
         processor.Emit(OpCodes.Ldftn, closure.FuncDef);
